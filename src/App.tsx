@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { addTodo, deleteTodo, listTodos, toggleTodoDone, updateTodoDueDate, updateTodoTitle } from "./db";
 import { Todo } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
+import { CustomTitleBar } from "./CustomTitleBar";
 import "./App.css";
 
 const partyEmojis = ["🎉", "🥳", "✨", "💫", "🌟", "🎊", "🔥", "💥", "⭐", "🚀"];
@@ -185,223 +186,244 @@ function App() {
   const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "all" || searchQuery;
 
   return (
-    <main className="app">
-      <h1>TodoList ✨</h1>
+    <div className="app-shell">
+      <CustomTitleBar />
 
-      <form className="add-form" onSubmit={handleAdd}>
-        <input
-          type="text"
-          placeholder="Was steht an? 🚀"
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.currentTarget.value)}
-        />
-        <input
-          type="date"
-          className="date-input"
-          value={newDueDate}
-          onChange={(e) => setNewDueDate(e.currentTarget.value)}
-          title="Fälligkeitsdatum (optional)"
-        />
-        <button type="submit">Los geht's!</button>
-      </form>
+      <main className="app">
+        <header className="app-header">
+          <h1>TodoList</h1>
+          <p className="app-subtitle">Behalte den Überblick</p>
+        </header>
 
-      <div className="filter-bar">
-        {(Object.keys(filterLabels) as DueDateFilter[]).map((key) => (
-          <button
-            key={key}
-            type="button"
-            className={`filter-btn ${dueDateFilter === key ? "active" : ""}`}
-            onClick={() => setDueDateFilter(key)}
-          >
-            {filterLabels[key]}
+        <form className="add-form" onSubmit={handleAdd}>
+          <input
+            type="text"
+            placeholder="Was steht an?"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.currentTarget.value)}
+          />
+          <input
+            type="date"
+            className="date-input"
+            value={newDueDate}
+            onChange={(e) => setNewDueDate(e.currentTarget.value)}
+            title="Fälligkeitsdatum (optional)"
+          />
+          <button type="submit" aria-label="Aufgabe hinzufügen">
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
           </button>
-        ))}
-        <div className="status-filter">
-          <button
-            type="button"
-            className={statusFilter === "all" ? "active" : ""}
-            onClick={() => setStatusFilter("all")}
-          >
-            Alle
-          </button>
-          <button
-            type="button"
-            className={statusFilter === "open" ? "active" : ""}
-            onClick={() => setStatusFilter("open")}
-          >
-            Offen
-          </button>
-          <button
-            type="button"
-            className={statusFilter === "done" ? "active" : ""}
-            onClick={() => setStatusFilter("done")}
-          >
-            Erledigt
-          </button>
-        </div>
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Suche..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.currentTarget.value)}
-        />
-      </div>
+        </form>
 
-      {hasActiveFilter && (
-        <div className="active-filters">
-          <span className="filter-label">
-            {filterLabels[dueDateFilter]}
-            {statusFilter !== "all"
-              ? ` • ${statusFilter === "open" ? "Offen" : "Erledigt"}`
-              : ""}
-            {searchQuery ? ` • Suche: "${searchQuery}"` : ""}
-          </span>
-          <button
-            type="button"
-            className="clear-filters"
-            onClick={() => {
-              setDueDateFilter("all");
-              setStatusFilter("all");
-              setSearchQuery("");
-            }}
-          >
-            Zurücksetzen ✕
-          </button>
-        </div>
-      )}
-      {error && <p className="error">⚠️ Fehler: {error}</p>}
-      {loading && <p className="muted">Lade Aufgaben... 🌀</p>}
-
-      {!loading && todos.length === 0 && !error && (
-        <p className="muted">Noch keine Aufgaben. Lege deine erste an! 🎯</p>
-      )}
-
-      {!loading && filteredTodos.length === 0 && todos.length > 0 && !error && (
-        <p className="muted">Keine Aufgaben in dieser Ansicht 🔍</p>
-      )}
-
-      <ul className="todo-list">
-        {filteredTodos.map((todo) => {
-          const overdue = !todo.done && isOverdue(todo.due_date);
-          const today = isDueToday(todo.due_date);
-
-          return (
-            <li
-              key={todo.id}
-              className={[
-                todo.done ? "done" : "",
-                overdue ? "overdue" : "",
-                today && !todo.done ? "due-today" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+        <div className="filter-bar">
+          {(Object.keys(filterLabels) as DueDateFilter[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={`filter-btn ${dueDateFilter === key ? "active" : ""}`}
+              onClick={() => setDueDateFilter(key)}
             >
-              <input
-                type="checkbox"
-                checked={todo.done}
-                onChange={() => handleToggle(todo)}
-                aria-label={`${todo.title} als erledigt markieren`}
-              />
+              {filterLabels[key]}
+            </button>
+          ))}
+          <div className="status-filter">
+            <button
+              type="button"
+              className={statusFilter === "all" ? "active" : ""}
+              onClick={() => setStatusFilter("all")}
+            >
+              Alle
+            </button>
+            <button
+              type="button"
+              className={statusFilter === "open" ? "active" : ""}
+              onClick={() => setStatusFilter("open")}
+            >
+              Offen
+            </button>
+            <button
+              type="button"
+              className={statusFilter === "done" ? "active" : ""}
+              onClick={() => setStatusFilter("done")}
+            >
+              Erledigt
+            </button>
+          </div>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Suche..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.currentTarget.value)}
+          />
+        </div>
 
-              {editingId === todo.id ? (
-                <div className="edit-row">
-                  <input
-                    className="edit-input"
-                    type="text"
-                    value={editingTitle}
-                    autoFocus
-                    onChange={(e) => setEditingTitle(e.currentTarget.value)}
-                    onBlur={() => commitEdit(todo.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitEdit(todo.id);
-                      if (e.key === "Escape") setEditingId(null);
-                    }}
-                  />
-                  <input
-                    type="date"
-                    className="edit-date-input"
-                    value={editingDueDate}
-                    onChange={(e) => setEditingDueDate(e.currentTarget.value)}
-                    onBlur={() => commitEdit(todo.id)}
-                  />
-                </div>
-              ) : (
-                <span className="title" onDoubleClick={() => startEdit(todo)}>
-                  {todo.title}
-                </span>
-              )}
+        {hasActiveFilter && (
+          <div className="active-filters">
+            <span className="filter-label">
+              {filterLabels[dueDateFilter]}
+              {statusFilter !== "all"
+                ? ` • ${statusFilter === "open" ? "Offen" : "Erledigt"}`
+                : ""}
+              {searchQuery ? ` • Suche: "${searchQuery}"` : ""}
+            </span>
+            <button
+              type="button"
+              className="clear-filters"
+              onClick={() => {
+                setDueDateFilter("all");
+                setStatusFilter("all");
+                setSearchQuery("");
+              }}
+            >
+              Zurücksetzen
+            </button>
+          </div>
+        )}
+        {error && <p className="error">Fehler: {error}</p>}
+        {loading && <p className="muted">Lade Aufgaben...</p>}
 
-              {editingId !== todo.id && todo.due_date && (
-                <span className={`due-date-badge ${overdue ? "overdue" : ""} ${today && !todo.done ? "today" : ""}`}>
-                  {overdue && !todo.done ? "⚠️ " : ""}
-                  {formatDate(todo.due_date)}
-                </span>
-              )}
+        {!loading && todos.length === 0 && !error && (
+          <p className="muted">Noch keine Aufgaben. Lege deine erste an!</p>
+        )}
 
-              <button
-                type="button"
-                className="icon-button"
-                onClick={() => startEdit(todo)}
-                aria-label="Bearbeiten"
+        {!loading && filteredTodos.length === 0 && todos.length > 0 && !error && (
+          <p className="muted">Keine Aufgaben in dieser Ansicht</p>
+        )}
+
+        <ul className="todo-list">
+          {filteredTodos.map((todo) => {
+            const overdue = !todo.done && isOverdue(todo.due_date);
+            const today = isDueToday(todo.due_date);
+
+            return (
+              <li
+                key={todo.id}
+                className={[
+                  todo.done ? "done" : "",
+                  overdue ? "overdue" : "",
+                  today && !todo.done ? "due-today" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
-                ✏️
-              </button>
-              <button
-                type="button"
-                className="icon-button danger"
-                onClick={() => handleDelete(todo.id)}
-                aria-label="Löschen"
-              >
-                🗑️
-              </button>
-
-              {burstEmoji?.id === todo.id && (
-                <span
-                  style={{
-                    position: "absolute",
-                    right: "1.5rem",
-                    top: "-1rem",
-                    fontSize: "1.5rem",
-                    animation: "emoji-burst 0.8s ease-out forwards",
-                    pointerEvents: "none",
-                  }}
+                <button
+                  className="checkbox"
+                  onClick={() => handleToggle(todo)}
+                  aria-label={`${todo.title} als erledigt markieren`}
                 >
-                  {burstEmoji.emoji}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                  {todo.done && (
+                    <svg width="14" height="14" viewBox="0 0 14 14">
+                      <path d="M2 7l4 4 6-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
+                  )}
+                </button>
 
-      {!loading && todos.length > 0 && (
-        <p className="footer">
-          {hasActiveFilter
-            ? `${filteredTodos.length} von ${todos.length} Aufgabe(n) angezeigt`
-            : remaining === 0
-              ? "Alles erledigt! 🎉"
-              : `${remaining} von ${todos.length} Aufgabe(n) offen 🎯`}
-        </p>
-      )}
+                {editingId === todo.id ? (
+                  <div className="edit-row">
+                    <input
+                      className="edit-input"
+                      type="text"
+                      value={editingTitle}
+                      autoFocus
+                      onChange={(e) => setEditingTitle(e.currentTarget.value)}
+                      onBlur={() => commitEdit(todo.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitEdit(todo.id);
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                    />
+                    <input
+                      type="date"
+                      className="edit-date-input"
+                      value={editingDueDate}
+                      onChange={(e) => setEditingDueDate(e.currentTarget.value)}
+                      onBlur={() => commitEdit(todo.id)}
+                    />
+                  </div>
+                ) : (
+                  <span className="title" onDoubleClick={() => startEdit(todo)}>
+                    {todo.title}
+                  </span>
+                )}
 
-      <footer className="app-footer">
-        <span className="version">v{APP_VERSION}</span>
-        <button
-          type="button"
-          className="changelog-btn"
-          onClick={() => setShowChangelog(true)}
-        >
-          Changelog
-        </button>
-      </footer>
+                {editingId !== todo.id && todo.due_date && (
+                  <span className={`due-date-badge ${overdue ? "overdue" : ""} ${today && !todo.done ? "today" : ""}`}>
+                    {formatDate(todo.due_date)}
+                  </span>
+                )}
+
+                <div className="todo-actions">
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => startEdit(todo)}
+                    aria-label="Bearbeiten"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14">
+                      <path d="M9.5 2.5l2 2M2 12l.5-2.5L9.5 3l2 2L5 11.5 2 12z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn danger"
+                    onClick={() => handleDelete(todo.id)}
+                    aria-label="Löschen"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14">
+                      <path d="M3 4h8M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1M6 7v4M8 7v4M4 4l.5 7a1 1 0 001 1h3a1 1 0 001-1L10 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
+                  </button>
+                </div>
+
+                {burstEmoji?.id === todo.id && (
+                  <span
+                    className="emoji-burst"
+                    style={{
+                      animation: "emoji-burst 0.8s ease-out forwards",
+                    }}
+                  >
+                    {burstEmoji.emoji}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        {!loading && todos.length > 0 && (
+          <p className="footer">
+            {hasActiveFilter
+              ? `${filteredTodos.length} von ${todos.length} Aufgabe(n) angezeigt`
+              : remaining === 0
+                ? "Alles erledigt!"
+                : `${remaining} von ${todos.length} Aufgabe(n) offen`}
+          </p>
+        )}
+
+        <footer className="app-footer">
+          <span className="version">v{APP_VERSION}</span>
+          <button
+            type="button"
+            className="changelog-btn"
+            onClick={() => setShowChangelog(true)}
+          >
+            Changelog
+          </button>
+        </footer>
+      </main>
 
       {showChangelog && (
         <div className="modal-overlay" onClick={closeChangelog}>
           <div className="changelog-modal" ref={changelogRef} onClick={(e) => e.stopPropagation()}>
             <div className="changelog-header">
               <h2>Changelog</h2>
-              <button type="button" className="close-btn" onClick={closeChangelog}>✕</button>
+              <button type="button" className="close-btn" onClick={closeChangelog}>
+                <svg width="14" height="14" viewBox="0 0 14 14">
+                  <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
             <div className="changelog-body">
               {CHANGELOG.map((entry) => (
@@ -421,7 +443,7 @@ function App() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 
