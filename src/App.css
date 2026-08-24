@@ -341,3 +341,164 @@ h1 {
   padding: 0.6rem;
   backdrop-filter: blur(8px);
 }
+
+.app-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 0.5rem;
+}
+
+.version {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.changelog-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.changelog-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.changelog-modal {
+  background: linear-gradient(135deg, rgba(30, 20, 60, 0.95), rgba(50, 30, 80, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 1.5rem;
+  max-width: 480px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  animation: modal-slide-in 0.3s ease;
+}
+
+@keyframes modal-slide-in {
+  from { transform: translateY(20px) scale(0.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.changelog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.2rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.changelog-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #fff;
+  font-weight: 700;
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(244, 63, 94, 0.3);
+  color: #fff;
+}
+
+.changelog-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.changelog-entry {
+  margin-bottom: 1.5rem;
+}
+
+.changelog-entry:last-child {
+  margin-bottom: 0;
+}
+
+.changelog-version {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.version-badge {
+  background: linear-gradient(135deg, #f472b6, #a78bfa);
+  color: #fff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.version-date {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+}
+
+.changelog-entry ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.changelog-entry li {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  padding: 0.3rem 0 0.3rem 1.2rem;
+  position: relative;
+}
+
+.changelog-entry li::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: #f472b6;
+}
