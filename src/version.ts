@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.2.0";
+export const APP_VERSION = "0.3.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.3.0",
+    date: "2026-08-24",
+    changes: [
+      "Kategorien für Aufgaben",
+      "Kategorien erstellen, bearbeiten und löschen",
+      "Farbige Kategorie-Badges",
+      "Filter nach Kategorie",
+    ],
+  },
   {
     version: "0.2.0",
     date: "2026-08-24",
