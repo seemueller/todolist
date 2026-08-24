@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { addTodo, deleteTodo, listTodos, toggleTodoDone, updateTodoTitle } from "./db";
-import { Todo } from "./types";
+import { addTodo, deleteTodo, listTodos, toggleTodoDone, updateTodoPriority, updateTodoTitle } from "./db";
+import { Priority, Todo } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import "./App.css";
 
@@ -9,6 +9,7 @@ const partyEmojis = ["🎉", "🥳", "✨", "💫", "🌟", "🎊", "🔥", "�
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
+  const [newPriority, setNewPriority] = useState<Priority>("medium");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -49,9 +50,10 @@ function App() {
     const title = newTitle.trim();
     if (!title) return;
     try {
-      const todo = await addTodo(title);
+      const todo = await addTodo(title, newPriority);
       setTodos((prev) => [todo, ...prev]);
       setNewTitle("");
+      setNewPriority("medium");
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -83,6 +85,16 @@ function App() {
     }
   }
 
+  async function handlePriorityChange(id: number, priority: Priority) {
+    try {
+      const updated = await updateTodoPriority(id, priority);
+      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
   function startEdit(todo: Todo) {
     setEditingId(todo.id);
     setEditingTitle(todo.title);
@@ -108,13 +120,23 @@ function App() {
     <main className="app">
       <h1>TodoList ✨</h1>
 
-      <form className="add-form" onSubmit={handleAdd}>
+       <form className="add-form" onSubmit={handleAdd}>
         <input
           type="text"
           placeholder="Was steht an? 🚀"
           value={newTitle}
           onChange={(e) => setNewTitle(e.currentTarget.value)}
         />
+        <select
+          className="priority-select"
+          value={newPriority}
+          onChange={(e) => setNewPriority(e.currentTarget.value as Priority)}
+          aria-label="Priorität"
+        >
+          <option value="low">Niedrig</option>
+          <option value="medium">Mittel</option>
+          <option value="high">Hoch</option>
+        </select>
         <button type="submit">Los geht's!</button>
       </form>
 
@@ -127,7 +149,7 @@ function App() {
 
       <ul className="todo-list">
         {todos.map((todo) => (
-          <li key={todo.id} className={todo.done ? "done" : ""}>
+          <li key={todo.id} className={`${todo.done ? "done" : ""} priority-${todo.priority}`}>
             <input
               type="checkbox"
               checked={todo.done}
@@ -153,6 +175,19 @@ function App() {
                 {todo.title}
               </span>
             )}
+
+            <span className={`priority-dot priority-dot-${todo.priority}`} title={`Priorität: ${todo.priority === "low" ? "niedrig" : todo.priority === "medium" ? "mittel" : "hoch"}`} />
+
+            <select
+              className="priority-select-inline"
+              value={todo.priority}
+              onChange={(e) => handlePriorityChange(todo.id, e.currentTarget.value as Priority)}
+              aria-label="Priorität ändern"
+            >
+              <option value="low">Niedrig</option>
+              <option value="medium">Mittel</option>
+              <option value="high">Hoch</option>
+            </select>
 
             <button
               type="button"
