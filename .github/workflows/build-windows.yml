@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -34,16 +34,6 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
-
-      - name: Install system dependencies
-        run: |
-          # WebView2 for Tauri on Windows
-          if (-not (Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}")) {
-            Write-Host "Installing WebView2..."
-            $webview2Installer = "$env:TEMP\MicrosoftEdgeWebview2Setup.exe"
-            Invoke-WebRequest "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile $webview2Installer
-            Start-Process -FilePath $webview2Installer -ArgumentList "/silent", "/install" -Wait
-          }
 
       - name: Build Tauri app
         env:
