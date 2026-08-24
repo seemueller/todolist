@@ -45,14 +45,7 @@ function formatDate(dueDate: string): string {
   return `${d}.${m}.`;
 }
 
-function filterTodos(todos: Todo[], filter: DueDateFilter): Todo[] {
-  if (filter === "all") return todos;
-  if (filter === "today") return todos.filter((t) => isDueToday(t.due_date));
-  if (filter === "overdue") return todos.filter((t) => isOverdue(t.due_date) && !t.done);
-  if (filter === "upcoming") return todos.filter((t) => isDueUpcoming(t.due_date));
-  if (filter === "none") return todos.filter((t) => !t.due_date);
-  return todos;
-}
+
 
 const filterLabels: Record<DueDateFilter, string> = {
   all: "Alle",
@@ -74,6 +67,8 @@ function App() {
   const [burstEmoji, setBurstEmoji] = useState<{ id: number; emoji: string } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "done">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const changelogRef = useRef<HTMLDivElement>(null);
 
   async function refresh() {
@@ -173,7 +168,21 @@ function App() {
   }
 
   const remaining = todos.filter((t) => !t.done).length;
-  const filteredTodos = filterTodos(todos, dueDateFilter);
+  const filteredTodos = todos.filter((todo) => {
+    if (dueDateFilter === "today" && !isDueToday(todo.due_date)) return false;
+    if (dueDateFilter === "overdue" && (!isOverdue(todo.due_date) || todo.done)) return false;
+    if (dueDateFilter === "upcoming" && !isDueUpcoming(todo.due_date)) return false;
+    if (dueDateFilter === "none" && todo.due_date) return false;
+    if (statusFilter === "open" && todo.done) return false;
+    if (statusFilter === "done" && !todo.done) return false;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      if (!todo.title.toLowerCase().includes(query)) return false;
+    }
+    return true;
+  });
+
+  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "all" || searchQuery;
 
   return (
     <main className="app">
@@ -207,8 +216,60 @@ function App() {
             {filterLabels[key]}
           </button>
         ))}
+        <div className="status-filter">
+          <button
+            type="button"
+            className={statusFilter === "all" ? "active" : ""}
+            onClick={() => setStatusFilter("all")}
+          >
+            Alle
+          </button>
+          <button
+            type="button"
+            className={statusFilter === "open" ? "active" : ""}
+            onClick={() => setStatusFilter("open")}
+          >
+            Offen
+          </button>
+          <button
+            type="button"
+            className={statusFilter === "done" ? "active" : ""}
+            onClick={() => setStatusFilter("done")}
+          >
+            Erledigt
+          </button>
+        </div>
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Suche..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.currentTarget.value)}
+        />
       </div>
 
+      {hasActiveFilter && (
+        <div className="active-filters">
+          <span className="filter-label">
+            {filterLabels[dueDateFilter]}
+            {statusFilter !== "all"
+              ? ` • ${statusFilter === "open" ? "Offen" : "Erledigt"}`
+              : ""}
+            {searchQuery ? ` • Suche: "${searchQuery}"` : ""}
+          </span>
+          <button
+            type="button"
+            className="clear-filters"
+            onClick={() => {
+              setDueDateFilter("all");
+              setStatusFilter("all");
+              setSearchQuery("");
+            }}
+          >
+            Zurücksetzen ✕
+          </button>
+        </div>
+      )}
       {error && <p className="error">⚠️ Fehler: {error}</p>}
       {loading && <p className="muted">Lade Aufgaben... 🌀</p>}
 
@@ -316,9 +377,11 @@ function App() {
 
       {!loading && todos.length > 0 && (
         <p className="footer">
-          {remaining === 0
-            ? "Alles erledigt! 🎉"
-            : `${remaining} von ${todos.length} Aufgabe(n) offen 🎯`}
+          {hasActiveFilter
+            ? `${filteredTodos.length} von ${todos.length} Aufgabe(n) angezeigt`
+            : remaining === 0
+              ? "Alles erledigt! 🎉"
+              : `${remaining} von ${todos.length} Aufgabe(n) offen 🎯`}
         </p>
       )}
 
