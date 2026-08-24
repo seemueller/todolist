@@ -7,7 +7,9 @@ describe("fromRow", () => {
       id: 1,
       title: "Test task",
       done: 1,
+      priority: "medium",
       created_at: "2026-01-01T00:00:00Z",
+      due_date: null,
     };
 
     const result: Todo = fromRow(row);
@@ -16,7 +18,9 @@ describe("fromRow", () => {
       id: 1,
       title: "Test task",
       done: true,
+      priority: "medium",
       created_at: "2026-01-01T00:00:00Z",
+      due_date: null,
     });
   });
 
@@ -25,7 +29,9 @@ describe("fromRow", () => {
       id: 2,
       title: "Open task",
       done: 0,
+      priority: "low",
       created_at: "2026-06-15T12:00:00Z",
+      due_date: null,
     };
 
     const result: Todo = fromRow(row);
@@ -40,7 +46,9 @@ describe("fromRow", () => {
       id: 99,
       title: "Preserve fields",
       done: 1,
+      priority: "high",
       created_at: "2025-12-31T23:59:59Z",
+      due_date: null,
     };
 
     const result = fromRow(row);
@@ -55,7 +63,9 @@ describe("fromRow", () => {
       id: 3,
       title: "Edge case",
       done: 2,
+      priority: "medium",
       created_at: "2026-01-01T00:00:00Z",
+      due_date: null,
     };
 
     const result = fromRow(row);

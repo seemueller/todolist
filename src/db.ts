@@ -10,7 +10,7 @@ function getDb(): Promise<Database> {
   return dbPromise;
 }
 
-const SELECT_TODO = "SELECT id, title, done, priority, created_at FROM todos";
+const SELECT_TODO = "SELECT id, title, done, priority, created_at, due_date FROM todos";
 
 export async function listTodos(): Promise<Todo[]> {
   const db = await getDb();
@@ -20,9 +20,9 @@ export async function listTodos(): Promise<Todo[]> {
   return rows.map(fromRow);
 }
 
-export async function addTodo(title: string, priority: Priority): Promise<Todo> {
+export async function addTodo(title: string, priority: Priority, dueDate: string | null): Promise<Todo> {
   const db = await getDb();
-  await db.execute("INSERT INTO todos (title, done, priority) VALUES ($1, 0, $2)", [title, priority]);
+  await db.execute("INSERT INTO todos (title, done, priority, due_date) VALUES ($1, 0, $2, $3)", [title, priority, dueDate]);
   const rows = await db.select<TodoRow[]>(
     `${SELECT_TODO} WHERE id = last_insert_rowid()`
   );
@@ -32,6 +32,16 @@ export async function addTodo(title: string, priority: Priority): Promise<Todo> 
 export async function updateTodoTitle(id: number, title: string): Promise<Todo> {
   const db = await getDb();
   await db.execute("UPDATE todos SET title = $1 WHERE id = $2", [title, id]);
+  const rows = await db.select<TodoRow[]>(
+    `${SELECT_TODO} WHERE id = $1`,
+    [id]
+  );
+  return fromRow(rows[0]);
+}
+
+export async function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
+  const db = await getDb();
+  await db.execute("UPDATE todos SET due_date = $1 WHERE id = $2", [dueDate, id]);
   const rows = await db.select<TodoRow[]>(
     `${SELECT_TODO} WHERE id = $1`,
     [id]

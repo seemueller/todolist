@@ -9,12 +9,28 @@ vi.mock("./db", () => ({
   deleteTodo: vi.fn(),
   toggleTodoDone: vi.fn(),
   updateTodoTitle: vi.fn(),
+  updateTodoDueDate: vi.fn(),
+  updateTodoPriority: vi.fn(),
 }));
 
 vi.mock("./version", () => ({
   APP_VERSION: "0.2.0",
   CHANGELOG: [],
 }));
+
+vi.mock("./CustomTitleBar", () => ({
+  CustomTitleBar: () => null,
+}));
+
+const makeTodo = (overrides = {}) => ({
+  id: 1,
+  title: "Test",
+  done: false,
+  priority: "medium" as const,
+  created_at: "2026-01-01T00:00:00Z",
+  due_date: null,
+  ...overrides,
+});
 
 describe("App", () => {
   beforeEach(() => {
@@ -33,8 +49,8 @@ describe("App", () => {
 
   it("renders existing todos", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Buy milk", done: false, created_at: "2026-01-01T00:00:00Z" },
-      { id: 2, title: "Walk dog", done: true, created_at: "2026-01-01T00:00:00Z" },
+      makeTodo({ id: 1, title: "Buy milk", done: false }),
+      makeTodo({ id: 2, title: "Walk dog", done: true }),
     ]);
 
     render(<App />);
@@ -47,23 +63,18 @@ describe("App", () => {
 
   it("adds a new todo on form submit", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([]);
-    vi.mocked(db.addTodo).mockResolvedValue({
-      id: 1,
-      title: "New task",
-      done: false,
-      created_at: "2026-01-01T00:00:00Z",
-    });
+    vi.mocked(db.addTodo).mockResolvedValue(makeTodo({ title: "New task" }));
 
     render(<App />);
 
     const input = screen.getByPlaceholderText(/Was steht an/i);
-    const button = screen.getByRole("button", { name: /Los geht's/i });
+    const button = screen.getByRole("button", { name: /Aufgabe hinzufügen/i });
 
     fireEvent.change(input, { target: { value: "New task" } });
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(db.addTodo).toHaveBeenCalledWith("New task");
+      expect(db.addTodo).toHaveBeenCalledWith("New task", "medium", null);
       expect(screen.getByText("New task")).toBeInTheDocument();
     });
   });
@@ -73,14 +84,14 @@ describe("App", () => {
 
     render(<App />);
 
-    const button = screen.getByRole("button", { name: /Los geht's/i });
+    const button = screen.getByRole("button", { name: /Aufgabe hinzufügen/i });
     fireEvent.click(button);
 
     expect(db.addTodo).not.toHaveBeenCalled();
   });
 
   it("toggles todo done status", async () => {
-    const todo = { id: 1, title: "Toggle me", done: false, created_at: "2026-01-01T00:00:00Z" };
+    const todo = makeTodo({ title: "Toggle me", done: false });
     const updated = { ...todo, done: true };
 
     vi.mocked(db.listTodos).mockResolvedValue([todo]);
@@ -92,7 +103,7 @@ describe("App", () => {
       expect(screen.getByText("Toggle me")).toBeInTheDocument();
     });
 
-    const checkbox = screen.getByRole("checkbox", { name: /Toggle me/i });
+    const checkbox = screen.getByRole("button", { name: /Toggle me als erledigt markieren/i });
     fireEvent.click(checkbox);
 
     await waitFor(() => {
@@ -101,7 +112,7 @@ describe("App", () => {
   });
 
   it("deletes a todo", async () => {
-    const todo = { id: 1, title: "Delete me", done: false, created_at: "2026-01-01T00:00:00Z" };
+    const todo = makeTodo({ title: "Delete me", done: false });
 
     vi.mocked(db.listTodos).mockResolvedValue([todo]);
     vi.mocked(db.deleteTodo).mockResolvedValue(1);
@@ -132,8 +143,8 @@ describe("App", () => {
 
   it("shows remaining count", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Open", done: false, created_at: "2026-01-01T00:00:00Z" },
-      { id: 2, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z" },
+      makeTodo({ id: 1, title: "Open", done: false }),
+      makeTodo({ id: 2, title: "Done", done: true }),
     ]);
 
     render(<App />);
@@ -145,7 +156,7 @@ describe("App", () => {
 
   it("shows completion message when all todos are done", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z" },
+      makeTodo({ title: "Done", done: true }),
     ]);
 
     render(<App />);

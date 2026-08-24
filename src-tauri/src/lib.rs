@@ -20,6 +20,12 @@ pub fn run() {
             sql: "ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium';",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "add_due_date_column",
+            sql: "ALTER TABLE todos ADD COLUMN due_date TEXT DEFAULT NULL;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
