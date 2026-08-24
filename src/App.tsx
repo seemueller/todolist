@@ -3,6 +3,8 @@ import { addTodo, deleteTodo, listTodos, toggleTodoDone, updateTodoTitle } from 
 import { Todo } from "./types";
 import "./App.css";
 
+const partyEmojis = ["🎉", "🥳", "✨", "💫", "🌟", "🎊", "🔥", "💥", "⭐", "🚀"];
+
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
@@ -10,6 +12,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [burstEmoji, setBurstEmoji] = useState<{ id: number; emoji: string } | null>(null);
 
   async function refresh() {
     try {
@@ -42,6 +45,11 @@ function App() {
   }
 
   async function handleToggle(todo: Todo) {
+    if (!todo.done) {
+      const randomEmoji = partyEmojis[Math.floor(Math.random() * partyEmojis.length)];
+      setBurstEmoji({ id: todo.id, emoji: randomEmoji });
+      setTimeout(() => setBurstEmoji(null), 800);
+    }
     try {
       const updated = await toggleTodoDone(todo.id, !todo.done);
       setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
@@ -84,23 +92,23 @@ function App() {
 
   return (
     <main className="app">
-      <h1>TodoList</h1>
+      <h1>TodoList ✨</h1>
 
       <form className="add-form" onSubmit={handleAdd}>
         <input
           type="text"
-          placeholder="Neue Aufgabe hinzufügen..."
+          placeholder="Was steht an? 🚀"
           value={newTitle}
           onChange={(e) => setNewTitle(e.currentTarget.value)}
         />
-        <button type="submit">Hinzufügen</button>
+        <button type="submit">Los geht's!</button>
       </form>
 
-      {error && <p className="error">Fehler: {error}</p>}
-      {loading && <p className="muted">Lade Aufgaben...</p>}
+      {error && <p className="error">⚠️ Fehler: {error}</p>}
+      {loading && <p className="muted">Lade Aufgaben... 🌀</p>}
 
       {!loading && todos.length === 0 && !error && (
-        <p className="muted">Noch keine Aufgaben. Lege deine erste Aufgabe an!</p>
+        <p className="muted">Noch keine Aufgaben. Lege deine erste an! 🎯</p>
       )}
 
       <ul className="todo-list">
@@ -112,6 +120,7 @@ function App() {
               onChange={() => handleToggle(todo)}
               aria-label={`${todo.title} als erledigt markieren`}
             />
+
             {editingId === todo.id ? (
               <input
                 className="edit-input"
@@ -130,13 +139,14 @@ function App() {
                 {todo.title}
               </span>
             )}
+
             <button
               type="button"
               className="icon-button"
               onClick={() => startEdit(todo)}
               aria-label="Bearbeiten"
             >
-              ✎
+              ✏️
             </button>
             <button
               type="button"
@@ -144,15 +154,32 @@ function App() {
               onClick={() => handleDelete(todo.id)}
               aria-label="Löschen"
             >
-              ✕
+              🗑️
             </button>
+
+            {burstEmoji?.id === todo.id && (
+              <span
+                style={{
+                  position: "absolute",
+                  right: "1.5rem",
+                  top: "-1rem",
+                  fontSize: "1.5rem",
+                  animation: "emoji-burst 0.8s ease-out forwards",
+                  pointerEvents: "none",
+                }}
+              >
+                {burstEmoji.emoji}
+              </span>
+            )}
           </li>
         ))}
       </ul>
 
       {!loading && todos.length > 0 && (
-        <p className="footer muted">
-          {remaining} von {todos.length} Aufgabe(n) offen
+        <p className="footer">
+          {remaining === 0
+            ? "Alles erledigt! 🎉"
+            : `${remaining} von ${todos.length} Aufgabe(n) offen 🎯`}
         </p>
       )}
     </main>
