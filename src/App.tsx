@@ -1,6 +1,18 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { addTodo, deleteTodo, listTodos, toggleTodoDone, updateTodoDueDate, updateTodoTitle } from "./db";
-import { Todo } from "./types";
+import {
+  addTodo,
+  addCategory,
+  deleteCategory,
+  deleteTodo,
+  listCategories,
+  listTodos,
+  toggleTodoDone,
+  updateCategory,
+  updateTodoCategory,
+  updateTodoDueDate,
+  updateTodoTitle,
+} from "./db";
+import { CATEGORY_COLORS, Category, Todo } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import "./App.css";
@@ -46,8 +58,6 @@ function formatDate(dueDate: string): string {
   return `${d}.${m}.`;
 }
 
-
-
 const filterLabels: Record<DueDateFilter, string> = {
   all: "Alle",
   today: "Heute",
@@ -60,6 +70,7 @@ function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
+  const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -72,10 +83,24 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const changelogRef = useRef<HTMLDivElement>(null);
 
+  // Category state
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryColor, setNewCategoryColor] = useState(CATEGORY_COLORS[0]);
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [editingCategoryColor, setEditingCategoryColor] = useState("");
+
   async function refresh() {
     try {
-      const items = await listTodos();
+      const [items, cats] = await Promise.all([
+        listTodos(),
+        listCategories(),
+      ]);
       setTodos(items);
+      setCategories(cats);
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -99,16 +124,26 @@ function App() {
     return () => document.removeEventListener("keydown", handler);
   }, [showChangelog, closeChangelog]);
 
+  useEffect(() => {
+    if (!showCategoryManager) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeCategoryManager();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [showCategoryManager]);
+
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
     const title = newTitle.trim();
     if (!title) return;
     try {
       const dueDate = newDueDate || null;
-      const todo = await addTodo(title, dueDate);
+      const todo = await addTodo(title, dueDate, newCategoryId);
       setTodos((prev) => [todo, ...prev]);
       setNewTitle("");
       setNewDueDate("");
+      setNewCategoryId(null);
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -168,6 +203,71 @@ function App() {
     setEditingId(null);
   }
 
+  async function handleUpdateTodoCategory(id: number, categoryId: number | null) {
+    try {
+      const updated = await updateTodoCategory(id, categoryId);
+      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  // ── Category CRUD ──────────────────────────────────────────────────────
+
+  async function handleAddCategory(e: FormEvent) {
+    e.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) return;
+    try {
+      const cat = await addCategory(name, newCategoryColor);
+      setCategories((prev) => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewCategoryName("");
+      setNewCategoryColor(CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length]);
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  function startEditCategory(cat: Category) {
+    setEditingCategoryId(cat.id);
+    setEditingCategoryName(cat.name);
+    setEditingCategoryColor(cat.color);
+  }
+
+  async function commitEditCategory(id: number) {
+    const name = editingCategoryName.trim();
+    if (!name) return;
+    try {
+      const updated = await updateCategory(id, name, editingCategoryColor);
+      setCategories((prev) =>
+        prev.map((c) => (c.id === updated.id ? updated : c)).sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+    setEditingCategoryId(null);
+  }
+
+  async function handleDeleteCategory(id: number) {
+    try {
+      await deleteCategory(id);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      setTodos((prev) => prev.map((t) => (t.category_id === id ? { ...t, category_id: null, category_name: null, category_color: null } : t)));
+      if (categoryFilter === id) setCategoryFilter(null);
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  function closeCategoryManager() {
+    setShowCategoryManager(false);
+    setEditingCategoryId(null);
+  }
+
   const remaining = todos.filter((t) => !t.done).length;
   const filteredTodos = todos.filter((todo) => {
     if (dueDateFilter === "today" && !isDueToday(todo.due_date)) return false;
@@ -176,6 +276,7 @@ function App() {
     if (dueDateFilter === "none" && todo.due_date) return false;
     if (statusFilter === "open" && todo.done) return false;
     if (statusFilter === "done" && !todo.done) return false;
+    if (categoryFilter !== null && todo.category_id !== categoryFilter) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       if (!todo.title.toLowerCase().includes(query)) return false;
@@ -183,7 +284,7 @@ function App() {
     return true;
   });
 
-  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "all" || searchQuery;
+  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "all" || searchQuery || categoryFilter !== null;
 
   return (
     <div className="app-shell">
@@ -209,6 +310,18 @@ function App() {
             onChange={(e) => setNewDueDate(e.currentTarget.value)}
             title="Fälligkeitsdatum (optional)"
           />
+          <select
+            className="category-select"
+            value={newCategoryId ?? ""}
+            onChange={(e) => setNewCategoryId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Keine Kategorie</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
           <button type="submit" aria-label="Aufgabe hinzufügen">
             <svg width="18" height="18" viewBox="0 0 18 18">
               <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -257,6 +370,26 @@ function App() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.currentTarget.value)}
           />
+          <select
+            className="category-select filter-select"
+            value={categoryFilter ?? ""}
+            onChange={(e) => setCategoryFilter(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Alle Kategorien</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => setShowCategoryManager(true)}
+            aria-label="Kategorien verwalten"
+          >
+            🏷️
+          </button>
         </div>
 
         {hasActiveFilter && (
@@ -265,6 +398,9 @@ function App() {
               {filterLabels[dueDateFilter]}
               {statusFilter !== "all"
                 ? ` • ${statusFilter === "open" ? "Offen" : "Erledigt"}`
+                : ""}
+              {categoryFilter !== null
+                ? ` • ${categories.find((c) => c.id === categoryFilter)?.name || "Kategorie"}`
                 : ""}
               {searchQuery ? ` • Suche: "${searchQuery}"` : ""}
             </span>
@@ -275,21 +411,22 @@ function App() {
                 setDueDateFilter("all");
                 setStatusFilter("all");
                 setSearchQuery("");
+                setCategoryFilter(null);
               }}
             >
-              Zurücksetzen
+              Zurücksetzen ✕
             </button>
           </div>
         )}
-        {error && <p className="error">Fehler: {error}</p>}
-        {loading && <p className="muted">Lade Aufgaben...</p>}
+        {error && <p className="error">⚠️ Fehler: {error}</p>}
+        {loading && <p className="muted">Lade Aufgaben... 🌀</p>}
 
         {!loading && todos.length === 0 && !error && (
-          <p className="muted">Noch keine Aufgaben. Lege deine erste an!</p>
+          <p className="muted">Noch keine Aufgaben. Lege deine erste an! 🎯</p>
         )}
 
-        {!loading && filteredTodos.length === 0 && todos.length > 0 && !error && (
-          <p className="muted">Keine Aufgaben in dieser Ansicht</p>
+        {!loading && hasActiveFilter && filteredTodos.length === 0 && (
+          <p className="muted">Keine Aufgaben gefunden 🔍</p>
         )}
 
         <ul className="todo-list">
@@ -354,6 +491,31 @@ function App() {
                   </span>
                 )}
 
+                {todo.category_name && (
+                  <span
+                    className="category-badge"
+                    style={{ backgroundColor: todo.category_color || "rgba(167,139,250,0.4)" }}
+                  >
+                    {todo.category_name}
+                  </span>
+                )}
+
+                <select
+                  className="category-select todo-select"
+                  value={todo.category_id ?? ""}
+                  onChange={(e) =>
+                    handleUpdateTodoCategory(todo.id, e.target.value ? Number(e.target.value) : null)
+                  }
+                  aria-label="Kategorie auswählen"
+                >
+                  <option value="">—</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+
                 <div className="todo-actions">
                   <button
                     type="button"
@@ -414,6 +576,7 @@ function App() {
         </footer>
       </main>
 
+      {/* Changelog Modal */}
       {showChangelog && (
         <div className="modal-overlay" onClick={closeChangelog}>
           <div className="changelog-modal" ref={changelogRef} onClick={(e) => e.stopPropagation()}>
@@ -440,6 +603,111 @@ function App() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Manager Modal */}
+      {showCategoryManager && (
+        <div className="modal-overlay" onClick={closeCategoryManager}>
+          <div className="category-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="changelog-header">
+              <h2>Kategorien 🏷️</h2>
+              <button type="button" className="close-btn" onClick={closeCategoryManager}>✕</button>
+            </div>
+
+            <form className="add-category-form" onSubmit={handleAddCategory}>
+              <input
+                type="text"
+                placeholder="Neue Kategorie..."
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.currentTarget.value)}
+              />
+              <div className="color-picker">
+                {CATEGORY_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`color-swatch ${newCategoryColor === color ? "active" : ""}`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setNewCategoryColor(color)}
+                    aria-label={`Farbe ${color} auswählen`}
+                  />
+                ))}
+              </div>
+              <button type="submit">Hinzufügen</button>
+            </form>
+
+            <ul className="category-list">
+              {categories.map((cat) => (
+                <li key={cat.id} className="category-item">
+                  {editingCategoryId === cat.id ? (
+                    <>
+                      <input
+                        className="edit-input"
+                        type="text"
+                        value={editingCategoryName}
+                        onChange={(e) => setEditingCategoryName(e.currentTarget.value)}
+                        onBlur={() => commitEditCategory(cat.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitEditCategory(cat.id);
+                          if (e.key === "Escape") setEditingCategoryId(null);
+                        }}
+                      />
+                      <div className="color-picker inline">
+                        {CATEGORY_COLORS.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className={`color-swatch ${editingCategoryColor === color ? "active" : ""}`}
+                            style={{ backgroundColor: color }}
+                            onClick={() => setEditingCategoryColor(color)}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        className="category-color-dot"
+                        style={{ backgroundColor: cat.color }}
+                      />
+                      <span className="category-name">{cat.name}</span>
+                    </>
+                  )}
+
+                  <div className="category-actions">
+                    {editingCategoryId === cat.id ? (
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => commitEditCategory(cat.id)}
+                        aria-label="Speichern"
+                      >
+                        ✓
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => startEditCategory(cat)}
+                        aria-label="Bearbeiten"
+                      >
+                        ✏️
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="icon-button danger"
+                      onClick={() => handleDeleteCategory(cat.id)}
+                      aria-label="Löschen"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       )}
