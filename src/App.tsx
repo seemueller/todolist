@@ -31,19 +31,34 @@ function App() {
     e.preventDefault();
     const title = newTitle.trim();
     if (!title) return;
-    await addTodo(title);
-    setNewTitle("");
-    await refresh();
+    try {
+      const todo = await addTodo(title);
+      setTodos((prev) => [todo, ...prev]);
+      setNewTitle("");
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleToggle(todo: Todo) {
-    await toggleTodoDone(todo.id, !todo.done);
-    await refresh();
+    try {
+      const updated = await toggleTodoDone(todo.id, !todo.done);
+      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleDelete(id: number) {
-    await deleteTodo(id);
-    await refresh();
+    try {
+      await deleteTodo(id);
+      setTodos((prev) => prev.filter((t) => t.id !== id));
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   function startEdit(todo: Todo) {
@@ -54,8 +69,13 @@ function App() {
   async function commitEdit(id: number) {
     const title = editingTitle.trim();
     if (title) {
-      await updateTodoTitle(id, title);
-      await refresh();
+      try {
+        const updated = await updateTodoTitle(id, title);
+        setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        setError(null);
+      } catch (err) {
+        setError(String(err));
+      }
     }
     setEditingId(null);
   }

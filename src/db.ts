@@ -18,22 +18,37 @@ export async function listTodos(): Promise<Todo[]> {
   return rows.map(fromRow);
 }
 
-export async function addTodo(title: string): Promise<void> {
+export async function addTodo(title: string): Promise<Todo> {
   const db = await getDb();
   await db.execute("INSERT INTO todos (title, done) VALUES ($1, 0)", [title]);
+  const rows = await db.select<TodoRow[]>(
+    "SELECT id, title, done, created_at FROM todos WHERE id = last_insert_rowid()"
+  );
+  return fromRow(rows[0]);
 }
 
-export async function updateTodoTitle(id: number, title: string): Promise<void> {
+export async function updateTodoTitle(id: number, title: string): Promise<Todo> {
   const db = await getDb();
   await db.execute("UPDATE todos SET title = $1 WHERE id = $2", [title, id]);
+  const rows = await db.select<TodoRow[]>(
+    "SELECT id, title, done, created_at FROM todos WHERE id = $1",
+    [id]
+  );
+  return fromRow(rows[0]);
 }
 
-export async function toggleTodoDone(id: number, done: boolean): Promise<void> {
+export async function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
   const db = await getDb();
   await db.execute("UPDATE todos SET done = $1 WHERE id = $2", [done ? 1 : 0, id]);
+  const rows = await db.select<TodoRow[]>(
+    "SELECT id, title, done, created_at FROM todos WHERE id = $1",
+    [id]
+  );
+  return fromRow(rows[0]);
 }
 
-export async function deleteTodo(id: number): Promise<void> {
+export async function deleteTodo(id: number): Promise<number> {
   const db = await getDb();
   await db.execute("DELETE FROM todos WHERE id = $1", [id]);
+  return id;
 }
