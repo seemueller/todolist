@@ -8,6 +8,7 @@ describe("fromRow", () => {
       title: "Test task",
       done: 1,
       created_at: "2026-01-01T00:00:00Z",
+      due_date: null,
     };
 
     const result: Todo = fromRow(row);
@@ -17,6 +18,7 @@ describe("fromRow", () => {
       title: "Test task",
       done: true,
       created_at: "2026-01-01T00:00:00Z",
+      due_date: null,
     });
   });
 
@@ -26,6 +28,7 @@ describe("fromRow", () => {
       title: "Open task",
       done: 0,
       created_at: "2026-06-15T12:00:00Z",
+      due_date: null,
     };
 
     const result: Todo = fromRow(row);
@@ -41,6 +44,7 @@ describe("fromRow", () => {
       title: "Preserve fields",
       done: 1,
       created_at: "2025-12-31T23:59:59Z",
+      due_date: null,
     };
 
     const result = fromRow(row);
@@ -56,6 +60,7 @@ describe("fromRow", () => {
       title: "Edge case",
       done: 2,
       created_at: "2026-01-01T00:00:00Z",
+      due_date: null,
     };
 
     const result = fromRow(row);

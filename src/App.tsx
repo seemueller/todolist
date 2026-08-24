@@ -1,20 +1,72 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { addTodo, deleteTodo, listTodos, toggleTodoDone, updateTodoTitle } from "./db";
+import { addTodo, deleteTodo, listTodos, toggleTodoDone, updateTodoDueDate, updateTodoTitle } from "./db";
 import { Todo } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import "./App.css";
 
 const partyEmojis = ["🎉", "🥳", "✨", "💫", "🌟", "🎊", "🔥", "💥", "⭐", "🚀"];
 
+type DueDateFilter = "all" | "today" | "overdue" | "upcoming" | "none";
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function isDueToday(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  return dueDate === todayStr();
+}
+
+function isOverdue(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  return dueDate < todayStr();
+}
+
+function isDueUpcoming(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  const today = todayStr();
+  return dueDate > today;
+}
+
+function formatDate(dueDate: string): string {
+  const [y, m, d] = dueDate.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const dateMidnight = new Date(date);
+  dateMidnight.setHours(0, 0, 0, 0);
+
+  if (dateMidnight.getTime() === today.getTime()) return "Heute";
+  if (dateMidnight.getTime() === tomorrow.getTime()) return "Morgen";
+
+  return `${d}.${m}.`;
+}
+
+
+
+const filterLabels: Record<DueDateFilter, string> = {
+  all: "Alle",
+  today: "Heute",
+  overdue: "Überfällig",
+  upcoming: "Künftig",
+  none: "Ohne Datum",
+};
+
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [editingDueDate, setEditingDueDate] = useState("");
   const [burstEmoji, setBurstEmoji] = useState<{ id: number; emoji: string } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "done">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const changelogRef = useRef<HTMLDivElement>(null);
@@ -51,9 +103,11 @@ function App() {
     const title = newTitle.trim();
     if (!title) return;
     try {
-      const todo = await addTodo(title);
+      const dueDate = newDueDate || null;
+      const todo = await addTodo(title, dueDate);
       setTodos((prev) => [todo, ...prev]);
       setNewTitle("");
+      setNewDueDate("");
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -88,6 +142,7 @@ function App() {
   function startEdit(todo: Todo) {
     setEditingId(todo.id);
     setEditingTitle(todo.title);
+    setEditingDueDate(todo.due_date || "");
   }
 
   async function commitEdit(id: number) {
@@ -101,12 +156,23 @@ function App() {
         setError(String(err));
       }
     }
+    try {
+      const dueDate = editingDueDate || null;
+      const updated = await updateTodoDueDate(id, dueDate);
+      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
     setEditingId(null);
   }
 
   const remaining = todos.filter((t) => !t.done).length;
-
   const filteredTodos = todos.filter((todo) => {
+    if (dueDateFilter === "today" && !isDueToday(todo.due_date)) return false;
+    if (dueDateFilter === "overdue" && (!isOverdue(todo.due_date) || todo.done)) return false;
+    if (dueDateFilter === "upcoming" && !isDueUpcoming(todo.due_date)) return false;
+    if (dueDateFilter === "none" && todo.due_date) return false;
     if (statusFilter === "open" && todo.done) return false;
     if (statusFilter === "done" && !todo.done) return false;
     if (searchQuery) {
@@ -116,7 +182,7 @@ function App() {
     return true;
   });
 
-  const hasActiveFilter = statusFilter !== "all" || searchQuery;
+  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "all" || searchQuery;
 
   return (
     <main className="app">
@@ -129,10 +195,27 @@ function App() {
           value={newTitle}
           onChange={(e) => setNewTitle(e.currentTarget.value)}
         />
+        <input
+          type="date"
+          className="date-input"
+          value={newDueDate}
+          onChange={(e) => setNewDueDate(e.currentTarget.value)}
+          title="Fälligkeitsdatum (optional)"
+        />
         <button type="submit">Los geht's!</button>
       </form>
 
       <div className="filter-bar">
+        {(Object.keys(filterLabels) as DueDateFilter[]).map((key) => (
+          <button
+            key={key}
+            type="button"
+            className={`filter-btn ${dueDateFilter === key ? "active" : ""}`}
+            onClick={() => setDueDateFilter(key)}
+          >
+            {filterLabels[key]}
+          </button>
+        ))}
         <div className="status-filter">
           <button
             type="button"
@@ -168,17 +251,17 @@ function App() {
       {hasActiveFilter && (
         <div className="active-filters">
           <span className="filter-label">
-            {statusFilter === "all"
-              ? "Alle"
-              : statusFilter === "open"
-                ? "Offen"
-                : "Erledigt"}
+            {filterLabels[dueDateFilter]}
+            {statusFilter !== "all"
+              ? ` • ${statusFilter === "open" ? "Offen" : "Erledigt"}`
+              : ""}
             {searchQuery ? ` • Suche: "${searchQuery}"` : ""}
           </span>
           <button
             type="button"
             className="clear-filters"
             onClick={() => {
+              setDueDateFilter("all");
               setStatusFilter("all");
               setSearchQuery("");
             }}
@@ -187,7 +270,6 @@ function App() {
           </button>
         </div>
       )}
-
       {error && <p className="error">⚠️ Fehler: {error}</p>}
       {loading && <p className="muted">Lade Aufgaben... 🌀</p>}
 
@@ -195,72 +277,102 @@ function App() {
         <p className="muted">Noch keine Aufgaben. Lege deine erste an! 🎯</p>
       )}
 
-      {!loading && hasActiveFilter && filteredTodos.length === 0 && (
-        <p className="muted">Keine Aufgaben gefunden 🔍</p>
+      {!loading && filteredTodos.length === 0 && todos.length > 0 && !error && (
+        <p className="muted">Keine Aufgaben in dieser Ansicht 🔍</p>
       )}
 
       <ul className="todo-list">
-        {filteredTodos.map((todo) => (
-          <li key={todo.id} className={todo.done ? "done" : ""}>
-            <input
-              type="checkbox"
-              checked={todo.done}
-              onChange={() => handleToggle(todo)}
-              aria-label={`${todo.title} als erledigt markieren`}
-            />
+        {filteredTodos.map((todo) => {
+          const overdue = !todo.done && isOverdue(todo.due_date);
+          const today = isDueToday(todo.due_date);
 
-            {editingId === todo.id ? (
+          return (
+            <li
+              key={todo.id}
+              className={[
+                todo.done ? "done" : "",
+                overdue ? "overdue" : "",
+                today && !todo.done ? "due-today" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
               <input
-                className="edit-input"
-                type="text"
-                value={editingTitle}
-                autoFocus
-                onChange={(e) => setEditingTitle(e.currentTarget.value)}
-                onBlur={() => commitEdit(todo.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitEdit(todo.id);
-                  if (e.key === "Escape") setEditingId(null);
-                }}
+                type="checkbox"
+                checked={todo.done}
+                onChange={() => handleToggle(todo)}
+                aria-label={`${todo.title} als erledigt markieren`}
               />
-            ) : (
-              <span className="title" onDoubleClick={() => startEdit(todo)}>
-                {todo.title}
-              </span>
-            )}
 
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() => startEdit(todo)}
-              aria-label="Bearbeiten"
-            >
-              ✏️
-            </button>
-            <button
-              type="button"
-              className="icon-button danger"
-              onClick={() => handleDelete(todo.id)}
-              aria-label="Löschen"
-            >
-              🗑️
-            </button>
+              {editingId === todo.id ? (
+                <div className="edit-row">
+                  <input
+                    className="edit-input"
+                    type="text"
+                    value={editingTitle}
+                    autoFocus
+                    onChange={(e) => setEditingTitle(e.currentTarget.value)}
+                    onBlur={() => commitEdit(todo.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitEdit(todo.id);
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                  />
+                  <input
+                    type="date"
+                    className="edit-date-input"
+                    value={editingDueDate}
+                    onChange={(e) => setEditingDueDate(e.currentTarget.value)}
+                    onBlur={() => commitEdit(todo.id)}
+                  />
+                </div>
+              ) : (
+                <span className="title" onDoubleClick={() => startEdit(todo)}>
+                  {todo.title}
+                </span>
+              )}
 
-            {burstEmoji?.id === todo.id && (
-              <span
-                style={{
-                  position: "absolute",
-                  right: "1.5rem",
-                  top: "-1rem",
-                  fontSize: "1.5rem",
-                  animation: "emoji-burst 0.8s ease-out forwards",
-                  pointerEvents: "none",
-                }}
+              {editingId !== todo.id && todo.due_date && (
+                <span className={`due-date-badge ${overdue ? "overdue" : ""} ${today && !todo.done ? "today" : ""}`}>
+                  {overdue && !todo.done ? "⚠️ " : ""}
+                  {formatDate(todo.due_date)}
+                </span>
+              )}
+
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => startEdit(todo)}
+                aria-label="Bearbeiten"
               >
-                {burstEmoji.emoji}
-              </span>
-            )}
-          </li>
-        ))}
+                ✏️
+              </button>
+              <button
+                type="button"
+                className="icon-button danger"
+                onClick={() => handleDelete(todo.id)}
+                aria-label="Löschen"
+              >
+                🗑️
+              </button>
+
+              {burstEmoji?.id === todo.id && (
+                <span
+                  style={{
+                    position: "absolute",
+                    right: "1.5rem",
+                    top: "-1rem",
+                    fontSize: "1.5rem",
+                    animation: "emoji-burst 0.8s ease-out forwards",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {burstEmoji.emoji}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       {!loading && todos.length > 0 && (
