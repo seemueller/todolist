@@ -9,6 +9,7 @@ vi.mock("./db", () => ({
   deleteTodo: vi.fn(),
   toggleTodoDone: vi.fn(),
   updateTodoTitle: vi.fn(),
+  updateTodoDueDate: vi.fn(),
 }));
 
 vi.mock("./version", () => ({
@@ -33,8 +34,8 @@ describe("App", () => {
 
   it("renders existing todos", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Buy milk", done: false, created_at: "2026-01-01T00:00:00Z" },
-      { id: 2, title: "Walk dog", done: true, created_at: "2026-01-01T00:00:00Z" },
+      { id: 1, title: "Buy milk", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null },
+      { id: 2, title: "Walk dog", done: true, created_at: "2026-01-01T00:00:00Z", due_date: null },
     ]);
 
     render(<App />);
@@ -52,6 +53,7 @@ describe("App", () => {
       title: "New task",
       done: false,
       created_at: "2026-01-01T00:00:00Z",
+      due_date: null,
     });
 
     render(<App />);
@@ -63,7 +65,7 @@ describe("App", () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(db.addTodo).toHaveBeenCalledWith("New task");
+      expect(db.addTodo).toHaveBeenCalledWith("New task", null);
       expect(screen.getByText("New task")).toBeInTheDocument();
     });
   });
@@ -80,7 +82,7 @@ describe("App", () => {
   });
 
   it("toggles todo done status", async () => {
-    const todo = { id: 1, title: "Toggle me", done: false, created_at: "2026-01-01T00:00:00Z" };
+    const todo = { id: 1, title: "Toggle me", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null };
     const updated = { ...todo, done: true };
 
     vi.mocked(db.listTodos).mockResolvedValue([todo]);
@@ -101,7 +103,7 @@ describe("App", () => {
   });
 
   it("deletes a todo", async () => {
-    const todo = { id: 1, title: "Delete me", done: false, created_at: "2026-01-01T00:00:00Z" };
+    const todo = { id: 1, title: "Delete me", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null };
 
     vi.mocked(db.listTodos).mockResolvedValue([todo]);
     vi.mocked(db.deleteTodo).mockResolvedValue(1);
@@ -132,8 +134,8 @@ describe("App", () => {
 
   it("shows remaining count", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Open", done: false, created_at: "2026-01-01T00:00:00Z" },
-      { id: 2, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z" },
+      { id: 1, title: "Open", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null },
+      { id: 2, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z", due_date: null },
     ]);
 
     render(<App />);
@@ -145,7 +147,7 @@ describe("App", () => {
 
   it("shows completion message when all todos are done", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z" },
+      { id: 1, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z", due_date: null },
     ]);
 
     render(<App />);
