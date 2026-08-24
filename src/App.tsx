@@ -27,6 +27,8 @@ function App() {
   const [editingTitle, setEditingTitle] = useState("");
   const [burstEmoji, setBurstEmoji] = useState<{ id: number; emoji: string } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "done">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const changelogRef = useRef<HTMLDivElement>(null);
 
   // Category state
@@ -42,7 +44,7 @@ function App() {
   async function refresh() {
     try {
       const [items, cats] = await Promise.all([
-        listTodos(categoryFilter),
+        listTodos(),
         listCategories(),
       ]);
       setTodos(items);
@@ -57,7 +59,7 @@ function App() {
 
   useEffect(() => {
     refresh();
-  }, [categoryFilter]);
+  }, []);
 
   const closeChangelog = useCallback(() => setShowChangelog(false), []);
 
@@ -205,6 +207,19 @@ function App() {
 
   const remaining = todos.filter((t) => !t.done).length;
 
+  const filteredTodos = todos.filter((todo) => {
+    if (statusFilter === "open" && todo.done) return false;
+    if (statusFilter === "done" && !todo.done) return false;
+    if (categoryFilter !== null && todo.category_id !== categoryFilter) return false;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      if (!todo.title.toLowerCase().includes(query)) return false;
+    }
+    return true;
+  });
+
+  const hasActiveFilter = statusFilter !== "all" || searchQuery || categoryFilter !== null;
+
   return (
     <main className="app">
       <h1>TodoList ✨</h1>
@@ -231,8 +246,37 @@ function App() {
         <button type="submit">Los geht's!</button>
       </form>
 
-      {/* Category filter + manager */}
       <div className="filter-bar">
+        <div className="status-filter">
+          <button
+            type="button"
+            className={statusFilter === "all" ? "active" : ""}
+            onClick={() => setStatusFilter("all")}
+          >
+            Alle
+          </button>
+          <button
+            type="button"
+            className={statusFilter === "open" ? "active" : ""}
+            onClick={() => setStatusFilter("open")}
+          >
+            Offen
+          </button>
+          <button
+            type="button"
+            className={statusFilter === "done" ? "active" : ""}
+            onClick={() => setStatusFilter("done")}
+          >
+            Erledigt
+          </button>
+        </div>
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Suche..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.currentTarget.value)}
+        />
         <select
           className="category-select filter-select"
           value={categoryFilter ?? ""}
@@ -255,19 +299,46 @@ function App() {
         </button>
       </div>
 
+      {hasActiveFilter && (
+        <div className="active-filters">
+          <span className="filter-label">
+            {statusFilter === "all"
+              ? "Alle"
+              : statusFilter === "open"
+                ? "Offen"
+                : "Erledigt"}
+            {categoryFilter !== null
+              ? ` • ${categories.find((c) => c.id === categoryFilter)?.name || "Kategorie"}`
+              : ""}
+            {searchQuery ? ` • Suche: "${searchQuery}"` : ""}
+          </span>
+          <button
+            type="button"
+            className="clear-filters"
+            onClick={() => {
+              setStatusFilter("all");
+              setSearchQuery("");
+              setCategoryFilter(null);
+            }}
+          >
+            Zurücksetzen ✕
+          </button>
+        </div>
+      )}
+
       {error && <p className="error">⚠️ Fehler: {error}</p>}
       {loading && <p className="muted">Lade Aufgaben... 🌀</p>}
 
       {!loading && todos.length === 0 && !error && (
-        <p className="muted">
-          {categoryFilter !== null
-            ? "Keine Aufgaben in dieser Kategorie."
-            : "Noch keine Aufgaben. Lege deine erste an! 🎯"}
-        </p>
+        <p className="muted">Noch keine Aufgaben. Lege deine erste an! 🎯</p>
+      )}
+
+      {!loading && hasActiveFilter && filteredTodos.length === 0 && (
+        <p className="muted">Keine Aufgaben gefunden 🔍</p>
       )}
 
       <ul className="todo-list">
-        {todos.map((todo) => (
+        {filteredTodos.map((todo) => (
           <li key={todo.id} className={todo.done ? "done" : ""}>
             <input
               type="checkbox"
@@ -357,9 +428,11 @@ function App() {
 
       {!loading && todos.length > 0 && (
         <p className="footer">
-          {remaining === 0
-            ? "Alles erledigt! 🎉"
-            : `${remaining} von ${todos.length} Aufgabe(n) offen 🎯`}
+          {hasActiveFilter
+            ? `${filteredTodos.length} von ${todos.length} Aufgabe(n) angezeigt`
+            : remaining === 0
+              ? "Alles erledigt! 🎉"
+              : `${remaining} von ${todos.length} Aufgabe(n) offen 🎯`}
         </p>
       )}
 
