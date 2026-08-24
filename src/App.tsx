@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { addTodo, deleteTodo, listTodos, toggleTodoDone, updateTodoTitle } from "./db";
 import { Todo } from "./types";
+import { APP_VERSION, CHANGELOG } from "./version";
 import "./App.css";
 
 const partyEmojis = ["🎉", "🥳", "✨", "💫", "🌟", "🎊", "🔥", "💥", "⭐", "🚀"];
@@ -13,6 +14,8 @@ function App() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [burstEmoji, setBurstEmoji] = useState<{ id: number; emoji: string } | null>(null);
+  const [showChangelog, setShowChangelog] = useState(false);
+  const changelogRef = useRef<HTMLDivElement>(null);
 
   async function refresh() {
     try {
@@ -29,6 +32,17 @@ function App() {
   useEffect(() => {
     refresh();
   }, []);
+
+  const closeChangelog = useCallback(() => setShowChangelog(false), []);
+
+  useEffect(() => {
+    if (!showChangelog) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeChangelog();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [showChangelog, closeChangelog]);
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
@@ -181,6 +195,43 @@ function App() {
             ? "Alles erledigt! 🎉"
             : `${remaining} von ${todos.length} Aufgabe(n) offen 🎯`}
         </p>
+      )}
+
+      <footer className="app-footer">
+        <span className="version">v{APP_VERSION}</span>
+        <button
+          type="button"
+          className="changelog-btn"
+          onClick={() => setShowChangelog(true)}
+        >
+          Changelog
+        </button>
+      </footer>
+
+      {showChangelog && (
+        <div className="modal-overlay" onClick={closeChangelog}>
+          <div className="changelog-modal" ref={changelogRef} onClick={(e) => e.stopPropagation()}>
+            <div className="changelog-header">
+              <h2>Changelog</h2>
+              <button type="button" className="close-btn" onClick={closeChangelog}>✕</button>
+            </div>
+            <div className="changelog-body">
+              {CHANGELOG.map((entry) => (
+                <div key={entry.version} className="changelog-entry">
+                  <div className="changelog-version">
+                    <span className="version-badge">{entry.version}</span>
+                    <span className="version-date">{entry.date}</span>
+                  </div>
+                  <ul>
+                    {entry.changes.map((change, i) => (
+                      <li key={i}>{change}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
