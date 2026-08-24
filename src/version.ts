@@ -15,6 +15,12 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Kategorien erstellen, bearbeiten und löschen",
       "Farbige Kategorie-Badges",
       "Filter nach Kategorie",
+      "Komplettes Look & Feel Redesign",
+      "Custom Title Leiste mit Fenstersteuerung",
+      "Modernes dunkles Design mit Glassmorphismus",
+      "Custom App-Icon und SVG-Grafiken",
+      "Verbesserte Animationen und Übergänge",
+      "Neue Typografie mit Inter Font",
     ],
   },
   {

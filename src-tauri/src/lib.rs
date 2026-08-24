@@ -27,6 +27,12 @@ pub fn run() {
         },
         Migration {
             version: 3,
+            description: "add_due_date_column",
+            sql: "ALTER TABLE todos ADD COLUMN due_date TEXT DEFAULT NULL;",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 4,
             description: "add_category_id_to_todos",
             sql: "ALTER TABLE todos ADD COLUMN category_id INTEGER DEFAULT NULL REFERENCES categories(id) ON DELETE SET NULL;",
             kind: MigrationKind::Up,

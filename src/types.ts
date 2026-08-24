@@ -3,6 +3,7 @@ export interface Todo {
   title: string;
   done: boolean;
   created_at: string;
+  due_date: string | null;
   category_id: number | null;
   category_name: string | null;
   category_color: string | null;
@@ -13,6 +14,7 @@ export interface TodoRow {
   title: string;
   done: number;
   created_at: string;
+  due_date: string | null;
   category_id: number | null;
   category_name: string | null;
   category_color: string | null;
@@ -24,6 +26,7 @@ export function fromRow(row: TodoRow): Todo {
     title: row.title,
     done: row.done === 1,
     created_at: row.created_at,
+    due_date: row.due_date,
     category_id: row.category_id,
     category_name: row.category_name,
     category_color: row.category_color,

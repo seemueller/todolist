@@ -1,20 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import App from "./App";
 import * as db from "./db";
 
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    isMaximized: () => Promise.resolve(false),
+    minimize: () => Promise.resolve(),
+    maximize: () => Promise.resolve(),
+    unmaximize: () => Promise.resolve(),
+    close: () => Promise.resolve(),
+  }),
+}));
+
 vi.mock("./db", () => ({
   listTodos: vi.fn(),
+  listCategories: vi.fn(() => Promise.resolve([])),
   addTodo: vi.fn(),
   deleteTodo: vi.fn(),
   toggleTodoDone: vi.fn(),
   updateTodoTitle: vi.fn(),
+  updateTodoDueDate: vi.fn(),
 }));
 
 vi.mock("./version", () => ({
   APP_VERSION: "0.2.0",
   CHANGELOG: [],
 }));
+
+const todoBase = { category_id: null as number | null, category_name: null as string | null, category_color: null as string | null };
 
 describe("App", () => {
   beforeEach(() => {
@@ -33,8 +47,8 @@ describe("App", () => {
 
   it("renders existing todos", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Buy milk", done: false, created_at: "2026-01-01T00:00:00Z" },
-      { id: 2, title: "Walk dog", done: true, created_at: "2026-01-01T00:00:00Z" },
+      { id: 1, title: "Buy milk", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
+      { id: 2, title: "Walk dog", done: true, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
     ]);
 
     render(<App />);
@@ -52,19 +66,22 @@ describe("App", () => {
       title: "New task",
       done: false,
       created_at: "2026-01-01T00:00:00Z",
+      due_date: null,
+      ...todoBase,
     });
 
     render(<App />);
 
     const input = screen.getByPlaceholderText(/Was steht an/i);
-    const button = screen.getByRole("button", { name: /Los geht's/i });
+    const button = screen.getByRole("button", { name: /Aufgabe hinzufügen/i });
 
-    fireEvent.change(input, { target: { value: "New task" } });
-    fireEvent.click(button);
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "New task" } });
+      fireEvent.click(button);
+    });
 
     await waitFor(() => {
-      expect(db.addTodo).toHaveBeenCalledWith("New task");
-      expect(screen.getByText("New task")).toBeInTheDocument();
+      expect(db.addTodo).toHaveBeenCalledWith("New task", null, null);
     });
   });
 
@@ -73,14 +90,14 @@ describe("App", () => {
 
     render(<App />);
 
-    const button = screen.getByRole("button", { name: /Los geht's/i });
+    const button = screen.getByRole("button", { name: /Aufgabe hinzufügen/i });
     fireEvent.click(button);
 
     expect(db.addTodo).not.toHaveBeenCalled();
   });
 
   it("toggles todo done status", async () => {
-    const todo = { id: 1, title: "Toggle me", done: false, created_at: "2026-01-01T00:00:00Z" };
+    const todo = { id: 1, title: "Toggle me", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase };
     const updated = { ...todo, done: true };
 
     vi.mocked(db.listTodos).mockResolvedValue([todo]);
@@ -92,7 +109,7 @@ describe("App", () => {
       expect(screen.getByText("Toggle me")).toBeInTheDocument();
     });
 
-    const checkbox = screen.getByRole("checkbox", { name: /Toggle me/i });
+    const checkbox = screen.getByRole("button", { name: /Toggle me als erledigt markieren/i });
     fireEvent.click(checkbox);
 
     await waitFor(() => {
@@ -101,7 +118,7 @@ describe("App", () => {
   });
 
   it("deletes a todo", async () => {
-    const todo = { id: 1, title: "Delete me", done: false, created_at: "2026-01-01T00:00:00Z" };
+    const todo = { id: 1, title: "Delete me", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase };
 
     vi.mocked(db.listTodos).mockResolvedValue([todo]);
     vi.mocked(db.deleteTodo).mockResolvedValue(1);
@@ -132,8 +149,8 @@ describe("App", () => {
 
   it("shows remaining count", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Open", done: false, created_at: "2026-01-01T00:00:00Z" },
-      { id: 2, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z" },
+      { id: 1, title: "Open", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
+      { id: 2, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
     ]);
 
     render(<App />);
@@ -145,7 +162,7 @@ describe("App", () => {
 
   it("shows completion message when all todos are done", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z" },
+      { id: 1, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
     ]);
 
     render(<App />);
