@@ -1,4 +1,4 @@
-import { DragEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
   addTodo,
   addCategory,
@@ -17,9 +17,29 @@ import {
 import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
+import {
+  BoardViewIcon,
+  CategoryBadge,
+  CategorySelect,
+  CheckIcon,
+  ChevronLeftIcon,
+  ColorPicker,
+  DueDateBadge,
+  FilterChip,
+  IconButton,
+  InlineEditInput,
+  LaneDoneIcon,
+  LaneProgressIcon,
+  LaneTodoIcon,
+  ListViewIcon,
+  Modal,
+  PencilIcon,
+  PlusIcon,
+  PrioritySelect,
+  TagIcon,
+  TrashIcon,
+} from "./ui";
 import "./App.css";
-
-const partyEmojis = ["🎉", "🥳", "✨", "💫", "🌟", "🎊", "🔥", "💥", "⭐", "🚀"];
 
 type DueDateFilter = "all" | "today" | "overdue" | "upcoming" | "none";
 
@@ -79,12 +99,11 @@ function App() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDueDate, setEditingDueDate] = useState("");
-  const [burstEmoji, setBurstEmoji] = useState<{ id: number; emoji: string } | null>(null);
+  const [burstId, setBurstId] = useState<number | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "done">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const changelogRef = useRef<HTMLDivElement>(null);
 
   // Category state
   const [categories, setCategories] = useState<Category[]>([]);
@@ -123,24 +142,6 @@ function App() {
 
   const closeChangelog = useCallback(() => setShowChangelog(false), []);
 
-  useEffect(() => {
-    if (!showChangelog) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeChangelog();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [showChangelog, closeChangelog]);
-
-  useEffect(() => {
-    if (!showCategoryManager) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeCategoryManager();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [showCategoryManager]);
-
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
     const title = newTitle.trim();
@@ -161,9 +162,8 @@ function App() {
 
   async function handleToggle(todo: Todo) {
     if (!todo.done) {
-      const randomEmoji = partyEmojis[Math.floor(Math.random() * partyEmojis.length)];
-      setBurstEmoji({ id: todo.id, emoji: randomEmoji });
-      setTimeout(() => setBurstEmoji(null), 800);
+      setBurstId(todo.id);
+      setTimeout(() => setBurstId(null), 800);
     }
     try {
       const updated = await toggleTodoDone(todo.id, !todo.done);
@@ -234,10 +234,10 @@ function App() {
 
   // ── Kanban drag-and-drop ──────────────────────────────────────────────
 
-  const kanbanLanes: { status: TodoStatus; label: string; icon: string; color: string }[] = [
-    { status: "todo", label: "Zu tun", icon: "📋", color: "#6366f1" },
-    { status: "in_progress", label: "In Bearbeitung", icon: "⚡", color: "#f59e0b" },
-    { status: "done", label: "Erledigt", icon: "✅", color: "#22c55e" },
+  const kanbanLanes: { status: TodoStatus; label: string; icon: ReactNode; color: string }[] = [
+    { status: "todo", label: "Zu tun", icon: <LaneTodoIcon />, color: "#7cc3f7" },
+    { status: "in_progress", label: "In Bearbeitung", icon: <LaneProgressIcon />, color: "#ffd43b" },
+    { status: "done", label: "Erledigt", icon: <LaneDoneIcon />, color: "#6fcf7f" },
   ];
 
   async function handleDropOnLane(todoId: number, targetStatus: TodoStatus) {
@@ -245,9 +245,8 @@ function App() {
       const updated = await updateTodoStatus(todoId, targetStatus);
       setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       if (targetStatus === "done") {
-        const randomEmoji = partyEmojis[Math.floor(Math.random() * partyEmojis.length)];
-        setBurstEmoji({ id: todoId, emoji: randomEmoji });
-        setTimeout(() => setBurstEmoji(null), 800);
+        setBurstId(todoId);
+        setTimeout(() => setBurstId(null), 800);
       }
       setError(null);
     } catch (err) {
@@ -327,12 +326,13 @@ function App() {
     }
   }
 
-  function closeCategoryManager() {
+  const closeCategoryManager = useCallback(() => {
     setShowCategoryManager(false);
     setEditingCategoryId(null);
-  }
+  }, []);
 
   const remaining = todos.filter((t) => !t.done).length;
+  const headerCount = todos.length === 0 ? "Keine Aufgaben" : `${remaining} offen`;
   const filteredTodos = todos.filter((todo) => {
     if (dueDateFilter === "today" && !isDueToday(todo.due_date)) return false;
     if (dueDateFilter === "overdue" && (!isOverdue(todo.due_date) || todo.done)) return false;
@@ -357,7 +357,7 @@ function App() {
       <main className="app">
         <header className="app-header">
           <h1>TodoList</h1>
-          <p className="app-subtitle">Behalte den Überblick</p>
+          <p className="app-subtitle">{headerCount}</p>
           <button
             type="button"
             className={`view-toggle ${viewMode === "kanban" ? "kanban-active" : ""}`}
@@ -365,22 +365,7 @@ function App() {
             aria-label={viewMode === "list" ? "Zum Kanban-Brett wechseln" : "Zur Listenansicht wechseln"}
             title={viewMode === "list" ? "Kanban-Brett" : "Liste"}
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              {viewMode === "list" ? (
-                <>
-                  <rect x="3" y="3" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                  <rect x="3" y="9" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                  <line x1="10" y1="5" x2="15" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  <line x1="10" y1="11" x2="15" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </>
-              ) : (
-                <>
-                  <rect x="1" y="3" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                  <rect x="7" y="3" width="4" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                  <rect x="13" y="3" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                </>
-              )}
-            </svg>
+            {viewMode === "list" ? <BoardViewIcon /> : <ListViewIcon />}
           </button>
         </header>
 
@@ -398,70 +383,40 @@ function App() {
             onChange={(e) => setNewDueDate(e.currentTarget.value)}
             title="Fälligkeitsdatum (optional)"
           />
-          <select
-            className="category-select"
-            value={newCategoryId ?? ""}
-            onChange={(e) => setNewCategoryId(e.target.value ? Number(e.target.value) : null)}
-          >
-            <option value="">Keine Kategorie</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
+          <CategorySelect
+            categories={categories}
+            value={newCategoryId}
+            onValueChange={setNewCategoryId}
+            placeholderLabel="Keine Kategorie"
+          />
+          <PrioritySelect value={newPriority} onValueChange={setNewPriority} aria-label="Priorität" />
           <button type="submit" aria-label="Aufgabe hinzufügen">
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            <PlusIcon />
           </button>
-          <select
-            className="priority-select"
-            value={newPriority}
-            onChange={(e) => setNewPriority(e.currentTarget.value as Priority)}
-            aria-label="Priorität"
-          >
-            <option value="low">Niedrig</option>
-            <option value="medium">Mittel</option>
-            <option value="high">Hoch</option>
-          </select>
         </form>
 
         {viewMode === "list" && (
           <>
             <div className="filter-bar">
           {(Object.keys(filterLabels) as DueDateFilter[]).map((key) => (
-            <button
+            <FilterChip
               key={key}
-              type="button"
-              className={`filter-btn ${dueDateFilter === key ? "active" : ""}`}
+              active={dueDateFilter === key}
               onClick={() => setDueDateFilter(key)}
             >
               {filterLabels[key]}
-            </button>
+            </FilterChip>
           ))}
           <div className="status-filter">
-            <button
-              type="button"
-              className={statusFilter === "all" ? "active" : ""}
-              onClick={() => setStatusFilter("all")}
-            >
+            <FilterChip variant="segment" active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
               Alle
-            </button>
-            <button
-              type="button"
-              className={statusFilter === "open" ? "active" : ""}
-              onClick={() => setStatusFilter("open")}
-            >
+            </FilterChip>
+            <FilterChip variant="segment" active={statusFilter === "open"} onClick={() => setStatusFilter("open")}>
               Offen
-            </button>
-            <button
-              type="button"
-              className={statusFilter === "done" ? "active" : ""}
-              onClick={() => setStatusFilter("done")}
-            >
+            </FilterChip>
+            <FilterChip variant="segment" active={statusFilter === "done"} onClick={() => setStatusFilter("done")}>
               Erledigt
-            </button>
+            </FilterChip>
           </div>
           <input
             type="text"
@@ -470,26 +425,21 @@ function App() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.currentTarget.value)}
           />
-          <select
-            className="category-select filter-select"
-            value={categoryFilter ?? ""}
-            onChange={(e) => setCategoryFilter(e.target.value ? Number(e.target.value) : null)}
-          >
-            <option value="">Alle Kategorien</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="icon-button"
+          <CategorySelect
+            className="filter-select"
+            categories={categories}
+            value={categoryFilter}
+            onValueChange={setCategoryFilter}
+            placeholderLabel="Alle Kategorien"
+          />
+          <IconButton
+            variant="icon"
             onClick={() => setShowCategoryManager(true)}
             aria-label="Kategorien verwalten"
           >
-            🏷️
-          </button>
+            <TagIcon />
+            Kategorien
+          </IconButton>
         </div>
 
         {hasActiveFilter && (
@@ -514,19 +464,19 @@ function App() {
                 setCategoryFilter(null);
               }}
             >
-              Zurücksetzen ✕
+              Zurücksetzen
             </button>
           </div>
         )}
-        {error && <p className="error">⚠️ Fehler: {error}</p>}
-        {loading && <p className="muted">Lade Aufgaben... 🌀</p>}
+        {error && <p className="error">Fehler: {error}</p>}
+        {loading && <p className="muted">Lade Aufgaben …</p>}
 
         {!loading && todos.length === 0 && !error && (
-          <p className="muted">Noch keine Aufgaben. Lege deine erste an! 🎯</p>
+          <p className="muted">Noch keine Aufgaben. Lege deine erste an — Titel eintippen, Enter drücken.</p>
         )}
 
         {!loading && hasActiveFilter && filteredTodos.length === 0 && (
-          <p className="muted">Keine Aufgaben gefunden 🔍</p>
+          <p className="muted">Keine Aufgaben gefunden. Setz den Filter auf „Alle“ zurück.</p>
         )}
 
         <ul className="todo-list">
@@ -546,31 +496,22 @@ function App() {
                   .filter(Boolean)
                   .join(" ")}
               >
-                <button
-                  className="checkbox"
+                <IconButton
+                  variant="checkbox"
                   onClick={() => handleToggle(todo)}
                   aria-label={`${todo.title} als erledigt markieren`}
                 >
-                  {todo.done && (
-                    <svg width="14" height="14" viewBox="0 0 14 14">
-                      <path d="M2 7l4 4 6-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                    </svg>
-                  )}
-                </button>
+                  {todo.done && <CheckIcon />}
+                </IconButton>
 
                 {editingId === todo.id ? (
                   <div className="edit-row">
-                    <input
-                      className="edit-input"
-                      type="text"
+                    <InlineEditInput
                       value={editingTitle}
                       autoFocus
-                      onChange={(e) => setEditingTitle(e.currentTarget.value)}
-                      onBlur={() => commitEdit(todo.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitEdit(todo.id);
-                        if (e.key === "Escape") setEditingId(null);
-                      }}
+                      onValueChange={setEditingTitle}
+                      onCommit={() => commitEdit(todo.id)}
+                      onCancel={() => setEditingId(null)}
                     />
                     <input
                       type="date"
@@ -587,84 +528,50 @@ function App() {
                 )}
 
                 {editingId !== todo.id && todo.due_date && (
-                  <span className={`due-date-badge ${overdue ? "overdue" : ""} ${today && !todo.done ? "today" : ""}`}>
+                  <DueDateBadge overdue={overdue} today={today && !todo.done}>
                     {formatDate(todo.due_date)}
-                  </span>
+                  </DueDateBadge>
                 )}
 
                 {editingId !== todo.id && (
-                  <span className={`priority-dot priority-dot-${todo.priority}`} title={`Priorität: ${todo.priority === "low" ? "niedrig" : todo.priority === "medium" ? "mittel" : "hoch"}`} />
-                )}
-
-                {editingId !== todo.id && (
-                  <select
-                    className="priority-select-inline"
+                  <PrioritySelect
+                    variant="inline"
                     value={todo.priority}
-                    onChange={(e) => handlePriorityChange(todo.id, e.currentTarget.value as Priority)}
+                    onValueChange={(priority) => handlePriorityChange(todo.id, priority)}
                     aria-label="Priorität ändern"
-                  >
-                    <option value="low">Niedrig</option>
-                    <option value="medium">Mittel</option>
-                    <option value="high">Hoch</option>
-                  </select>
+                  />
                 )}
 
                 {todo.category_name && (
-                  <span
-                    className="category-badge"
-                    style={{ backgroundColor: todo.category_color || "rgba(167,139,250,0.4)" }}
-                  >
-                    {todo.category_name}
-                  </span>
+                  <CategoryBadge color={todo.category_color}>{todo.category_name}</CategoryBadge>
                 )}
 
-                <select
-                  className="category-select todo-select"
-                  value={todo.category_id ?? ""}
-                  onChange={(e) =>
-                    handleUpdateTodoCategory(todo.id, e.target.value ? Number(e.target.value) : null)
-                  }
+                <CategorySelect
+                  className="todo-select"
+                  categories={categories}
+                  value={todo.category_id}
+                  onValueChange={(categoryId) => handleUpdateTodoCategory(todo.id, categoryId)}
+                  placeholderLabel="—"
                   aria-label="Kategorie auswählen"
-                >
-                  <option value="">—</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                />
 
                 <div className="todo-actions">
-                  <button
-                    type="button"
-                    className="action-btn"
-                    onClick={() => startEdit(todo)}
-                    aria-label="Bearbeiten"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14">
-                      <path d="M9.5 2.5l2 2M2 12l.5-2.5L9.5 3l2 2L5 11.5 2 12z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className="action-btn danger"
+                  <IconButton variant="action" onClick={() => startEdit(todo)} aria-label="Bearbeiten">
+                    <PencilIcon />
+                  </IconButton>
+                  <IconButton
+                    variant="action"
+                    danger
                     onClick={() => handleDelete(todo.id)}
                     aria-label="Löschen"
                   >
-                    <svg width="14" height="14" viewBox="0 0 14 14">
-                      <path d="M3 4h8M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1M6 7v4M8 7v4M4 4l.5 7a1 1 0 001 1h3a1 1 0 001-1L10 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                    </svg>
-                  </button>
+                    <TrashIcon />
+                  </IconButton>
                 </div>
 
-                {burstEmoji?.id === todo.id && (
-                  <span
-                    className="emoji-burst"
-                    style={{
-                      animation: "emoji-burst 0.8s ease-out forwards",
-                    }}
-                  >
-                    {burstEmoji.emoji}
+                {burstId === todo.id && (
+                  <span className="done-flash" aria-hidden="true">
+                    <CheckIcon />
                   </span>
                 )}
               </li>
@@ -707,12 +614,10 @@ function App() {
                   onDragLeave={() => setDragOverLane(null)}
                   onDrop={(e) => handleLaneDrop(e, lane.status)}
                 >
-                  <div className="kanban-lane-header" style={{ borderColor: lane.color }}>
+                  <div className="kanban-lane-header" style={{ backgroundColor: lane.color }}>
                     <span className="kanban-lane-icon">{lane.icon}</span>
                     <h3>{lane.label}</h3>
-                    <span className="kanban-count" style={{ backgroundColor: `${lane.color}22`, color: lane.color }}>
-                      {laneTodos.length}
-                    </span>
+                    <span className="kanban-count">{laneTodos.length}</span>
                   </div>
 
                   <div className="kanban-lane-body">
@@ -723,59 +628,44 @@ function App() {
                       return (
                         <div
                           key={todo.id}
-                          className={`kanban-card priority-${todo.priority} ${overdue ? "overdue" : ""} ${today && !todo.done ? "due-today" : ""} ${
+                          className={`kanban-card priority-${todo.priority} ${todo.done ? "done" : ""} ${overdue ? "overdue" : ""} ${today && !todo.done ? "due-today" : ""} ${
                             draggedTodoId === todo.id ? "dragging" : ""
                           }`}
                           draggable
                           onDragStart={(e) => handleDragStart(e, todo.id)}
                         >
-                          <span className={`kanban-card-priority priority-dot-${todo.priority}`} />
                           <span className="kanban-card-title">{todo.title}</span>
 
                           <div className="kanban-card-meta">
                             {todo.due_date && (
-                              <span className={`kanban-due-badge ${overdue ? "overdue" : ""} ${today && !todo.done ? "today" : ""}`}>
+                              <DueDateBadge variant="kanban" overdue={overdue} today={today && !todo.done}>
                                 {formatDate(todo.due_date)}
-                              </span>
+                              </DueDateBadge>
                             )}
                             {todo.category_name && (
-                              <span
-                                className="kanban-category-badge"
-                                style={{ backgroundColor: todo.category_color || "rgba(167,139,250,0.4)" }}
-                              >
+                              <CategoryBadge variant="kanban" color={todo.category_color}>
                                 {todo.category_name}
-                              </span>
+                              </CategoryBadge>
                             )}
                           </div>
 
                           <div className="kanban-card-actions">
-                            <button
-                              type="button"
-                              className="kanban-action-btn"
+                            <IconButton
+                              variant="kanban"
                               onClick={() => handleToggle(todo)}
                               aria-label={`${todo.title} Status ändern`}
                               title={todo.status === "done" ? "Zurück zu \"Zu tun\"" : "Als erledigt markieren"}
                             >
-                              {todo.status === "done" ? (
-                                <svg width="14" height="14" viewBox="0 0 14 14">
-                                  <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                                </svg>
-                              ) : (
-                                <svg width="14" height="14" viewBox="0 0 14 14">
-                                  <path d="M2 7l4 4 6-8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                                </svg>
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              className="kanban-action-btn danger"
+                              {todo.status === "done" ? <ChevronLeftIcon /> : <CheckIcon />}
+                            </IconButton>
+                            <IconButton
+                              variant="kanban"
+                              danger
                               onClick={() => handleDelete(todo.id)}
                               aria-label="Löschen"
                             >
-                              <svg width="14" height="14" viewBox="0 0 14 14">
-                                <path d="M3 4h8M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1M6 7v4M8 7v4M4 4l.5 7a1 1 0 001 1h3a1 1 0 001-1L10 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                              </svg>
-                            </button>
+                              <TrashIcon />
+                            </IconButton>
                           </div>
                         </div>
                       );
@@ -807,16 +697,7 @@ function App() {
 
       {/* Changelog Modal */}
       {showChangelog && (
-        <div className="modal-overlay" onClick={closeChangelog}>
-          <div className="changelog-modal" ref={changelogRef} onClick={(e) => e.stopPropagation()}>
-            <div className="changelog-header">
-              <h2>Changelog</h2>
-              <button type="button" className="close-btn" onClick={closeChangelog}>
-                <svg width="14" height="14" viewBox="0 0 14 14">
-                  <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
+        <Modal variant="changelog" title="Changelog" onClose={closeChangelog} closeLabel="Schließen">
             <div className="changelog-body">
               {CHANGELOG.map((entry) => (
                 <div key={entry.version} className="changelog-entry">
@@ -832,18 +713,12 @@ function App() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Category Manager Modal */}
       {showCategoryManager && (
-        <div className="modal-overlay" onClick={closeCategoryManager}>
-          <div className="category-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="changelog-header">
-              <h2>Kategorien 🏷️</h2>
-              <button type="button" className="close-btn" onClick={closeCategoryManager}>✕</button>
-            </div>
+        <Modal variant="category" title="Kategorien" onClose={closeCategoryManager} closeLabel="Schließen">
 
             <form className="add-category-form" onSubmit={handleAddCategory}>
               <input
@@ -852,18 +727,11 @@ function App() {
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.currentTarget.value)}
               />
-              <div className="color-picker">
-                {CATEGORY_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`color-swatch ${newCategoryColor === color ? "active" : ""}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setNewCategoryColor(color)}
-                    aria-label={`Farbe ${color} auswählen`}
-                  />
-                ))}
-              </div>
+              <ColorPicker
+                value={newCategoryColor}
+                onSelect={setNewCategoryColor}
+                swatchLabel={(color) => `Farbe ${color} auswählen`}
+              />
               <button type="submit">Hinzufügen</button>
             </form>
 
@@ -872,28 +740,18 @@ function App() {
                 <li key={cat.id} className="category-item">
                   {editingCategoryId === cat.id ? (
                     <>
-                      <input
-                        className="edit-input"
-                        type="text"
+                      <InlineEditInput
                         value={editingCategoryName}
-                        onChange={(e) => setEditingCategoryName(e.currentTarget.value)}
-                        onBlur={() => commitEditCategory(cat.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") commitEditCategory(cat.id);
-                          if (e.key === "Escape") setEditingCategoryId(null);
-                        }}
+                        onValueChange={setEditingCategoryName}
+                        onCommit={() => commitEditCategory(cat.id)}
+                        onCancel={() => setEditingCategoryId(null)}
                       />
-                      <div className="color-picker inline">
-                        {CATEGORY_COLORS.map((color) => (
-                          <button
-                            key={color}
-                            type="button"
-                            className={`color-swatch ${editingCategoryColor === color ? "active" : ""}`}
-                            style={{ backgroundColor: color }}
-                            onClick={() => setEditingCategoryColor(color)}
-                          />
-                        ))}
-                      </div>
+                      <ColorPicker
+                        inline
+                        value={editingCategoryColor}
+                        onSelect={setEditingCategoryColor}
+                        swatchLabel={(color) => `Farbe ${color} auswählen`}
+                      />
                     </>
                   ) : (
                     <>
@@ -907,38 +765,35 @@ function App() {
 
                   <div className="category-actions">
                     {editingCategoryId === cat.id ? (
-                      <button
-                        type="button"
-                        className="icon-button"
+                      <IconButton
+                        variant="icon"
                         onClick={() => commitEditCategory(cat.id)}
                         aria-label="Speichern"
                       >
-                        ✓
-                      </button>
+                        <CheckIcon />
+                      </IconButton>
                     ) : (
-                      <button
-                        type="button"
-                        className="icon-button"
+                      <IconButton
+                        variant="icon"
                         onClick={() => startEditCategory(cat)}
                         aria-label="Bearbeiten"
                       >
-                        ✏️
-                      </button>
+                        <PencilIcon />
+                      </IconButton>
                     )}
-                    <button
-                      type="button"
-                      className="icon-button danger"
+                    <IconButton
+                      variant="icon"
+                      danger
                       onClick={() => handleDeleteCategory(cat.id)}
                       aria-label="Löschen"
                     >
-                      🗑️
-                    </button>
+                      <TrashIcon />
+                    </IconButton>
                   </div>
                 </li>
               ))}
             </ul>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

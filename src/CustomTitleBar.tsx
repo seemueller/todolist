@@ -3,14 +3,8 @@ import { useEffect, useState } from "react";
 function AppIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="icon-bg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#818cf8" />
-          <stop offset="1" stopColor="#a78bfa" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="8" fill="url(#icon-bg)" />
-      <path d="M9 16.5l4 4 10-10" stroke="#e0e7ff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="2" y="2" width="28" height="28" rx="5" fill="#ffd43b" stroke="#14100c" strokeWidth="3" />
+      <path d="M10 16.8l4 4 9-9" stroke="#14100c" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

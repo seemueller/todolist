@@ -67,14 +67,12 @@ export function fromCategoryRow(row: CategoryRow): Category {
 }
 
 export const CATEGORY_COLORS = [
-  "#a78bfa",
-  "#f472b6",
-  "#4facfe",
-  "#34d399",
-  "#fbbf24",
-  "#f87171",
-  "#60a5fa",
-  "#c084fc",
-  "#fb923c",
-  "#2dd4bf",
+  "#7cc3f7",
+  "#efaee6",
+  "#ffd43b",
+  "#6fcf7f",
+  "#e5401a",
+  "#b9a4f0",
+  "#f9a03f",
+  "#7fd8d0",
 ];

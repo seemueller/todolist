@@ -13,6 +13,11 @@ Eine einfache Desktop-TODO-Listen-Anwendung für Windows, macOS und Linux.
 - Aufgaben anlegen, bearbeiten, abhaken und löschen
 - Lokale Speicherung in einer SQLite-Datenbank (keine Anmeldung, kein Server nötig)
 
+## Oberfläche
+
+Die Gestaltung folgt einem verbindlichen Styleguide: [`STYLEGUIDE.md`](STYLEGUIDE.md).
+Wiederverwendbare Bausteine liegen unter `src/ui/`.
+
 ## Entwicklung
 
 ```bash
