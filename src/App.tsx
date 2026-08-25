@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { DragEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   addTodo,
   addCategory,
@@ -11,9 +11,10 @@ import {
   updateTodoCategory,
   updateTodoDueDate,
   updateTodoPriority,
+  updateTodoStatus,
   updateTodoTitle,
 } from "./db";
-import { CATEGORY_COLORS, Category, Priority, Todo } from "./types";
+import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import "./App.css";
@@ -94,6 +95,11 @@ function App() {
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingCategoryColor, setEditingCategoryColor] = useState("");
+
+  // Kanban view state
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [draggedTodoId, setDraggedTodoId] = useState<number | null>(null);
+  const [dragOverLane, setDragOverLane] = useState<TodoStatus | null>(null);
 
   async function refresh() {
     try {
@@ -226,6 +232,51 @@ function App() {
     }
   }
 
+  // ── Kanban drag-and-drop ──────────────────────────────────────────────
+
+  const kanbanLanes: { status: TodoStatus; label: string; icon: string; color: string }[] = [
+    { status: "todo", label: "Zu tun", icon: "📋", color: "#6366f1" },
+    { status: "in_progress", label: "In Bearbeitung", icon: "⚡", color: "#f59e0b" },
+    { status: "done", label: "Erledigt", icon: "✅", color: "#22c55e" },
+  ];
+
+  async function handleDropOnLane(todoId: number, targetStatus: TodoStatus) {
+    try {
+      const updated = await updateTodoStatus(todoId, targetStatus);
+      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      if (targetStatus === "done") {
+        const randomEmoji = partyEmojis[Math.floor(Math.random() * partyEmojis.length)];
+        setBurstEmoji({ id: todoId, emoji: randomEmoji });
+        setTimeout(() => setBurstEmoji(null), 800);
+      }
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setDraggedTodoId(null);
+      setDragOverLane(null);
+    }
+  }
+
+  function handleDragStart(e: DragEvent, todoId: number) {
+    setDraggedTodoId(todoId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(todoId));
+  }
+
+  function handleLaneDragOver(e: DragEvent) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }
+
+  function handleLaneDrop(e: DragEvent, targetStatus: TodoStatus) {
+    e.preventDefault();
+    const todoId = Number(e.dataTransfer.getData("text/plain"));
+    if (todoId) {
+      handleDropOnLane(todoId, targetStatus);
+    }
+  }
+
   // ── Category CRUD ──────────────────────────────────────────────────────
 
   async function handleAddCategory(e: FormEvent) {
@@ -307,6 +358,30 @@ function App() {
         <header className="app-header">
           <h1>TodoList</h1>
           <p className="app-subtitle">Behalte den Überblick</p>
+          <button
+            type="button"
+            className={`view-toggle ${viewMode === "kanban" ? "kanban-active" : ""}`}
+            onClick={() => setViewMode((v) => (v === "list" ? "kanban" : "list"))}
+            aria-label={viewMode === "list" ? "Zum Kanban-Brett wechseln" : "Zur Listenansicht wechseln"}
+            title={viewMode === "list" ? "Kanban-Brett" : "Liste"}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              {viewMode === "list" ? (
+                <>
+                  <rect x="3" y="3" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                  <rect x="3" y="9" width="5" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                  <line x1="10" y1="5" x2="15" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1="10" y1="11" x2="15" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </>
+              ) : (
+                <>
+                  <rect x="1" y="3" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                  <rect x="7" y="3" width="4" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                  <rect x="13" y="3" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                </>
+              )}
+            </svg>
+          </button>
         </header>
 
         <form className="add-form" onSubmit={handleAdd}>
@@ -352,7 +427,9 @@ function App() {
           </select>
         </form>
 
-        <div className="filter-bar">
+        {viewMode === "list" && (
+          <>
+            <div className="filter-bar">
           {(Object.keys(filterLabels) as DueDateFilter[]).map((key) => (
             <button
               key={key}
@@ -603,6 +680,117 @@ function App() {
                 ? "Alles erledigt!"
                 : `${remaining} von ${todos.length} Aufgabe(n) offen`}
           </p>
+        )}
+          </>
+        )}
+
+        {viewMode === "kanban" && (
+          <div className="kanban-wrapper">
+            {kanbanLanes.map((lane) => {
+              const laneTodos = todos
+                .filter((t) => t.status === lane.status)
+                .sort((a, b) => {
+                  const priorityOrder = { high: 0, medium: 1, low: 2 };
+                  const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+                  if (pDiff !== 0) return pDiff;
+                  return b.created_at.localeCompare(a.created_at);
+                });
+
+              return (
+                <div
+                  key={lane.status}
+                  className={`kanban-lane ${dragOverLane === lane.status ? "drag-over" : ""}`}
+                  onDragOver={(e) => {
+                    handleLaneDragOver(e);
+                    setDragOverLane(lane.status);
+                  }}
+                  onDragLeave={() => setDragOverLane(null)}
+                  onDrop={(e) => handleLaneDrop(e, lane.status)}
+                >
+                  <div className="kanban-lane-header" style={{ borderColor: lane.color }}>
+                    <span className="kanban-lane-icon">{lane.icon}</span>
+                    <h3>{lane.label}</h3>
+                    <span className="kanban-count" style={{ backgroundColor: `${lane.color}22`, color: lane.color }}>
+                      {laneTodos.length}
+                    </span>
+                  </div>
+
+                  <div className="kanban-lane-body">
+                    {laneTodos.map((todo) => {
+                      const overdue = !todo.done && isOverdue(todo.due_date);
+                      const today = isDueToday(todo.due_date);
+
+                      return (
+                        <div
+                          key={todo.id}
+                          className={`kanban-card priority-${todo.priority} ${overdue ? "overdue" : ""} ${today && !todo.done ? "due-today" : ""} ${
+                            draggedTodoId === todo.id ? "dragging" : ""
+                          }`}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, todo.id)}
+                        >
+                          <span className={`kanban-card-priority priority-dot-${todo.priority}`} />
+                          <span className="kanban-card-title">{todo.title}</span>
+
+                          <div className="kanban-card-meta">
+                            {todo.due_date && (
+                              <span className={`kanban-due-badge ${overdue ? "overdue" : ""} ${today && !todo.done ? "today" : ""}`}>
+                                {formatDate(todo.due_date)}
+                              </span>
+                            )}
+                            {todo.category_name && (
+                              <span
+                                className="kanban-category-badge"
+                                style={{ backgroundColor: todo.category_color || "rgba(167,139,250,0.4)" }}
+                              >
+                                {todo.category_name}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="kanban-card-actions">
+                            <button
+                              type="button"
+                              className="kanban-action-btn"
+                              onClick={() => handleToggle(todo)}
+                              aria-label={`${todo.title} Status ändern`}
+                              title={todo.status === "done" ? "Zurück zu \"Zu tun\"" : "Als erledigt markieren"}
+                            >
+                              {todo.status === "done" ? (
+                                <svg width="14" height="14" viewBox="0 0 14 14">
+                                  <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                                </svg>
+                              ) : (
+                                <svg width="14" height="14" viewBox="0 0 14 14">
+                                  <path d="M2 7l4 4 6-8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                                </svg>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              className="kanban-action-btn danger"
+                              onClick={() => handleDelete(todo.id)}
+                              aria-label="Löschen"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 14 14">
+                                <path d="M3 4h8M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1M6 7v4M8 7v4M4 4l.5 7a1 1 0 001 1h3a1 1 0 001-1L10 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {laneTodos.length === 0 && (
+                      <div className="kanban-lane-empty">
+                        Keine Aufgaben
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
 
         <footer className="app-footer">

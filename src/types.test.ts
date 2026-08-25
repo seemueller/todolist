@@ -21,6 +21,7 @@ describe("fromRow", () => {
       id: 1,
       title: "Test task",
       done: true,
+      status: "done",
       priority: "medium",
       created_at: "2026-01-01T00:00:00Z",
       due_date: null,

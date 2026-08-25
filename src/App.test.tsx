@@ -22,6 +22,7 @@ vi.mock("./db", () => ({
   updateTodoTitle: vi.fn(),
   updateTodoDueDate: vi.fn(),
   updateTodoPriority: vi.fn(),
+  updateTodoStatus: vi.fn(),
 }));
 
 vi.mock("./version", () => ({
@@ -33,7 +34,7 @@ vi.mock("./CustomTitleBar", () => ({
   CustomTitleBar: () => null,
 }));
 
-const todoBase = { priority: "medium" as const, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null };
+const todoBase = { priority: "medium" as const, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null, status: "todo" as const };
 
 const makeTodo = (overrides = {}) => ({
   id: 1,
@@ -177,6 +178,25 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Alles erledigt/i)).toBeInTheDocument();
+    });
+  });
+
+  it("toggles to kanban view", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ title: "Task" })]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Task")).toBeInTheDocument();
+    });
+
+    const toggleBtn = screen.getByRole("button", { name: /Zum Kanban-Brett wechseln/i });
+    fireEvent.click(toggleBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Zu tun/i)).toBeInTheDocument();
+      expect(screen.getByText(/In Bearbeitung/i)).toBeInTheDocument();
+      expect(screen.getByText(/Erledigt/i)).toBeInTheDocument();
     });
   });
 });

@@ -1,9 +1,11 @@
 export type Priority = "low" | "medium" | "high";
+export type TodoStatus = "todo" | "in_progress" | "done";
 
 export interface Todo {
   id: number;
   title: string;
   done: boolean;
+  status: TodoStatus;
   priority: Priority;
   created_at: string;
   due_date: string | null;
@@ -22,13 +24,16 @@ export interface TodoRow {
   category_id: number | null;
   category_name: string | null;
   category_color: string | null;
+  status?: TodoStatus;
 }
 
 export function fromRow(row: TodoRow): Todo {
+  const status = row.status ?? (row.done === 1 ? "done" : "todo");
   return {
     id: row.id,
     title: row.title,
-    done: row.done === 1,
+    done: status === "done",
+    status,
     priority: row.priority,
     created_at: row.created_at,
     due_date: row.due_date,

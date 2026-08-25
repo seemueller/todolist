@@ -1,4 +1,4 @@
-import { Priority, Todo, TodoRow, Category, CategoryRow, fromRow, fromCategoryRow } from "./types";
+import { Priority, Todo, TodoRow, TodoStatus, Category, CategoryRow, fromRow, fromCategoryRow } from "./types";
 
 // ── In-memory + localStorage fallback ────────────────────────────────────
 
@@ -17,10 +17,18 @@ function loadTodos(): Todo[] {
   try {
     const raw = localStorage.getItem(TODOS_KEY);
     if (!raw) return [];
-    return JSON.parse(raw);
+    return migrateTodos(JSON.parse(raw));
   } catch {
     return [];
   }
+}
+
+function migrateTodos(todos: any[]): Todo[] {
+  return todos.map((todo) => {
+    if (todo.status) return todo;
+    const status: TodoStatus = todo.done ? "done" : "todo";
+    return { ...todo, status, done: status === "done" };
+  });
 }
 
 function saveTodos(todos: Todo[]): void {
@@ -78,6 +86,7 @@ export function addTodo(
     id: generateId(),
     title,
     done: false,
+    status: "todo",
     priority,
     created_at: now(),
     due_date: dueDate,
@@ -132,11 +141,21 @@ export function updateTodoCategory(id: number, categoryId: number | null): Promi
   return Promise.resolve(todos[idx]);
 }
 
+export function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id);
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+  todos[idx] = { ...todos[idx], status, done: status === "done" };
+  saveTodos(todos);
+  return Promise.resolve(todos[idx]);
+}
+
 export function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id);
   if (idx === -1) throw new Error(`Todo ${id} not found`);
-  todos[idx] = { ...todos[idx], done };
+  const status: TodoStatus = done ? "done" : "todo";
+  todos[idx] = { ...todos[idx], done, status };
   saveTodos(todos);
   return Promise.resolve(todos[idx]);
 }
