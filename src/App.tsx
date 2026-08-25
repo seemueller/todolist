@@ -10,9 +10,10 @@ import {
   updateCategory,
   updateTodoCategory,
   updateTodoDueDate,
+  updateTodoPriority,
   updateTodoTitle,
 } from "./db";
-import { CATEGORY_COLORS, Category, Todo } from "./types";
+import { CATEGORY_COLORS, Category, Priority, Todo } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import "./App.css";
@@ -69,6 +70,7 @@ const filterLabels: Record<DueDateFilter, string> = {
 function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
+  const [newPriority, setNewPriority] = useState<Priority>("medium");
   const [newDueDate, setNewDueDate] = useState("");
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -139,9 +141,10 @@ function App() {
     if (!title) return;
     try {
       const dueDate = newDueDate || null;
-      const todo = await addTodo(title, dueDate, newCategoryId);
+      const todo = await addTodo(title, newPriority, dueDate, newCategoryId);
       setTodos((prev) => [todo, ...prev]);
       setNewTitle("");
+      setNewPriority("medium");
       setNewDueDate("");
       setNewCategoryId(null);
       setError(null);
@@ -169,6 +172,16 @@ function App() {
     try {
       await deleteTodo(id);
       setTodos((prev) => prev.filter((t) => t.id !== id));
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  async function handlePriorityChange(id: number, priority: Priority) {
+    try {
+      const updated = await updateTodoPriority(id, priority);
+      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -327,6 +340,16 @@ function App() {
               <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </button>
+          <select
+            className="priority-select"
+            value={newPriority}
+            onChange={(e) => setNewPriority(e.currentTarget.value as Priority)}
+            aria-label="Priorität"
+          >
+            <option value="low">Niedrig</option>
+            <option value="medium">Mittel</option>
+            <option value="high">Hoch</option>
+          </select>
         </form>
 
         <div className="filter-bar">
@@ -441,6 +464,7 @@ function App() {
                   todo.done ? "done" : "",
                   overdue ? "overdue" : "",
                   today && !todo.done ? "due-today" : "",
+                  `priority-${todo.priority}`,
                 ]
                   .filter(Boolean)
                   .join(" ")}
@@ -489,6 +513,23 @@ function App() {
                   <span className={`due-date-badge ${overdue ? "overdue" : ""} ${today && !todo.done ? "today" : ""}`}>
                     {formatDate(todo.due_date)}
                   </span>
+                )}
+
+                {editingId !== todo.id && (
+                  <span className={`priority-dot priority-dot-${todo.priority}`} title={`Priorität: ${todo.priority === "low" ? "niedrig" : todo.priority === "medium" ? "mittel" : "hoch"}`} />
+                )}
+
+                {editingId !== todo.id && (
+                  <select
+                    className="priority-select-inline"
+                    value={todo.priority}
+                    onChange={(e) => handlePriorityChange(todo.id, e.currentTarget.value as Priority)}
+                    aria-label="Priorität ändern"
+                  >
+                    <option value="low">Niedrig</option>
+                    <option value="medium">Mittel</option>
+                    <option value="high">Hoch</option>
+                  </select>
                 )}
 
                 {todo.category_name && (

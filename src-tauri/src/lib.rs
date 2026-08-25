@@ -37,6 +37,12 @@ pub fn run() {
             sql: "ALTER TABLE todos ADD COLUMN category_id INTEGER DEFAULT NULL REFERENCES categories(id) ON DELETE SET NULL;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "add_priority_column",
+            sql: "ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium';",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

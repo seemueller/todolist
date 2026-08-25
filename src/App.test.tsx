@@ -21,6 +21,7 @@ vi.mock("./db", () => ({
   toggleTodoDone: vi.fn(),
   updateTodoTitle: vi.fn(),
   updateTodoDueDate: vi.fn(),
+  updateTodoPriority: vi.fn(),
 }));
 
 vi.mock("./version", () => ({
@@ -28,7 +29,20 @@ vi.mock("./version", () => ({
   CHANGELOG: [],
 }));
 
-const todoBase = { category_id: null as number | null, category_name: null as string | null, category_color: null as string | null };
+vi.mock("./CustomTitleBar", () => ({
+  CustomTitleBar: () => null,
+}));
+
+const todoBase = { priority: "medium" as const, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null };
+
+const makeTodo = (overrides = {}) => ({
+  id: 1,
+  title: "Test",
+  done: false,
+  created_at: "2026-01-01T00:00:00Z",
+  ...todoBase,
+  ...overrides,
+});
 
 describe("App", () => {
   beforeEach(() => {
@@ -47,8 +61,8 @@ describe("App", () => {
 
   it("renders existing todos", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Buy milk", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
-      { id: 2, title: "Walk dog", done: true, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
+      makeTodo({ id: 1, title: "Buy milk", done: false }),
+      makeTodo({ id: 2, title: "Walk dog", done: true }),
     ]);
 
     render(<App />);
@@ -60,28 +74,20 @@ describe("App", () => {
   });
 
   it("adds a new todo on form submit", async () => {
+    const addedTodo = makeTodo({ title: "New task" });
     vi.mocked(db.listTodos).mockResolvedValue([]);
-    vi.mocked(db.addTodo).mockResolvedValue({
-      id: 1,
-      title: "New task",
-      done: false,
-      created_at: "2026-01-01T00:00:00Z",
-      due_date: null,
-      ...todoBase,
-    });
+    vi.mocked(db.addTodo).mockResolvedValue(addedTodo);
 
     render(<App />);
 
     const input = screen.getByPlaceholderText(/Was steht an/i);
     const button = screen.getByRole("button", { name: /Aufgabe hinzufügen/i });
 
-    await act(async () => {
-      fireEvent.change(input, { target: { value: "New task" } });
-      fireEvent.click(button);
-    });
+    fireEvent.change(input, { target: { value: "New task" } });
+    fireEvent.click(button);
 
     await waitFor(() => {
-      expect(db.addTodo).toHaveBeenCalledWith("New task", null, null);
+      expect(db.addTodo).toHaveBeenCalledWith("New task", "medium", null, null);
     });
   });
 
@@ -97,7 +103,7 @@ describe("App", () => {
   });
 
   it("toggles todo done status", async () => {
-    const todo = { id: 1, title: "Toggle me", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase };
+    const todo = makeTodo({ title: "Toggle me", done: false });
     const updated = { ...todo, done: true };
 
     vi.mocked(db.listTodos).mockResolvedValue([todo]);
@@ -118,7 +124,7 @@ describe("App", () => {
   });
 
   it("deletes a todo", async () => {
-    const todo = { id: 1, title: "Delete me", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase };
+    const todo = makeTodo({ title: "Delete me", done: false });
 
     vi.mocked(db.listTodos).mockResolvedValue([todo]);
     vi.mocked(db.deleteTodo).mockResolvedValue(1);
@@ -149,8 +155,8 @@ describe("App", () => {
 
   it("shows remaining count", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Open", done: false, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
-      { id: 2, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
+      makeTodo({ id: 1, title: "Open", done: false }),
+      makeTodo({ id: 2, title: "Done", done: true }),
     ]);
 
     render(<App />);
@@ -162,7 +168,7 @@ describe("App", () => {
 
   it("shows completion message when all todos are done", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      { id: 1, title: "Done", done: true, created_at: "2026-01-01T00:00:00Z", due_date: null, ...todoBase },
+      makeTodo({ title: "Done", done: true }),
     ]);
 
     render(<App />);
