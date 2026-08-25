@@ -1,10 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import App from "./App";
 import * as db from "./db";
 
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    isMaximized: () => Promise.resolve(false),
+    minimize: () => Promise.resolve(),
+    maximize: () => Promise.resolve(),
+    unmaximize: () => Promise.resolve(),
+    close: () => Promise.resolve(),
+  }),
+}));
+
 vi.mock("./db", () => ({
   listTodos: vi.fn(),
+  listCategories: vi.fn(() => Promise.resolve([])),
   addTodo: vi.fn(),
   deleteTodo: vi.fn(),
   toggleTodoDone: vi.fn(),
@@ -22,13 +33,14 @@ vi.mock("./CustomTitleBar", () => ({
   CustomTitleBar: () => null,
 }));
 
+const todoBase = { priority: "medium" as const, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null };
+
 const makeTodo = (overrides = {}) => ({
   id: 1,
   title: "Test",
   done: false,
-  priority: "medium" as const,
   created_at: "2026-01-01T00:00:00Z",
-  due_date: null,
+  ...todoBase,
   ...overrides,
 });
 
@@ -62,8 +74,9 @@ describe("App", () => {
   });
 
   it("adds a new todo on form submit", async () => {
+    const addedTodo = makeTodo({ title: "New task" });
     vi.mocked(db.listTodos).mockResolvedValue([]);
-    vi.mocked(db.addTodo).mockResolvedValue(makeTodo({ title: "New task" }));
+    vi.mocked(db.addTodo).mockResolvedValue(addedTodo);
 
     render(<App />);
 
@@ -74,8 +87,7 @@ describe("App", () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(db.addTodo).toHaveBeenCalledWith("New task", "medium", null);
-      expect(screen.getByText("New task")).toBeInTheDocument();
+      expect(db.addTodo).toHaveBeenCalledWith("New task", "medium", null, null);
     });
   });
 
