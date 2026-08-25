@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 
 function AppIcon() {
   return (
@@ -49,19 +48,48 @@ function CloseIcon() {
   );
 }
 
+function isTauri(): boolean {
+  return typeof window !== "undefined" && "__TAURI_" in window;
+}
+
+// Tauri window controls (loaded dynamically to avoid import errors in browser)
+async function loadTauriWindow() {
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  return getCurrentWindow();
+}
+
 export function CustomTitleBar() {
-  const win = getCurrentWindow();
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isTauriEnv, setIsTauriEnv] = useState(false);
 
   useEffect(() => {
-    win.isMaximized().then(setIsMaximized);
-  }, [win]);
+    const tauri = isTauri();
+    setIsTauriEnv(tauri);
+    if (tauri) {
+      loadTauriWindow().then((win) => {
+        win.isMaximized().then(setIsMaximized);
+      });
+    }
+  }, []);
+
+  if (!isTauriEnv) {
+    return (
+      <div className="titlebar">
+        <div className="titlebar-left">
+          <AppIcon />
+          <span className="titlebar-title">TodoList</span>
+        </div>
+      </div>
+    );
+  }
 
   async function handleMinimize() {
+    const win = await loadTauriWindow();
     await win.minimize();
   }
 
   async function handleMaximize() {
+    const win = await loadTauriWindow();
     const maximized = await win.isMaximized();
     if (maximized) {
       await win.unmaximize();
@@ -72,6 +100,7 @@ export function CustomTitleBar() {
   }
 
   async function handleClose() {
+    const win = await loadTauriWindow();
     await win.close();
   }
 
@@ -88,7 +117,7 @@ export function CustomTitleBar() {
         <button className="titlebar-btn maximize" onClick={handleMaximize} aria-label="Maximieren">
           {isMaximized ? <UnmaximizeIcon /> : <MaximizeIcon />}
         </button>
-        <button className="titlebar-btn close" onClick={handleClose} aria-label="Schlie&szlig;en">
+        <button className="titlebar-btn close" onClick={handleClose} aria-label="Schließen">
           <CloseIcon />
         </button>
       </div>
