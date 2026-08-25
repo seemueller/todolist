@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.4.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,21 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.4.0",
+    date: "2026-08-25",
+    changes: [
+      "Neues helles Design mit warmem Sandton statt des dunklen Looks",
+      "Kräftige Umrandungen, versetzte Schatten und klare Flächen für alle Bedienelemente",
+      "Neue Schrift für Überschriften und Fließtext",
+      "Emoji in der Oberfläche durch einheitlich gezeichnete Symbole ersetzt",
+      "Kopfzeile zeigt jetzt die Anzahl der offenen Aufgaben",
+      "Verständlichere Hinweise bei leerer Liste, aktivem Filter und Fehlern",
+      "Kanban-Spalten mit farbigem Kopf, erledigte Karten sind auch dort erkennbar",
+      "Neue Farbpalette für Kategorie-Badges und Prioritäten",
+      "Oberfläche intern in eine gemeinsame Komponenten-Bibliothek überführt",
+    ],
+  },
   {
     version: "0.3.0",
     date: "2026-08-24",

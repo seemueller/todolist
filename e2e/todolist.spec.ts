@@ -391,7 +391,8 @@ test.describe("Layout and UI", () => {
 
   test("app header is visible", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "TodoList" })).toBeVisible();
-    await expect(page.getByText(/Behalte den Überblick/i)).toBeVisible();
+    await expect(page.locator(".app-subtitle")).toBeVisible();
+    await expect(page.locator(".app-subtitle")).toHaveText(/Keine Aufgaben|offen/i);
   });
 
   test("add form is visible and functional", async ({ page }) => {
@@ -536,11 +537,14 @@ test.describe("Layout and UI", () => {
 
     await expect(page.getByText(longTitle)).toBeVisible();
 
+    const item = page.locator(".todo-list li").first();
     const title = page.locator(".todo-list .title").first();
     const boundingBox = await title.boundingBox();
+    const itemBox = await item.boundingBox();
     expect(boundingBox).toBeDefined();
-    // Title should not overflow the container
-    expect(boundingBox!.width).toBeLessThan(480);
+    expect(itemBox).toBeDefined();
+    // Title should not overflow its row
+    expect(boundingBox!.width).toBeLessThanOrEqual(itemBox!.width);
   });
 
   test("footer shows correct count with filters", async ({ page }) => {
