@@ -97,7 +97,9 @@ describe("App", () => {
     render(<App />);
 
     const button = screen.getByRole("button", { name: /Aufgabe hinzufügen/i });
-    fireEvent.click(button);
+    await act(async () => {
+      fireEvent.click(button);
+    });
 
     expect(db.addTodo).not.toHaveBeenCalled();
   });
