@@ -22,7 +22,7 @@ async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateCheckResponse, 
         Some(update) => UpdateCheckResponse {
             update_available: true,
             version: Some(update.version.to_string()),
-            download_url: update.download_url.clone(),
+            download_url: Some(update.download_url.to_string()),
         },
         None => UpdateCheckResponse {
             update_available: false,
