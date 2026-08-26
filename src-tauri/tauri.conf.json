@@ -43,7 +43,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlGRjMxQjZFMzlCMkE2M0QKUldSZFZjWk9oRm5Jd1Z4cHdOdlUyTlFYYmJkS2k3TjlXaFJ5UjdXZG5YV1R1M2FjRjFkMmMK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhEOTVEOURCQUYzQTJEQkYKUldTL0xUcXYyOW1Walh6SnlJTlhIOXhXQ0x1amFrRXBkc3ZxUXRIRW5EUEt3aGc3UG53THdHazQK",
       "endpoints": [
         "https://github.com/seemueller/roomote-test-todolist/releases/latest/download/latest.json"
       ]
