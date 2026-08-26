@@ -48,12 +48,14 @@ jobs:
         env:
           TAURI_KEY_PASSWORD: "todolist-signing-key"
         run: |
-          echo "todolist-signing-key" | npx @tauri-apps/cli signer generate
-          $pubkey = Get-Content "src-tauri/updater_public_key.pem" -Raw
+          $output = echo "todolist-signing-key" | npx @tauri-apps/cli signer generate
+          $pubkeyLine = $output | Select-String "Public:"
+          if (-not $pubkeyLine) { Write-Error "Could not find Public key in signer output"; exit 1 }
+          $pubkey = $pubkeyLine.Line.Substring("Public:".Length).Trim()
           $config = Get-Content "src-tauri/tauri.conf.json" | ConvertFrom-Json
-          $config.updater.pubkey = $pubkey.Trim()
+          $config.updater.pubkey = $pubkey
           $config | ConvertTo-Json -Depth 10 | Set-Content "src-tauri/tauri.conf.json"
-          Write-Host "::notice::Update tauri.conf.json with public key. Save TAURI_PRIVATE_KEY as a GitHub secret for future runs."
+          Write-Host "::notice::Updated tauri.conf.json with public key. Save TAURI_PRIVATE_KEY as a GitHub secret for future runs."
         continue-on-error: true
 
       - name: Create draft release
