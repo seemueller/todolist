@@ -2,6 +2,13 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.5.0] - 2026-08-26
+- In-App-Update-Mechanismus über GitHub Releases
+- Deutsche Sprache für Windows-Installer
+- Explizite 64-Bit-Targets für Windows-Bundles
+- Tauri v2 Bundle-Konfiguration
+- Eigene Titelleiste mit Fenstersteuerung wiederhergestellt
+
 ## [0.4.0] - 2026-08-25
 - Neues helles Design mit warmem Sandton statt des dunklen Looks
 - Kräftige Umrandungen, versetzte Schatten und klare Flächen für alle Bedienelemente
