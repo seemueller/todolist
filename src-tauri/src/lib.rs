@@ -1,5 +1,6 @@
 use serde::Serialize;
 use tauri_plugin_sql::{Migration, MigrationKind};
+use tauri_plugin_updater::UpdaterExt;
 
 #[derive(Clone, Serialize)]
 struct UpdateCheckResponse {
@@ -10,8 +11,8 @@ struct UpdateCheckResponse {
 
 #[tauri::command]
 async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateCheckResponse, String> {
-    let result = tauri_plugin_updater::Updater::builder()
-        .build(app.clone())
+    let result = app
+        .updater()
         .map_err(|e| e.to_string())?
         .check()
         .await
@@ -33,8 +34,8 @@ async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateCheckResponse, 
 
 #[tauri::command]
 async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
-    let update = tauri_plugin_updater::Updater::builder()
-        .build(app.clone())
+    let update = app
+        .updater()
         .map_err(|e| e.to_string())?
         .check()
         .await
@@ -107,7 +108,11 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_updater::init())
+        .setup(|app| {
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build());
+            Ok(())
+        })
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:todolist.db", migrations)
