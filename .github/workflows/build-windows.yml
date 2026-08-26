@@ -1,4 +1,4 @@
-name: Build Windows Installer
+name: Build & Release
 
 on:
   workflow_dispatch:
@@ -9,8 +9,8 @@ on:
         type: string
 
 jobs:
-  build-windows:
-    name: Build Windows Installer
+  build-and-release:
+    name: Build Windows & Release
     runs-on: windows-latest
 
     steps:
@@ -35,24 +35,98 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Get app version
+        id: version
+        run: |
+          $version = if ($env:INPUT_VERSION) { $env:INPUT_VERSION } else { (Get-Content package.json | ConvertFrom-Json).version }
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+
+      - name: Generate updater signing key
+        if: ${{ !env.TAURI_PRIVATE_KEY }}
+        env:
+          TAURI_KEY_PASSWORD: "todolist-signing-key"
+        run: |
+          echo "todolist-signing-key" | npx @tauri-apps/cli signer generate
+          $pubkey = Get-Content "src-tauri/updater_public_key.pem" -Raw
+          $config = Get-Content "src-tauri/tauri.conf.json" | ConvertFrom-Json
+          $config.updater.pubkey = $pubkey.Trim()
+          $config | ConvertTo-Json -Depth 10 | Set-Content "src-tauri/tauri.conf.json"
+          Write-Host "::notice::Update tauri.conf.json with public key. Save TAURI_PRIVATE_KEY as a GitHub secret for future runs."
+        continue-on-error: true
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" --draft --title "v${{ steps.version.outputs.version }}"
+          $releaseId = gh release view "v${{ steps.version.outputs.version }}" --json id --jq '.id'
+          echo "RELEASE_ID=$releaseId" >> $env:GITHUB_ENV
+
       - name: Build Tauri app
         env:
           TAURI_SIGNING_SKIP: "true"
         run: npm run tauri build
 
-      - name: Upload MSI installer
-        uses: actions/upload-artifact@v5
-        with:
-          name: todolist-windows-installer
-          path: src-tauri/target/release/bundle/msi/*.msi
-          retention-days: 30
+      - name: Generate latest.json
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $repo = "seemueller/roomote-test-todolist"
+          $baseUrl = "https://github.com/$repo/releases/download/v$version"
 
-      - name: Upload NSIS installer
-        uses: actions/upload-artifact@v5
-        with:
-          name: todolist-windows-nsis
-          path: src-tauri/target/release/bundle/nsis/*.exe
-          retention-days: 30
+          $msiFile = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.msi" | Select-Object -First 1
+          $nsisFile = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe" | Select-Object -First 1
+
+          $msiSha = (Get-FileHash $msiFile.FullName -Algorithm SHA256).Hash.ToLower()
+          $nsisSha = (Get-FileHash $nsisFile.FullName -Algorithm SHA256).Hash.ToLower()
+
+          $manifest = @{
+            version = "v$version"
+            date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = ""
+                packages = @(
+                  @{
+                    url = "$baseUrl/$($msiFile.Name)"
+                    signature = ""
+                    signature_checksum = @{
+                      sha256 = $msiSha
+                    }
+                  },
+                  @{
+                    url = "$baseUrl/$($nsisFile.Name)"
+                    signature = ""
+                    signature_checksum = @{
+                      sha256 = $nsisSha
+                    }
+                  }
+                )
+              }
+            }
+          } | ConvertTo-Json -Depth 10
+
+          $manifest | Out-File -FilePath "latest.json" -Encoding utf8
+          Write-Host "Generated latest.json:"
+          Get-Content "latest.json"
+
+      - name: Upload artifacts to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -File | ForEach-Object {
+            gh release upload "v$version" $_.FullName --clobber
+          }
+          gh release upload "v$version" latest.json --clobber
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          gh release edit "v$version" --latest
 
       - name: List build artifacts
         if: always()

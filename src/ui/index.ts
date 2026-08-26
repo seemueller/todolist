@@ -7,7 +7,21 @@
 // Neue UI wird zuerst aus diesen Bausteinen gebaut. Eine neue Komponente
 // entsteht erst, wenn ein Muster zum zweiten Mal auftaucht — siehe STYLEGUIDE.md.
 
-export * from "./icons";
+export {
+  BoardViewIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  CloseIcon,
+  LaneDoneIcon,
+  LaneProgressIcon,
+  LaneTodoIcon,
+  ListViewIcon,
+  PencilIcon,
+  PlusIcon,
+  TagIcon,
+  TrashIcon,
+  UpdateIcon,
+} from "./icons";
 
 export { IconButton } from "./IconButton";
 export type { IconButtonProps, IconButtonVariant } from "./IconButton";

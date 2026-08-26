@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
   addTodo,
@@ -38,6 +39,7 @@ import {
   PrioritySelect,
   TagIcon,
   TrashIcon,
+  UpdateIcon,
 } from "./ui";
 import "./App.css";
 
@@ -101,6 +103,9 @@ function App() {
   const [editingDueDate, setEditingDueDate] = useState("");
   const [burstId, setBurstId] = useState<number | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [checkUpdate, setCheckUpdate] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState<string | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "done">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -141,6 +146,34 @@ function App() {
   }, []);
 
   const closeChangelog = useCallback(() => setShowChangelog(false), []);
+
+  useEffect(() => {
+    if (!checkUpdate) return;
+    setCheckingUpdate(true);
+    (async () => {
+      try {
+        const result = await invoke<{ update_available: boolean; version?: string }>(
+          "check_for_update",
+        );
+        if (result.update_available && result.version) {
+          setUpdateAvailable(result.version);
+        }
+      } catch {
+        // invoke not available in browser/dev mode
+      } finally {
+        setCheckingUpdate(false);
+        setCheckUpdate(false);
+      }
+    })();
+  }, [checkUpdate]);
+
+  const handleInstallUpdate = useCallback(async () => {
+    try {
+      await invoke("install_update");
+    } catch {
+      // invoke not available in browser/dev mode
+    }
+  }, []);
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
@@ -684,6 +717,16 @@ function App() {
         )}
 
         <footer className="app-footer">
+          <button
+            type="button"
+            className="update-btn"
+            onClick={() => setCheckUpdate(true)}
+            disabled={checkingUpdate}
+            aria-label="Nach Updates suchen"
+          >
+            <UpdateIcon />
+            {checkingUpdate ? "Prüfe..." : "Update"}
+          </button>
           <span className="version">v{APP_VERSION}</span>
           <button
             type="button"
@@ -713,6 +756,22 @@ function App() {
                 </div>
               ))}
             </div>
+        </Modal>
+      )}
+
+      {/* Update Modal */}
+      {updateAvailable && (
+        <Modal variant="changelog" title="Update verfügbar" onClose={() => setUpdateAvailable(null)} closeLabel="Schließen">
+          <div className="update-modal-body">
+            <p>Version <strong>{updateAvailable}</strong> ist verfügbar.</p>
+            <button
+              type="button"
+              className="update-install-btn"
+              onClick={handleInstallUpdate}
+            >
+              Herunterladen &amp; installieren
+            </button>
+          </div>
         </Modal>
       )}
 
