@@ -59,7 +59,7 @@ jobs:
           if (-not $pubkeyLine) { Write-Error "Could not find Public key in signer output"; exit 1 }
           $pubkey = $pubkeyLine.Line.Substring("Public:".Length).Trim()
           $config = Get-Content "src-tauri/tauri.conf.json" | ConvertFrom-Json
-          $config.bundle.updater.pubkey = $pubkey
+          $config.plugins.updater.pubkey = $pubkey
           $config | ConvertTo-Json -Depth 10 | Set-Content "src-tauri/tauri.conf.json"
           Write-Host "::notice::Updated tauri.conf.json with public key. Save TAURI_PRIVATE_KEY as a GitHub secret for future runs."
         continue-on-error: true
@@ -79,34 +79,16 @@ jobs:
           $repo = "seemueller/roomote-test-todolist"
           $baseUrl = "https://github.com/$repo/releases/download/v$version"
 
-          $msiFile = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.msi" | Select-Object -First 1
           $nsisFile = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe" | Select-Object -First 1
-
-          $msiSha = (Get-FileHash $msiFile.FullName -Algorithm SHA256).Hash.ToLower()
-          $nsisSha = (Get-FileHash $nsisFile.FullName -Algorithm SHA256).Hash.ToLower()
+          $nsisSig = Get-Content "$($nsisFile.DirectoryName)/$($nsisFile.BaseName).exe.sig" -Raw
 
           $manifest = @{
             version = "v$version"
-            date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+            pub_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
             platforms = @{
               "windows-x86_64" = @{
-                signature = ""
-                packages = @(
-                  @{
-                    url = "$baseUrl/$($msiFile.Name)"
-                    signature = ""
-                    signature_checksum = @{
-                      sha256 = $msiSha
-                    }
-                  },
-                  @{
-                    url = "$baseUrl/$($nsisFile.Name)"
-                    signature = ""
-                    signature_checksum = @{
-                      sha256 = $nsisSha
-                    }
-                  }
-                )
+                url = "$baseUrl/$($nsisFile.Name)"
+                signature = $nsisSig.Trim()
               }
             }
           } | ConvertTo-Json -Depth 10
