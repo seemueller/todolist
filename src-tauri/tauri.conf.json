@@ -3,11 +3,6 @@
   "productName": "TodoList",
   "version": "0.5.0",
   "identifier": "com.roomote.todolist",
-  "updater": {
-    "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlGRjMxQjZFMzlCMkE2M0QKUldSZFZjWk9oRm5Jd1Z4cHdOdlUyTlFYYmJkS2k3TjlXaFJ5UjdXZG5YV1R1M2FjRjFkMmMK",
-    "enduserLicenseAgreement": true,
-    "url": "https://github.com/seemueller/roomote-test-todolist/releases/latest/download/latest.json"
-  },
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -43,6 +38,11 @@
       "wix": {
         "language": "de-DE"
       }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlGRjMxQjZFMzlCMkE2M0QKUldSZFZjWk9oRm5Jd1Z4cHdOdlUyTlFYYmJkS2k3TjlXaFJ5UjdXZG5YV1R1M2FjRjFkMmMK",
+      "enduserLicenseAgreement": true,
+      "dialog": true
     }
   }
 }

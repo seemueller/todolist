@@ -59,7 +59,7 @@ jobs:
           if (-not $pubkeyLine) { Write-Error "Could not find Public key in signer output"; exit 1 }
           $pubkey = $pubkeyLine.Line.Substring("Public:".Length).Trim()
           $config = Get-Content "src-tauri/tauri.conf.json" | ConvertFrom-Json
-          $config.updater.pubkey = $pubkey
+          $config.bundle.updater.pubkey = $pubkey
           $config | ConvertTo-Json -Depth 10 | Set-Content "src-tauri/tauri.conf.json"
           Write-Host "::notice::Updated tauri.conf.json with public key. Save TAURI_PRIVATE_KEY as a GitHub secret for future runs."
         continue-on-error: true
