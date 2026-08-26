@@ -43,7 +43,7 @@ function CloseIcon() {
 }
 
 function isTauri(): boolean {
-  return typeof window !== "undefined" && "__TAURI_" in window;
+  return typeof window !== "undefined" && "__TAURI__" in window;
 }
 
 // Tauri window controls (loaded dynamically to avoid import errors in browser)
