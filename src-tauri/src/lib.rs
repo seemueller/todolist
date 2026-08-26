@@ -1,4 +1,64 @@
+use serde::Serialize;
 use tauri_plugin_sql::{Migration, MigrationKind};
+
+#[derive(Clone, Serialize)]
+struct UpdateCheckResponse {
+    update_available: bool,
+    version: Option<String>,
+    download_url: Option<String>,
+}
+
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateCheckResponse, String> {
+    let result = tauri_plugin_updater::Updater::builder()
+        .build(app.clone())
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(match result {
+        Some(update) => UpdateCheckResponse {
+            update_available: true,
+            version: Some(update.version.to_string()),
+            download_url: update.download_url.clone(),
+        },
+        None => UpdateCheckResponse {
+            update_available: false,
+            version: None,
+            download_url: None,
+        },
+    })
+}
+
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    let update = tauri_plugin_updater::Updater::builder()
+        .build(app.clone())
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("No update available")?;
+
+    let mut downloaded = 0;
+    update
+        .download_and_install(
+            |chunk_length, content_length| {
+                downloaded += chunk_length;
+                if let Some(total) = content_length {
+                    println!("Downloaded {downloaded}B out of {total}B");
+                }
+            },
+            || {
+                println!("Download finished");
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -47,11 +107,13 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:todolist.db", migrations)
                 .build(),
         )
+        .invoke_handler(tauri::generate_handler![check_for_update, install_update])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

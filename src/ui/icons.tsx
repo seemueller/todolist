@@ -156,3 +156,14 @@ export function BoardViewIcon(props: IconProps) {
     </BaseIcon>
   );
 }
+
+/** Update-Pfeil im Footer. */
+export function UpdateIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" strokeWidth={1.6} {...props}>
+      <path d="M1.5 7a5.5 5.5 0 0110.2-2.8M12.5 7a5.5 5.5 0 01-10.2 2.8" />
+      <polyline points="8.5,1.5 11.5,2 11.5,5" />
+      <polyline points="5.5,12.5 2.5,12 2.5,9" />
+    </BaseIcon>
+  );
+}
