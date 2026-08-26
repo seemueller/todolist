@@ -8,6 +8,9 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     name: Build Windows & Release
@@ -61,16 +64,14 @@ jobs:
           Write-Host "::notice::Updated tauri.conf.json with public key. Save TAURI_PRIVATE_KEY as a GitHub secret for future runs."
         continue-on-error: true
 
+      - name: Build Tauri app
+        run: npm run tauri build
+
       - name: Create draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "v${{ steps.version.outputs.version }}" --draft --title "v${{ steps.version.outputs.version }}"
           $releaseId = gh release view "v${{ steps.version.outputs.version }}" --json id --jq '.id'
           echo "RELEASE_ID=$releaseId" >> $env:GITHUB_ENV
-
-      - name: Build Tauri app
-        run: npm run tauri build
 
       - name: Generate latest.json
         run: |
@@ -115,8 +116,6 @@ jobs:
           Get-Content "latest.json"
 
       - name: Upload artifacts to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $version = "${{ steps.version.outputs.version }}"
           Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -File | ForEach-Object {
@@ -125,8 +124,6 @@ jobs:
           gh release upload "v$version" latest.json --clobber
 
       - name: Publish release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $version = "${{ steps.version.outputs.version }}"
           gh release edit "v$version" --latest
@@ -135,6 +132,10 @@ jobs:
         if: always()
         run: |
           Write-Host "=== Build Artifacts ==="
-          Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -File | ForEach-Object {
-            Write-Host "$($_.FullName) ($([math]::Round($_.Length / 1MB, 2)) MB)"
+          if (Test-Path "src-tauri/target/release/bundle") {
+            Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -File | ForEach-Object {
+              Write-Host "$($_.FullName) ($([math]::Round($_.Length / 1MB, 2)) MB)"
+            }
+          } else {
+            Write-Host "No build artifacts found."
           }
