@@ -17,7 +17,7 @@ jobs:
     runs-on: windows-latest
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-      TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -52,7 +52,7 @@ jobs:
       - name: Generate updater signing key
         if: ${{ !env.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
-          $password = $env:TAURI_KEY_PASSWORD
+          $password = $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD
           if (-not $password) { Write-Error "TAURI_KEY_PASSWORD secret not set"; exit 1 }
           $output = echo $password | npx @tauri-apps/cli signer generate
           $pubkeyLine = $output | Select-String "Public:"
