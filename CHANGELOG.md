@@ -2,6 +2,12 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.6.0] - 2026-08-27
+- Filterleiste in feste Zeilen gegliedert: Fälligkeit und Status oben, Suche und Kategorie darunter — statt beliebigem Umbruch je nach Fensterbreite
+- Größeres Standardfenster (1020 × 820) mit Mindestgröße, startet mittig auf dem Bildschirm
+- Update-Prüfung meldet jetzt Fehler und "kein Update verfügbar", statt wortlos nichts zu tun
+- Projekt unter MIT-Lizenz veröffentlicht
+
 ## [0.5.2] - 2026-08-27
 - Titelleiste unter Windows repariert: Fenster ziehen, minimieren, maximieren und schließen funktionieren
 - Debug-Log-Panel (Ctrl+Shift+L) für Fehlerdiagnose

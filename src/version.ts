@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.5.2";
+export const APP_VERSION = "0.6.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.0",
+    date: "2026-08-27",
+    changes: [
+      "Filterleiste in feste Zeilen gegliedert: Fälligkeit und Status oben, Suche und Kategorie darunter",
+      "Größeres Standardfenster mit Mindestgröße, startet mittig auf dem Bildschirm",
+      "Update-Prüfung meldet jetzt Fehler und \"kein Update verfügbar\", statt wortlos nichts zu tun",
+      "Projekt unter MIT-Lizenz veröffentlicht",
+    ],
+  },
   {
     version: "0.5.2",
     date: "2026-08-27",
