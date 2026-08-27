@@ -90,6 +90,8 @@ a:hover {
   position: sticky;
   top: 0;
   z-index: 50;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .titlebar-left {
@@ -112,6 +114,7 @@ a:hover {
   align-items: center;
   height: 100%;
   margin-left: auto;
+  -webkit-app-region: no-drag;
 }
 
 .titlebar-btn {
@@ -125,6 +128,8 @@ a:hover {
   color: var(--canvas);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
 }
 
 .titlebar-btn:hover {

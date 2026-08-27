@@ -43,10 +43,13 @@ function CloseIcon() {
 }
 
 function isTauri(): boolean {
-  return typeof window !== "undefined" && "__TAURI__" in window;
+  return (
+    typeof window !== "undefined" &&
+    ((window as any).__TAURI_INTERNALS__ !== undefined ||
+      (window as any).__TAURI__ !== undefined)
+  );
 }
 
-// Tauri window controls (loaded dynamically to avoid import errors in browser)
 async function loadTauriWindow() {
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
   return getCurrentWindow();
@@ -62,7 +65,20 @@ export function CustomTitleBar() {
     if (tauri) {
       loadTauriWindow().then((win) => {
         win.isMaximized().then(setIsMaximized);
-      });
+
+        const unlistenPayload = win.listen("tauri://resize", () => {
+          win.isMaximized().then(setIsMaximized).catch(() => {});
+        });
+
+        const unlistenClose = win.listen("tauri://close-requested", () => {
+          // no-op, just subscribed to keep the listener alive
+        });
+
+        return () => {
+          unlistenPayload.then((fn) => fn());
+          unlistenClose.then((fn) => fn());
+        };
+      }).catch(() => {});
     }
   }, []);
 
@@ -104,7 +120,7 @@ export function CustomTitleBar() {
         <AppIcon />
         <span className="titlebar-title">TodoList</span>
       </div>
-      <div className="titlebar-controls">
+      <div className="titlebar-controls" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
         <button className="titlebar-btn minimize" onClick={handleMinimize} aria-label="Minimieren">
           <MinimizeIcon />
         </button>
