@@ -461,48 +461,52 @@ function App() {
         {viewMode === "list" && (
           <>
             <div className="filter-bar">
-          {(Object.keys(filterLabels) as DueDateFilter[]).map((key) => (
-            <FilterChip
-              key={key}
-              active={dueDateFilter === key}
-              onClick={() => setDueDateFilter(key)}
-            >
-              {filterLabels[key]}
-            </FilterChip>
-          ))}
-          <div className="status-filter">
-            <FilterChip variant="segment" active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
-              Alle
-            </FilterChip>
-            <FilterChip variant="segment" active={statusFilter === "open"} onClick={() => setStatusFilter("open")}>
-              Offen
-            </FilterChip>
-            <FilterChip variant="segment" active={statusFilter === "done"} onClick={() => setStatusFilter("done")}>
-              Erledigt
-            </FilterChip>
+          <div className="filter-row">
+            {(Object.keys(filterLabels) as DueDateFilter[]).map((key) => (
+              <FilterChip
+                key={key}
+                active={dueDateFilter === key}
+                onClick={() => setDueDateFilter(key)}
+              >
+                {filterLabels[key]}
+              </FilterChip>
+            ))}
+            <div className="status-filter">
+              <FilterChip variant="segment" active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
+                Alle
+              </FilterChip>
+              <FilterChip variant="segment" active={statusFilter === "open"} onClick={() => setStatusFilter("open")}>
+                Offen
+              </FilterChip>
+              <FilterChip variant="segment" active={statusFilter === "done"} onClick={() => setStatusFilter("done")}>
+                Erledigt
+              </FilterChip>
+            </div>
           </div>
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Suche..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.currentTarget.value)}
-          />
-          <CategorySelect
-            className="filter-select"
-            categories={categories}
-            value={categoryFilter}
-            onValueChange={setCategoryFilter}
-            placeholderLabel="Alle Kategorien"
-          />
-          <IconButton
-            variant="icon"
-            onClick={() => setShowCategoryManager(true)}
-            aria-label="Kategorien verwalten"
-          >
-            <TagIcon />
-            Kategorien
-          </IconButton>
+          <div className="filter-row">
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Suche..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.currentTarget.value)}
+            />
+            <CategorySelect
+              className="filter-select"
+              categories={categories}
+              value={categoryFilter}
+              onValueChange={setCategoryFilter}
+              placeholderLabel="Alle Kategorien"
+            />
+            <IconButton
+              variant="icon"
+              onClick={() => setShowCategoryManager(true)}
+              aria-label="Kategorien verwalten"
+            >
+              <TagIcon />
+              Kategorien
+            </IconButton>
+          </div>
         </div>
 
         {hasActiveFilter && (
