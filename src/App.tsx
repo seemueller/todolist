@@ -296,9 +296,18 @@ function App() {
     e.dataTransfer.setData("text/plain", String(todoId));
   }
 
+  function handleChildDragStart(e: DragEvent) {
+    e.stopPropagation();
+  }
+
   function handleLaneDragOver(e: DragEvent) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
+  }
+
+  function handleLaneDragLeave(e: DragEvent) {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragOverLane(null);
   }
 
   function handleLaneDrop(e: DragEvent, targetStatus: TodoStatus) {
@@ -644,7 +653,7 @@ function App() {
                     handleLaneDragOver(e);
                     setDragOverLane(lane.status);
                   }}
-                  onDragLeave={() => setDragOverLane(null)}
+                  onDragLeave={handleLaneDragLeave}
                   onDrop={(e) => handleLaneDrop(e, lane.status)}
                 >
                   <div className="kanban-lane-header" style={{ backgroundColor: lane.color }}>
@@ -683,23 +692,25 @@ function App() {
                           </div>
 
                           <div className="kanban-card-actions">
-                            <IconButton
-                              variant="kanban"
-                              onClick={() => handleToggle(todo)}
-                              aria-label={`${todo.title} Status ändern`}
-                              title={todo.status === "done" ? "Zurück zu \"Zu tun\"" : "Als erledigt markieren"}
-                            >
-                              {todo.status === "done" ? <ChevronLeftIcon /> : <CheckIcon />}
-                            </IconButton>
-                            <IconButton
-                              variant="kanban"
-                              danger
-                              onClick={() => handleDelete(todo.id)}
-                              aria-label="Löschen"
-                            >
-                              <TrashIcon />
-                            </IconButton>
-                          </div>
+                              <IconButton
+                                variant="kanban"
+                                onDragStart={handleChildDragStart}
+                                onClick={() => handleToggle(todo)}
+                                aria-label={`${todo.title} Status ändern`}
+                                title={todo.status === "done" ? "Zurück zu \"Zu tun\"" : "Als erledigt markieren"}
+                              >
+                                {todo.status === "done" ? <ChevronLeftIcon /> : <CheckIcon />}
+                              </IconButton>
+                              <IconButton
+                                variant="kanban"
+                                danger
+                                onDragStart={handleChildDragStart}
+                                onClick={() => handleDelete(todo.id)}
+                                aria-label="Löschen"
+                              >
+                                <TrashIcon />
+                              </IconButton>
+                            </div>
                         </div>
                       );
                     })}
