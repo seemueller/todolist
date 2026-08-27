@@ -3,6 +3,12 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import App from "./App";
 import * as db from "./db";
 
+const invokeMock = vi.fn();
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invokeMock(...args),
+  isTauri: () => true,
+}));
+
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     isMaximized: () => Promise.resolve(false),
@@ -197,6 +203,41 @@ describe("App", () => {
       expect(screen.getByText(/Zu tun/i)).toBeInTheDocument();
       expect(screen.getByText(/In Bearbeitung/i)).toBeInTheDocument();
       expect(screen.getByText(/Erledigt/i)).toBeInTheDocument();
+    });
+  });
+
+  it("reports a failed update check instead of staying silent", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    invokeMock.mockRejectedValue("Network Error: 404 Not Found");
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Noch keine Aufgaben/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Nach Updates suchen/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Update-Prüfung fehlgeschlagen/i)).toBeInTheDocument();
+      expect(screen.getByText(/404 Not Found/i)).toBeInTheDocument();
+    });
+  });
+
+  it("reports when no update is available", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    invokeMock.mockResolvedValue({ update_available: false });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Noch keine Aufgaben/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Nach Updates suchen/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Kein Update verfügbar/i)).toBeInTheDocument();
     });
   });
 });

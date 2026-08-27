@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { DragEvent, FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
   addTodo,
@@ -108,6 +108,12 @@ function App() {
   const [checkUpdate, setCheckUpdate] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState<string | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [installingUpdate, setInstallingUpdate] = useState(false);
+  // Rueckmeldung der Update-Pruefung: Fehler oder "kein Update". Ohne diese
+  // Anzeige laeuft der Knopf ins Leere, wenn der Endpunkt nicht erreichbar ist.
+  const [updateStatus, setUpdateStatus] = useState<{ kind: "info" | "error"; text: string } | null>(
+    null,
+  );
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "done">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -171,16 +177,31 @@ function App() {
   useEffect(() => {
     if (!checkUpdate) return;
     setCheckingUpdate(true);
+    setUpdateStatus(null);
     (async () => {
+      if (!isTauri()) {
+        setUpdateStatus({
+          kind: "info",
+          text: "Updates stehen nur in der installierten App zur Verfügung, nicht im Browser.",
+        });
+        setCheckingUpdate(false);
+        setCheckUpdate(false);
+        return;
+      }
       try {
         const result = await invoke<{ update_available: boolean; version?: string }>(
           "check_for_update",
         );
         if (result.update_available && result.version) {
           setUpdateAvailable(result.version);
+        } else {
+          setUpdateStatus({
+            kind: "info",
+            text: `Version ${APP_VERSION} ist aktuell. Kein Update verfügbar.`,
+          });
         }
-      } catch {
-        // invoke not available in browser/dev mode
+      } catch (err) {
+        setUpdateStatus({ kind: "error", text: `Update-Prüfung fehlgeschlagen: ${String(err)}` });
       } finally {
         setCheckingUpdate(false);
         setCheckUpdate(false);
@@ -189,10 +210,19 @@ function App() {
   }, [checkUpdate]);
 
   const handleInstallUpdate = useCallback(async () => {
+    setInstallingUpdate(true);
     try {
       await invoke("install_update");
-    } catch {
-      // invoke not available in browser/dev mode
+      setUpdateAvailable(null);
+      setUpdateStatus({
+        kind: "info",
+        text: "Update installiert. Die Anwendung startet neu, um die neue Version zu laden.",
+      });
+    } catch (err) {
+      setUpdateAvailable(null);
+      setUpdateStatus({ kind: "error", text: `Installation fehlgeschlagen: ${String(err)}` });
+    } finally {
+      setInstallingUpdate(false);
     }
   }, []);
 
@@ -812,9 +842,26 @@ function App() {
               type="button"
               className="update-install-btn"
               onClick={handleInstallUpdate}
+              disabled={installingUpdate}
             >
-              Herunterladen &amp; installieren
+              {installingUpdate ? "Wird installiert..." : "Herunterladen & installieren"}
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Rueckmeldung der Update-Pruefung */}
+      {updateStatus && (
+        <Modal
+          variant="changelog"
+          title={updateStatus.kind === "error" ? "Update fehlgeschlagen" : "Update"}
+          onClose={() => setUpdateStatus(null)}
+          closeLabel="Schließen"
+        >
+          <div className="update-modal-body">
+            <p className={updateStatus.kind === "error" ? "update-status-error" : undefined}>
+              {updateStatus.text}
+            </p>
           </div>
         </Modal>
       )}

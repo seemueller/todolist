@@ -872,6 +872,16 @@ a:hover {
   color: var(--ink);
 }
 
+.update-modal-body p.update-status-error {
+  color: var(--accent-ink);
+  word-break: break-word;
+}
+
+.update-install-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .update-install-btn {
   display: inline-flex;
   align-items: center;
