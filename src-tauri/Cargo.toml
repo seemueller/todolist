@@ -2,8 +2,9 @@
 name = "todolist"
 version = "0.5.2"
 description = "A simple desktop TODO list application"
-authors = ["you"]
+authors = ["seemueller"]
 edition = "2021"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

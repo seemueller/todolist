@@ -30,3 +30,7 @@ npm run tauri dev
 ```bash
 npm run tauri build
 ```
+
+## Lizenz
+
+MIT — siehe [`LICENSE`](LICENSE).
