@@ -333,7 +333,9 @@ function App() {
         setTimeout(() => setBurstId(null), 800);
       }
       setError(null);
+      console.log(`drag: Aufgabe ${todoId} nach "${targetStatus}" verschoben`);
     } catch (err) {
+      console.error(`drag: Verschieben von Aufgabe ${todoId} fehlgeschlagen:`, String(err));
       setError(String(err));
     } finally {
       setDraggedTodoId(null);
@@ -345,6 +347,7 @@ function App() {
     setDraggedTodoId(todoId);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(todoId));
+    console.log(`drag: dragstart für Aufgabe ${todoId}`);
   }
 
   function handleChildDragStart(e: DragEvent) {
@@ -363,9 +366,13 @@ function App() {
 
   function handleLaneDrop(e: DragEvent, targetStatus: TodoStatus) {
     e.preventDefault();
-    const todoId = Number(e.dataTransfer.getData("text/plain"));
+    const raw = e.dataTransfer.getData("text/plain");
+    const todoId = Number(raw);
+    console.log(`drag: drop auf "${targetStatus}", dataTransfer="${raw}"`);
     if (todoId) {
       handleDropOnLane(todoId, targetStatus);
+    } else {
+      console.warn(`drag: drop ohne verwertbare Aufgaben-ID (dataTransfer="${raw}")`);
     }
   }
 

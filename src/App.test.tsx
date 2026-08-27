@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import App from "./App";
 import * as db from "./db";
+import { debugLogs, clearDebugLogs } from "./debug";
 
 const invokeMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -204,6 +205,51 @@ describe("App", () => {
       expect(screen.getByText(/In Bearbeitung/i)).toBeInTheDocument();
       expect(screen.getByText(/Erledigt/i)).toBeInTheDocument();
     });
+  });
+
+  it("moves a card between lanes on drop and records it in the debug log", async () => {
+    clearDebugLogs();
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.updateTodoStatus).mockResolvedValue(
+      makeTodo({ id: 7, title: "Task", status: "in_progress" }),
+    );
+
+    const { container } = render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Task")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Zum Kanban-Brett wechseln/i }));
+
+    const card = await waitFor(() => {
+      const found = container.querySelector<HTMLElement>(".kanban-card");
+      if (!found) throw new Error("keine Kanban-Karte gefunden");
+      return found;
+    });
+    const lanes = container.querySelectorAll<HTMLElement>(".kanban-lane");
+    expect(lanes.length).toBe(3);
+
+    let payload = "";
+    const dataTransfer = {
+      effectAllowed: "",
+      dropEffect: "",
+      setData: (_type: string, value: string) => {
+        payload = value;
+      },
+      getData: () => payload,
+    };
+
+    fireEvent.dragStart(card, { dataTransfer });
+    fireEvent.drop(lanes[1], { dataTransfer });
+
+    await waitFor(() => {
+      expect(db.updateTodoStatus).toHaveBeenCalledWith(7, "in_progress");
+    });
+
+    const messages = debugLogs.map((l) => l.message);
+    expect(messages.some((m) => m.includes("dragstart für Aufgabe 7"))).toBe(true);
+    expect(messages.some((m) => m.includes('nach "in_progress" verschoben'))).toBe(true);
   });
 
   it("reports a failed update check instead of staying silent", async () => {
