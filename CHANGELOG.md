@@ -2,6 +2,10 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.6.1] - 2026-08-27
+- Drag-and-drop im Kanban-Brett unter Windows repariert: Tauris nativer Drag-Handler hat die Events des Bretts verschluckt
+- Drag-Vorgänge erscheinen jetzt im Debug-Panel (Start, Ablegen, Statuswechsel, Fehler)
+
 ## [0.6.0] - 2026-08-27
 - Filterleiste in feste Zeilen gegliedert: Fälligkeit und Status oben, Suche und Kategorie darunter — statt beliebigem Umbruch je nach Fensterbreite
 - Größeres Standardfenster (1020 × 820) mit Mindestgröße, startet mittig auf dem Bildschirm

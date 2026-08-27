@@ -1,6 +1,6 @@
 [package]
 name = "todolist"
-version = "0.6.0"
+version = "0.6.1"
 description = "A simple desktop TODO list application"
 authors = ["seemueller"]
 edition = "2021"

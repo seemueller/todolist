@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.6.0";
+export const APP_VERSION = "0.6.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.1",
+    date: "2026-08-27",
+    changes: [
+      "Drag-and-drop im Kanban-Brett unter Windows repariert",
+      "Drag-Vorgänge erscheinen jetzt im Debug-Panel",
+    ],
+  },
   {
     version: "0.6.0",
     date: "2026-08-27",
