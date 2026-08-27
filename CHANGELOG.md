@@ -2,6 +2,10 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.5.2] - 2026-08-27
+- Titelleiste unter Windows repariert: Fenster ziehen, minimieren, maximieren und schließen funktionieren
+- Debug-Log-Panel (Ctrl+Shift+L) für Fehlerdiagnose
+
 ## [0.5.0] - 2026-08-26
 - In-App-Update-Mechanismus über GitHub Releases
 - Deutsche Sprache für Windows-Installer

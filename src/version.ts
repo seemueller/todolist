@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.5.0";
+export const APP_VERSION = "0.5.2";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.5.2",
+    date: "2026-08-27",
+    changes: [
+      "Titelleiste unter Windows repariert: Fenster ziehen, minimieren, maximieren und schließen funktionieren",
+      "Debug-Log-Panel (Ctrl+Shift+L) für Fehlerdiagnose",
+    ],
+  },
   {
     version: "0.5.0",
     date: "2026-08-27",
@@ -22,7 +30,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Kräftige Umrandungen, versetzte Schatten und klare Flächen für alle Bedienelemente",
       "Neue Schrift für Überschriften und Fließtext",
       "Emoji in der Oberfläche durch einheitlich gezeichnete Symbole ersetzt",
-      "Kopfzeile zeigt jetzt die Anzahl der offenen Aufgaben",
       "Verständlichere Hinweise bei leerer Liste, aktivem Filter und Fehlern",
       "Kanban-Spalten mit farbigem Kopf, erledigte Karten sind auch dort erkennbar",
       "Neue Farbpalette für Kategorie-Badges und Prioritäten",

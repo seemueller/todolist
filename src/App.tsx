@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
+import { DragEvent, FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
   addTodo,
   addCategory,
@@ -15,9 +15,11 @@ import {
   updateTodoStatus,
   updateTodoTitle,
 } from "./db";
+import { installDebugInterceptor } from "./debug";
 import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
+import { DebugLogPanel } from "./DebugLogPanel";
 import {
   BoardViewIcon,
   CategoryBadge,
@@ -125,6 +127,10 @@ function App() {
   const [draggedTodoId, setDraggedTodoId] = useState<number | null>(null);
   const [dragOverLane, setDragOverLane] = useState<TodoStatus | null>(null);
 
+  // Debug log panel (Ctrl+Shift+L)
+  const [showDebug, setShowDebug] = useState(false);
+  const closeDebug = useCallback(() => setShowDebug(false), []);
+
   async function refresh() {
     try {
       const [items, cats] = await Promise.all([
@@ -143,6 +149,21 @@ function App() {
 
   useEffect(() => {
     refresh();
+  }, []);
+
+  useEffect(() => {
+    installDebugInterceptor();
+  }, []);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key === "L") {
+        e.preventDefault();
+        setShowDebug((d) => !d);
+      }
+    }
+    document.addEventListener("keydown", handleKey as any);
+    return () => document.removeEventListener("keydown", handleKey as any);
   }, []);
 
   const closeChangelog = useCallback(() => setShowChangelog(false), []);
@@ -741,6 +762,14 @@ function App() {
           <span className="version">v{APP_VERSION}</span>
           <button
             type="button"
+            className="debug-btn"
+            onClick={() => setShowDebug(true)}
+            aria-label="Debug Logs"
+          >
+            Debug
+          </button>
+          <button
+            type="button"
             className="changelog-btn"
             onClick={() => setShowChangelog(true)}
           >
@@ -865,6 +894,8 @@ function App() {
             </ul>
         </Modal>
       )}
+
+      {showDebug && <DebugLogPanel onClose={closeDebug} />}
     </div>
   );
 }
