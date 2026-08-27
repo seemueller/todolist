@@ -108,7 +108,7 @@ jobs:
           }
           gh release upload "v$version" latest.json --clobber
 
-       - name: Publish release
+      - name: Publish release
         run: |
           $version = "${{ steps.version.outputs.version }}"
           gh release edit "v$version" --draft=false --latest
