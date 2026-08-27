@@ -1244,7 +1244,13 @@ a:hover {
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   cursor: grab;
+  user-select: none;
+  -webkit-user-drag: element;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.kanban-card > * {
+  -webkit-user-drag: none;
 }
 
 .kanban-card.priority-high {
