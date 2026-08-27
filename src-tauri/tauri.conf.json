@@ -13,8 +13,11 @@
     "windows": [
       {
         "title": "TodoList",
-        "width": 480,
-        "height": 720,
+        "width": 1020,
+        "height": 820,
+        "minWidth": 560,
+        "minHeight": 620,
+        "center": true,
         "decorations": false,
         "transparent": true,
         "visible": true
