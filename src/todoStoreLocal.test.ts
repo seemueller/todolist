@@ -33,6 +33,12 @@ describe("localTodoStore", () => {
     expect(todo.category_color).toBe("#a78bfa");
   });
 
+  it("rejects rather than throwing synchronously for a missing todo", async () => {
+    // A synchronous throw would escape here before the assertion ever runs,
+    // which is exactly the difference from the SQL store we are closing.
+    await expect(localTodoStore.updateTodoTitle(999, "x")).rejects.toThrow("Todo 999 not found");
+  });
+
   it("clears the category off a todo when its category is deleted", async () => {
     const cat = await localTodoStore.addCategory("Kunde", "#a78bfa");
     const todo = await localTodoStore.addTodo("Meeting", "medium", null, cat.id);

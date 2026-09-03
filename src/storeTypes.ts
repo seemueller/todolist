@@ -17,24 +17,24 @@ export interface TodoStore {
     dueDate: string | null,
     categoryId?: number | null
   ): Promise<Todo>;
-  /** Wirft, wenn `id` kein bestehendes Todo referenziert. */
+  /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoTitle(id: number, title: string): Promise<Todo>;
-  /** Wirft, wenn `id` kein bestehendes Todo referenziert. */
+  /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo>;
-  /** Wirft, wenn `id` kein bestehendes Todo referenziert. */
+  /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoPriority(id: number, priority: Priority): Promise<Todo>;
-  /** Aktualisiert category_id und denormalisiert category_name/category_color neu; wirft, wenn `id` kein bestehendes Todo referenziert. */
+  /** Aktualisiert category_id und denormalisiert category_name/category_color neu; lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoCategory(id: number, categoryId: number | null): Promise<Todo>;
-  /** Haelt `done` konsistent zu `status` ("done" <=> done === true); wirft, wenn `id` kein bestehendes Todo referenziert. */
+  /** Haelt `done` konsistent zu `status` ("done" <=> done === true); lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoStatus(id: number, status: TodoStatus): Promise<Todo>;
-  /** Haelt `status` konsistent zu `done`; wirft, wenn `id` kein bestehendes Todo referenziert. */
+  /** Haelt `status` konsistent zu `done`; lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   toggleTodoDone(id: number, done: boolean): Promise<Todo>;
   deleteTodo(id: number): Promise<number>;
   /** Alle Kategorien, sortiert nach `name.localeCompare` (nicht nach einer DB-Kollation) — das ist der Vertrag, jedes Backend muss dieselbe Reihenfolge liefern. */
   listCategories(): Promise<Category[]>;
   /** Legt eine neue Kategorie an; `name` wird getrimmt. */
   addCategory(name: string, color: string): Promise<Category>;
-  /** Aktualisiert Name (getrimmt) und Farbe und denormalisiert beides auf alle referenzierenden Todos; wirft, wenn `id` keine bestehende Kategorie referenziert. */
+  /** Aktualisiert Name (getrimmt) und Farbe und denormalisiert beides auf alle referenzierenden Todos; lehnt mit `Category <id> not found` ab, wenn `id` keine bestehende Kategorie referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateCategory(id: number, name: string, color: string): Promise<Category>;
   /** Loescht die Kategorie; Todos, die sie referenzierten, verlieren sie (category_id/category_name/category_color werden null), werden aber nicht geloescht. */
   deleteCategory(id: number): Promise<number>;

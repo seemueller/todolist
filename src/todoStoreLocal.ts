@@ -104,7 +104,7 @@ function addTodo(
   return Promise.resolve(todo);
 }
 
-function updateTodoTitle(id: number, title: string): Promise<Todo> {
+async function updateTodoTitle(id: number, title: string): Promise<Todo> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id);
   if (idx === -1) throw new Error(`Todo ${id} not found`);
@@ -113,7 +113,7 @@ function updateTodoTitle(id: number, title: string): Promise<Todo> {
   return Promise.resolve(todos[idx]);
 }
 
-function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
+async function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id);
   if (idx === -1) throw new Error(`Todo ${id} not found`);
@@ -122,7 +122,7 @@ function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
   return Promise.resolve(todos[idx]);
 }
 
-function updateTodoPriority(id: number, priority: Priority): Promise<Todo> {
+async function updateTodoPriority(id: number, priority: Priority): Promise<Todo> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id);
   if (idx === -1) throw new Error(`Todo ${id} not found`);
@@ -131,7 +131,7 @@ function updateTodoPriority(id: number, priority: Priority): Promise<Todo> {
   return Promise.resolve(todos[idx]);
 }
 
-function updateTodoCategory(id: number, categoryId: number | null): Promise<Todo> {
+async function updateTodoCategory(id: number, categoryId: number | null): Promise<Todo> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id);
   if (idx === -1) throw new Error(`Todo ${id} not found`);
@@ -146,7 +146,7 @@ function updateTodoCategory(id: number, categoryId: number | null): Promise<Todo
   return Promise.resolve(todos[idx]);
 }
 
-function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
+async function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id);
   if (idx === -1) throw new Error(`Todo ${id} not found`);
@@ -155,7 +155,7 @@ function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
   return Promise.resolve(todos[idx]);
 }
 
-function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
+async function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id);
   if (idx === -1) throw new Error(`Todo ${id} not found`);
@@ -203,7 +203,7 @@ function addCategory(name: string, color: string): Promise<Category> {
   return Promise.resolve(cat);
 }
 
-function updateCategory(id: number, name: string, color: string): Promise<Category> {
+async function updateCategory(id: number, name: string, color: string): Promise<Category> {
   const categories = loadCategories();
   const idx = categories.findIndex((c) => c.id === id);
   if (idx === -1) throw new Error(`Category ${id} not found`);
