@@ -343,6 +343,11 @@ export function clearBlock(date: string, startSlot: number, endSlot: number): Pr
 
 Note the import cycle between `timeDb.ts` and `timeStoreLocal.ts` — `timeDb` imports the store, the store imports the types back. This is fine because the types are erased at compile time and `DEFAULT_SETTINGS` is only read inside functions, never at module top level. If Vitest ever reports `DEFAULT_SETTINGS` as undefined, move the three type declarations into `src/storeTypes.ts` and re-export them from `timeDb.ts`.
 
+> **Amended after review — see "Amendment 1" below.** The cycle was resolved
+> immediately rather than left in place, so the three declarations now live in
+> `src/timeTypes.ts`. Every later task imports `TimeSettings`,
+> `DEFAULT_SETTINGS` and `TimeSlotRecord` from `./timeTypes`, not `./timeDb`.
+
 - [ ] **Step 6: Run the full suite**
 
 Run: `npm run typecheck && npm test`
@@ -359,6 +364,46 @@ Expected: PASS — nothing user-visible changed
 git add src/storeTypes.ts src/todoStoreLocal.ts src/timeStoreLocal.ts src/todoStoreLocal.test.ts src/db.ts src/timeDb.ts
 git commit -m "refactor: put the localStorage persistence behind a store interface"
 ```
+
+---
+
+## Amendment 1 — after the Task 1 review
+
+Task 1 shipped as `3638b28`, then a code quality review produced four findings,
+fixed in `0fd6d1d`. What later tasks need to know:
+
+**`src/timeTypes.ts` now exists.** It holds `TimeSettings`, `DEFAULT_SETTINGS`
+and `TimeSlotRecord`. The import cycle the plan had accepted was resolved
+straight away instead of being deferred, because Task 6 replaces `store()` with
+exactly the module-scope form that makes the cycle bite — and the resulting
+failure is a silent `undefined` under Vite's SSR transform, not a load-time
+error. `timeDb.ts` re-exports all three, so `TimeTrackingView.tsx` was untouched.
+The code blocks in Tasks 5 and 7 have been updated to import from `./timeTypes`.
+
+**The interfaces in `src/storeTypes.ts` now carry the operation contracts** —
+`listTodos`'s sort order, the `Todo N not found` error, the denormalised
+`category_name`/`category_color`, `listCategories`'s alphabetical order, the
+trimmed category names, and the seven time-tracking guarantees. Tasks 4 and 5
+implement against those comments; read them before writing the SQL stores, and
+if an SQL implementation cannot keep a contract, say so rather than quietly
+diverging.
+
+**`src/timeStoreLocal.test.ts` now exists** with six tests. It is the behaviour
+baseline for Task 5: the SQLite time store must satisfy the same cases.
+
+**Known flaky test, not a regression.** `TimeTrackingView > zeigt eine positive
+Differenz, sobald das Soll erreicht ist` intermittently times out at Vitest's
+default 5 s. Reproduced on the untouched `3638b28`, so it predates this work. If
+it fails in a later task, re-run before investigating; do not treat it as caused
+by your change and do not "fix" it as a side quest.
+
+**Storage-independent rules still live in the local stores.** `clampTarget`,
+`migrateTodos`, the sort orders in `selectTodos`/`listCategories` and the
+category denormalisation are rules, not storage details. Tasks 4 and 5 must not
+copy them by hand — every divergence becomes a silent behaviour difference
+between the browser and the desktop app. Where a rule is needed on both sides,
+move it into a shared module (`types.ts` for todo rules, `timeSlots.ts` for time
+rules) and have both stores call it.
 
 ---
 
@@ -869,7 +914,7 @@ vi.mock("./sqlClient", () => ({
 }));
 
 import { sqlTimeStore } from "./timeStoreSql";
-import { DEFAULT_SETTINGS } from "./timeDb";
+import { DEFAULT_SETTINGS } from "./timeTypes";
 
 describe("sqlTimeStore", () => {
   beforeEach(() => {
@@ -944,7 +989,7 @@ Create `src/timeStoreSql.ts`:
 // ein Tag wird immer komplett ersetzt, die Fachlogik bleibt in timeSlots.ts.
 
 import { DaySlot, applyPaint, setBlockNote as setNoteOnBlock } from "./timeSlots";
-import { TimeSettings, DEFAULT_SETTINGS } from "./timeDb";
+import { TimeSettings, DEFAULT_SETTINGS } from "./timeTypes";
 import { TimeStore } from "./storeTypes";
 import { getDb } from "./sqlClient";
 
