@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.6.1";
+export const APP_VERSION = "0.7.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,18 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.0",
+    date: "2026-09-03",
+    changes: [
+      "Neue Ansicht „Zeit“: Arbeitszeit auf 15 Minuten genau buchen, indem man Viertelstunden in einem Wochenraster anklickt oder überstreicht",
+      "Wochenraster Montag bis Freitag von 6 bis 22 Uhr, Samstag und Sonntag zuschaltbar; gebucht wird auf die bestehenden Kategorien",
+      "Zusammenhängende Viertelstunden werden als Block gezeigt und können eine Notiz tragen",
+      "Summen je Tag, je Kategorie und für die Woche, dazu die Differenz zur Sollzeit",
+      "Einstellungs-Popup mit Sollzeit je Arbeitstag, Wochenend-Schalter und CSV-Export der Woche",
+      "Ansicht-Umschalter im Kopf ist jetzt eine Segmentleiste: Liste, Brett, Zeit",
+    ],
+  },
   {
     version: "0.6.1",
     date: "2026-08-27",

@@ -2,6 +2,14 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.7.0] - 2026-09-03
+- Neue Ansicht „Zeit“: Arbeitszeit auf 15 Minuten genau buchen, indem man Viertelstunden in einem Wochenraster anklickt oder überstreicht
+- Wochenraster Montag bis Freitag von 6 bis 22 Uhr, Samstag und Sonntag zuschaltbar; gebucht wird auf die bestehenden Kategorien
+- Zusammenhängende Viertelstunden werden als Block gezeigt und können eine Notiz tragen
+- Summen je Tag, je Kategorie und für die Woche, dazu die Differenz zur Sollzeit
+- Einstellungs-Popup mit Sollzeit je Arbeitstag, Wochenend-Schalter und CSV-Export der Woche
+- Ansicht-Umschalter im Kopf ist jetzt eine Segmentleiste: Liste, Brett, Zeit
+
 ## [0.6.1] - 2026-08-27
 - Drag-and-drop im Kanban-Brett unter Windows repariert: Tauris nativer Drag-Handler hat die Events des Bretts verschluckt
 - Drag-Vorgänge erscheinen jetzt im Debug-Panel (Start, Ablegen, Statuswechsel, Fehler)
