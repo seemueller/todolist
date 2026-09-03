@@ -104,6 +104,38 @@ pub fn run() {
             sql: "ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium';",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "add_status_column",
+            sql: "ALTER TABLE todos ADD COLUMN status TEXT NOT NULL DEFAULT 'todo';",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 7,
+            description: "create_time_tables",
+            sql: "CREATE TABLE IF NOT EXISTS time_slots (
+                date TEXT NOT NULL,
+                slot INTEGER NOT NULL,
+                category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+                note TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (date, slot)
+            );
+            CREATE TABLE IF NOT EXISTS time_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                target_slots_per_day INTEGER NOT NULL DEFAULT 32,
+                show_weekend INTEGER NOT NULL DEFAULT 0
+            );",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 8,
+            description: "create_app_settings",
+            sql: "CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
