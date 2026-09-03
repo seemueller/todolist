@@ -1,20 +1,12 @@
 // localStorage-Backend der Zeiterfassung. Implementiert TimeStore aus storeTypes.ts;
 // die dort dokumentierten Vertraege gelten, hier stehen nur Implementierungsdetails.
 
-import { DaySlot, applyPaint, setBlockNote as setNoteOnBlock } from "./timeSlots";
+import { DaySlot, applyPaint, clampTarget, setBlockNote as setNoteOnBlock } from "./timeSlots";
 import { TimeSettings, DEFAULT_SETTINGS, TimeSlotRecord } from "./timeTypes";
 import { TimeStore } from "./storeTypes";
 
 const SLOTS_KEY = "todolist_timeslots";
 const SETTINGS_KEY = "todolist_time_settings";
-
-/** Soll je Tag zwischen 0:00 und 16:00; alles andere waere ein Tippfehler. */
-const MAX_TARGET_SLOTS = 64;
-
-function clampTarget(slots: number): number {
-  if (!Number.isFinite(slots)) return DEFAULT_SETTINGS.targetSlotsPerDay;
-  return Math.min(MAX_TARGET_SLOTS, Math.max(0, Math.round(slots)));
-}
 
 function loadAll(): TimeSlotRecord[] {
   try {
