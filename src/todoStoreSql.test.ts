@@ -89,4 +89,16 @@ describe("sqlTodoStore", () => {
 
     expect(categories.map((c) => c.name)).toEqual(["Apfel", "Ärzte", "Zebra"]);
   });
+
+  it("deletes a category and relies on the foreign key to clear it off todos", async () => {
+    execute.mockResolvedValue({ rowsAffected: 1 });
+
+    await sqlTodoStore.deleteCategory(2);
+
+    // No cleanup query against todos here: migration 4 declares
+    // todos.category_id with ON DELETE SET NULL, so SQLite clears it itself.
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][0]).toContain("DELETE FROM categories WHERE id = $1");
+    expect(execute.mock.calls[0][1]).toEqual([2]);
+  });
 });

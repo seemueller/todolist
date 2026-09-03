@@ -33,6 +33,19 @@ describe("localTodoStore", () => {
     expect(todo.category_color).toBe("#a78bfa");
   });
 
+  it("clears the category off a todo when its category is deleted", async () => {
+    const cat = await localTodoStore.addCategory("Kunde", "#a78bfa");
+    const todo = await localTodoStore.addTodo("Meeting", "medium", null, cat.id);
+
+    await localTodoStore.deleteCategory(cat.id);
+
+    const [reloaded] = await localTodoStore.listTodos();
+    expect(reloaded.id).toBe(todo.id);
+    expect(reloaded.category_id).toBeNull();
+    expect(reloaded.category_name).toBeNull();
+    expect(reloaded.category_color).toBeNull();
+  });
+
   it("sorts categories the way German readers expect", async () => {
     await localTodoStore.addCategory("Zebra", "#000000");
     await localTodoStore.addCategory("Apfel", "#000000");

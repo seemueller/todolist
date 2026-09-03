@@ -36,6 +36,7 @@ export interface TodoStore {
   addCategory(name: string, color: string): Promise<Category>;
   /** Aktualisiert Name (getrimmt) und Farbe und denormalisiert beides auf alle referenzierenden Todos; wirft, wenn `id` keine bestehende Kategorie referenziert. */
   updateCategory(id: number, name: string, color: string): Promise<Category>;
+  /** Loescht die Kategorie; Todos, die sie referenzierten, verlieren sie (category_id/category_name/category_color werden null), werden aber nicht geloescht. */
   deleteCategory(id: number): Promise<number>;
 }
 

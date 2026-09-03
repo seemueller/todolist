@@ -226,6 +226,19 @@ function updateCategory(id: number, name: string, color: string): Promise<Catego
 function deleteCategory(id: number): Promise<number> {
   const categories = loadCategories().filter((c) => c.id !== id);
   saveCategories(categories);
+
+  // Clear the category off todos that referenced it, instead of leaving it
+  // dangling: the SQL store gets this for free via ON DELETE SET NULL.
+  const todos = loadTodos();
+  for (const todo of todos) {
+    if (todo.category_id === id) {
+      todo.category_id = null;
+      todo.category_name = null;
+      todo.category_color = null;
+    }
+  }
+  saveTodos(todos);
+
   return Promise.resolve(id);
 }
 

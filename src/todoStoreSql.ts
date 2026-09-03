@@ -132,6 +132,8 @@ async function updateCategory(id: number, name: string, color: string): Promise<
 
 async function deleteCategory(id: number): Promise<number> {
   const db = await getDb();
+  // No manual cleanup of referencing todos needed here: migration 4 declares
+  // todos.category_id with ON DELETE SET NULL, so the database clears it.
   await db.execute("DELETE FROM categories WHERE id = $1", [id]);
   return id;
 }
