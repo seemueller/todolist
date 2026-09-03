@@ -2,10 +2,15 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const select = vi.fn();
 const execute = vi.fn();
+const invoke = vi.fn();
 
 vi.mock("./sqlClient", () => ({
   getDb: () => Promise.resolve({ select, execute }),
   isTauri: () => true,
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invoke(...args),
 }));
 
 import { sqlTimeStore } from "./timeStoreSql";
@@ -16,6 +21,8 @@ describe("sqlTimeStore", () => {
     select.mockReset();
     execute.mockReset();
     execute.mockResolvedValue({ rowsAffected: 1 });
+    invoke.mockReset();
+    invoke.mockResolvedValue(undefined);
   });
 
   it("falls back to the defaults when no settings row exists", async () => {
@@ -49,14 +56,31 @@ describe("sqlTimeStore", () => {
     expect(slots).toHaveLength(2);
   });
 
-  it("replaces a day inside a transaction", async () => {
-    await sqlTimeStore.saveDay("2026-09-03", [{ slot: 36, category_id: 2, note: "" }]);
+  it("replaces a day via the replace_time_day command", async () => {
+    await sqlTimeStore.saveDay("2026-09-03", [
+      { slot: 36, category_id: 2, note: "Meeting" },
+      { slot: 37, category_id: 2, note: "" },
+    ]);
 
-    const statements = execute.mock.calls.map((call) => call[0] as string);
-    expect(statements[0]).toContain("BEGIN");
-    expect(statements.some((s) => s.includes("DELETE FROM time_slots"))).toBe(true);
-    expect(statements.some((s) => s.includes("INSERT INTO time_slots"))).toBe(true);
-    expect(statements[statements.length - 1]).toContain("COMMIT");
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith("replace_time_day", {
+      date: "2026-09-03",
+      slots: [
+        { slot: 36, category_id: 2, note: "Meeting" },
+        { slot: 37, category_id: 2, note: "" },
+      ],
+    });
+  });
+
+  it("defaults a slot's note to an empty string when it carries none", async () => {
+    await sqlTimeStore.saveDay("2026-09-03", [
+      { slot: 36, category_id: 2 } as unknown as { slot: number; category_id: number; note: string },
+    ]);
+
+    expect(invoke).toHaveBeenCalledWith("replace_time_day", {
+      date: "2026-09-03",
+      slots: [{ slot: 36, category_id: 2, note: "" }],
+    });
   });
 
   it("clears a block by painting it with no category", async () => {

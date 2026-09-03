@@ -1,6 +1,7 @@
 // SQLite-Variante der Zeit-Persistenz. Gleiche Semantik wie timeStoreLocal.ts:
 // ein Tag wird immer komplett ersetzt, die Fachlogik bleibt in timeSlots.ts.
 
+import { invoke } from "@tauri-apps/api/core";
 import { DaySlot, applyPaint, clampTarget, setBlockNote as setNoteOnBlock } from "./timeSlots";
 import { TimeSettings, DEFAULT_SETTINGS } from "./timeTypes";
 import { TimeStore } from "./storeTypes";
@@ -53,22 +54,16 @@ async function listSlots(date: string): Promise<DaySlot[]> {
   return rows.map((row) => ({ slot: row.slot, category_id: row.category_id, note: row.note }));
 }
 
+// Ersetzt den Tag ueber den Rust-Command replace_time_day statt ueber db.execute():
+// db.execute() zieht je Aufruf eine beliebige Verbindung aus dem Pool des SQL-
+// Plugins, darum haelt ein BEGIN/COMMIT ueber mehrere execute()-Aufrufe hinweg
+// keine echte Transaktion zusammen. Der Rust-Command haelt eine Verbindung fest
+// und fuehrt DELETE + INSERTs in einer einzigen sqlx-Transaktion aus.
 async function saveDay(date: string, slots: DaySlot[]): Promise<DaySlot[]> {
-  const db = await getDb();
-  await db.execute("BEGIN");
-  try {
-    await db.execute("DELETE FROM time_slots WHERE date = $1", [date]);
-    for (const slot of slots) {
-      await db.execute(
-        "INSERT INTO time_slots (date, slot, category_id, note) VALUES ($1, $2, $3, $4)",
-        [date, slot.slot, slot.category_id, slot.note ?? ""]
-      );
-    }
-    await db.execute("COMMIT");
-  } catch (error) {
-    await db.execute("ROLLBACK");
-    throw error;
-  }
+  await invoke("replace_time_day", {
+    date,
+    slots: slots.map((s) => ({ slot: s.slot, category_id: s.category_id, note: s.note ?? "" })),
+  });
   return slots;
 }
 
