@@ -531,21 +531,20 @@ a file from a test must do the same.
 **`@types/node` is now a devDependency.** The project had none, so `node:fs` and
 `node:url` did not typecheck. Added at `^22`.
 
-**No Rust toolchain in this environment.** `cargo`, `rustc` and `rustup` are all
-absent, so nothing in this plan can compile or run the Rust side. Consequences:
+**No Rust toolchain in this environment.** ~~`cargo`, `rustc` and `rustup` are
+all absent, so nothing in this plan can compile or run the Rust side.~~
 
-- Task 2's `cargo check` was skipped; the migration edit was reviewed by reading
-  it, not by compiling it.
-- **Task 9 cannot be executed here at all.** It is the only step that verifies
-  the SQLite stores against a real database instead of mocks: launching the app,
-  creating data, restarting, and inspecting `todolist.db` with `sqlite3`. Until
-  someone runs it on a machine with a Rust toolchain, "done" means "every mock is
-  green", which is not the same thing. Do not mark Phase 1 complete on the
-  strength of the unit suite alone.
+**Resolved during Task 4.** The toolchain and the Tauri system libraries were
+installed (`rustup default stable`; `pkg-config`, `sqlite3`,
+`libwebkit2gtk-4.1-dev`, `libsoup-3.0-dev`, `librsvg2-dev`,
+`libayatana-appindicator3-dev`, `libxdo-dev`, `libssl-dev`, `build-essential`,
+`file`). `cargo check` in `src-tauri` then finished clean in 2m08s with
+rustc 1.98.1, so Task 2's migrations are compiled, not merely read. Task 9 is
+no longer blocked and must be executed before Phase 1 counts as done.
 
-The practical risk this leaves: a typo in the migration SQL, a wrong column name
-in a query, or a `tauri-plugin-sql` parameter-binding quirk would pass every test
-in Tasks 3 to 8 and only surface when the desktop app first runs.
+The risk that remains until Task 9 runs: a wrong column name in a query or a
+`tauri-plugin-sql` binding quirk would pass every mocked test in Tasks 3 to 8
+and only surface when the desktop app first opens the database.
 
 ---
 
