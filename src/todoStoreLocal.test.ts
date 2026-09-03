@@ -32,4 +32,13 @@ describe("localTodoStore", () => {
     expect(todo.category_name).toBe("Kunde");
     expect(todo.category_color).toBe("#a78bfa");
   });
+
+  it("sorts categories the way German readers expect", async () => {
+    await localTodoStore.addCategory("Zebra", "#000000");
+    await localTodoStore.addCategory("Apfel", "#000000");
+    await localTodoStore.addCategory("Ärzte", "#000000");
+
+    const names = (await localTodoStore.listCategories()).map((c) => c.name);
+    expect(names).toEqual(["Apfel", "Ärzte", "Zebra"]);
+  });
 });

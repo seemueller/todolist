@@ -93,9 +93,12 @@ async function deleteTodo(id: number): Promise<number> {
 async function listCategories(): Promise<Category[]> {
   const db = await getDb();
   const rows = await db.select<CategoryRow[]>(
-    "SELECT id, name, color, created_at FROM categories ORDER BY name COLLATE NOCASE ASC"
+    "SELECT id, name, color, created_at FROM categories"
   );
-  return rows.map(fromCategoryRow);
+  // Sorted here, not in SQL: SQLite's NOCASE collation only case-folds ASCII,
+  // so "Ärzte" would land after "Zebra". localeCompare matches what the
+  // localStorage store does, and there are only ever a handful of categories.
+  return rows.map(fromCategoryRow).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function selectCategory(id: number): Promise<Category> {

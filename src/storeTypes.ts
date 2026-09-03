@@ -30,7 +30,7 @@ export interface TodoStore {
   /** Haelt `status` konsistent zu `done`; wirft, wenn `id` kein bestehendes Todo referenziert. */
   toggleTodoDone(id: number, done: boolean): Promise<Todo>;
   deleteTodo(id: number): Promise<number>;
-  /** Alle Kategorien, alphabetisch nach Namen sortiert. */
+  /** Alle Kategorien, sortiert nach `name.localeCompare` (nicht nach einer DB-Kollation) — das ist der Vertrag, jedes Backend muss dieselbe Reihenfolge liefern. */
   listCategories(): Promise<Category[]>;
   /** Legt eine neue Kategorie an; `name` wird getrimmt. */
   addCategory(name: string, color: string): Promise<Category>;

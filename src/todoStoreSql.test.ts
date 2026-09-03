@@ -76,9 +76,17 @@ describe("sqlTodoStore", () => {
     await expect(sqlTodoStore.updateTodoTitle(99, "x")).rejects.toThrow("Todo 99 not found");
   });
 
-  it("sorts categories by name", async () => {
-    select.mockResolvedValue([]);
-    await sqlTodoStore.listCategories();
-    expect(select.mock.calls[0][0]).toContain("ORDER BY name COLLATE NOCASE");
+  it("sorts categories the way German readers expect", async () => {
+    // Rows deliberately out of order, and not sorted the way SQLite's NOCASE
+    // collation would sort them either (that would put "Ärzte" after "Zebra").
+    select.mockResolvedValue([
+      { id: 1, name: "Zebra", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+      { id: 2, name: "Apfel", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+      { id: 3, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    const categories = await sqlTodoStore.listCategories();
+
+    expect(categories.map((c) => c.name)).toEqual(["Apfel", "Ärzte", "Zebra"]);
   });
 });
