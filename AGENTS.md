@@ -39,8 +39,12 @@ Beschriftung umbenennt, zieht den Test mit.
 ## Test Files
 
 - `src/types.test.ts` — unit tests for type utilities (`fromRow`)
+- `src/timeSlots.test.ts` — unit tests for the time-tracking domain logic
+- `src/timeCsv.test.ts` — unit tests for the CSV export
+- `src/TimeTrackingView.test.tsx` — time-tracking view (`timeDb` is mocked)
 - `src/App.test.tsx` — React component tests (db layer is mocked)
 - `e2e/todolist.spec.ts` — Playwright end-to-end tests against the dev server
+- `e2e/timetracking.spec.ts` — Playwright end-to-end tests for the time tracking view
 
 ## Adding Tests
 

@@ -72,7 +72,7 @@ ausschließlich über diese Variablen angesprochen.
 | `--radius-lg` | `8px` | Modal-Panels. |
 | `--radius-pill` | `999px` | Filter-Chips und Segmentleisten. |
 | `--shadow-sm` | `3px 3px 0 var(--ink)` | Kanban-Karten, Einträge im Kategorien-Dialog. |
-| `--shadow-md` | `4px 4px 0 var(--ink)` | Listenzeilen, Ansicht-Umschalter, Changelog-Einträge. |
+| `--shadow-md` | `4px 4px 0 var(--ink)` | Listenzeilen, Ansicht-Umschalter, Zeitraster, Zeitblöcke, Changelog-Einträge. |
 | `--shadow-lg` | `5px 5px 0 var(--ink)` | Das Hinzufügen-Formular als wichtigstes Element der Seite. |
 | `--shadow-xl` | `8px 8px 0 var(--ink)` | Modal-Panels. |
 | `--shadow-focus` | `5px 5px 0 var(--accent)` | Fokus: der Schatten wechselt auf den Akzent, statt einen Ring zu zeichnen. |
@@ -264,9 +264,42 @@ Tastaturvertrag: Enter und Verlassen übernehmen, Escape bricht ab.
 Ein neues Icon entsteht hier und nirgends sonst: strichbasiert, `currentColor`,
 Raster 14/16/18 px, Strichstärke 1,6–2 px.
 
+### Ansicht-Umschalter
+
+Der Kopf trägt die Segmentleiste `.view-switch` mit den drei Ansichten Liste,
+Brett und Zeit. Die Knöpfe sind `FilterChip variant="segment"`; die Beschriftung
+lautet „Zur Ansicht <Name> wechseln" und wird von den Tests gegriffen.
+
+### Zeiterfassung
+
+Die Zeit-Ansicht liegt komplett in `src/TimeTrackingView.tsx` und bringt eigene
+Klassen mit (`.time-grid`, `.time-cell`, `.time-brush`, `.time-block`). Sie zeigt
+eine ganze Arbeitswoche: 17 Stundenzeilen, 20 Spalten (fünf Tage mal vier
+Viertelstunden). Ihre Regeln:
+
+- Das Raster trägt **einen** Rahmen und `--shadow-md`. Die Zellen tragen nur
+  `1px solid var(--ink-line)` als Rasterlinie und keinen eigenen Schatten —
+  340 Zellen mit Offset-Schatten wären Rauschen.
+- Die Tagesgrenze ist die einzige kräftige Linie im Raster: die erste Zelle eines
+  Tages trägt `--border-thin`, damit die fünf Spalten auseinanderfallen.
+- Der Kopf des heutigen Tages liegt auf `--highlight`, Wochenendspalten liegen auf
+  `--surface-muted`.
+- Die Spaltenzahl steckt in der Klasse `days-5` bzw. `days-7` am `.time-grid`;
+  `repeat()` nimmt kein `calc()`, darum zwei feste Varianten. Wer eine dritte
+  Spaltenzahl braucht, legt eine dritte Klasse an.
+- Die Kategoriefarbe kommt als Inline-Style aus den Daten, wie `category_color`
+  sonst auch.
+- Eine Zelle ist 30 px hoch und damit auf Klickflächengröße; ihr `aria-label` ist
+  „08:15, Projekt Alpha" bzw. „08:15, frei".
+- Fachlogik gehört nach `src/timeSlots.ts` (rein, ohne React), Persistenz nach
+  `src/timeDb.ts`. Die View rechnet nichts selbst außer der Zug-Vorschau.
+- Selten Gebrauchtes gehört ins Einstellungs-Popup (`Modal variant="category"`),
+  nicht in die Kopfzeile: dort stehen nur Navigation, Wochensumme und Differenz.
+
 ### Bewusst nicht extrahiert
 
-Todo-Zeile und Kanban-Spalte bleiben in `App.tsx`: sie hätten je einen einzigen
+Zeitzelle und Zeitblock-Zeile bleiben in `TimeTrackingView.tsx`, Todo-Zeile und
+Kanban-Spalte in `App.tsx`: sie hätten je einen einzigen
 Aufrufort, würden aber Drag-and-drop, Sortierung und Inline-Bearbeitung
 mitschleppen. Ebenso `.muted`, `.error`, `.version-badge`, `.kanban-count` und
 `.app-subtitle` — optisch ähnlich, semantisch verschiedene Dinge an je einem Ort.
@@ -308,6 +341,8 @@ Das frühere dunkle Thema mit Glassmorphismus, violettem Akzent (`#7f5af0`),
 weichen Schatten und `backdrop-filter` ist vollständig ersetzt. **Inter** ist
 nicht mehr die Schrift der App. Das Emoji-Konfetti beim Abhaken ist einem
 gezeichneten Haken gewichen, und der Prioritätspunkt ist ersatzlos entfallen.
+Der binäre Umschalter `.view-toggle` mit seinen `::after`-Beschriftungen ist durch
+die Segmentleiste `.view-switch` ersetzt.
 
 Wer einen alten Stand braucht, findet ihn in der git history — im Arbeitsbaum
 wird nichts davon aufbewahrt.

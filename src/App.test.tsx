@@ -197,7 +197,7 @@ describe("App", () => {
       expect(screen.getByText("Task")).toBeInTheDocument();
     });
 
-    const toggleBtn = screen.getByRole("button", { name: /Zum Kanban-Brett wechseln/i });
+    const toggleBtn = screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i });
     fireEvent.click(toggleBtn);
 
     await waitFor(() => {
@@ -220,7 +220,7 @@ describe("App", () => {
       expect(screen.getByText("Task")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Zum Kanban-Brett wechseln/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
 
     const card = await waitFor(() => {
       const found = container.querySelector<HTMLElement>(".kanban-card");

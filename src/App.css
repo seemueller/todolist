@@ -189,45 +189,45 @@ a:hover {
   text-transform: uppercase;
 }
 
-.view-toggle {
+.view-switch {
+  display: flex;
+  margin-left: auto;
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-md);
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+.view-switch button {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-left: auto;
-  padding: 10px 16px;
-  border: var(--border);
-  border-radius: var(--radius-md);
-  background: var(--canvas);
-  box-shadow: var(--shadow-md);
+  gap: 6px;
+  min-height: 30px;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
   color: var(--ink);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.view-toggle::after {
-  content: 'Brett';
+.view-switch button + button {
+  border-left: var(--border-thin);
 }
 
-.view-toggle.kanban-active {
+.view-switch button:hover {
   background: var(--highlight);
 }
 
-.view-toggle.kanban-active::after {
-  content: 'Liste';
-}
-
-.view-toggle:hover {
-  background: var(--highlight);
-}
-
-.view-toggle:active {
-  transform: translate(3px, 3px);
-  box-shadow: 1px 1px 0 var(--ink);
+.view-switch button.active {
+  background: var(--ink);
+  color: var(--canvas);
 }
 
 /* Add Form */
@@ -1418,6 +1418,425 @@ a:hover {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--ink-ghost);
+}
+
+/* Zeiterfassung */
+.time-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.time-daybar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.time-date {
+  font-family: 'Archivo Black', system-ui, sans-serif;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+.time-total {
+  margin-left: auto;
+  padding: 6px 12px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--highlight);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.time-total strong {
+  font-size: 13px;
+}
+
+/* Einstellungen liegen im Popup, damit die Kopfzeile ruhig bleibt. */
+.time-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.time-setting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-setting-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.time-setting-hint {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.time-setting-hint strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.time-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border: var(--border-thin);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.time-target-value {
+  min-width: 44px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Differenz zum Soll: rot wenn Stunden fehlen, gruen wenn welche uebrig sind. */
+.time-difference {
+  padding: 6px 12px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-difference.behind {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.time-difference.ahead {
+  background: var(--success);
+}
+
+.time-brushes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.time-brush {
+  padding: 7px 13px;
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.time-brush.active {
+  box-shadow: var(--shadow-sm);
+  transform: translate(-1px, -1px);
+}
+
+/* Wochenraster: Stundenspalte, dann fuenf Tage mit je vier Viertelstunden. */
+.time-grid {
+  display: flex;
+  flex-direction: column;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--canvas-sunken);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Die Spaltenzahl haengt an den angezeigten Tagen: vier Viertelstunden je Tag.
+   repeat() nimmt kein calc(), darum zwei feste Varianten statt einer Variable. */
+.time-grid-days,
+.time-grid-head,
+.time-grid-row,
+.time-grid-foot {
+  display: grid;
+}
+
+.time-grid.days-5 .time-grid-days,
+.time-grid.days-5 .time-grid-head,
+.time-grid.days-5 .time-grid-row,
+.time-grid.days-5 .time-grid-foot {
+  grid-template-columns: 38px repeat(20, 1fr);
+}
+
+.time-grid.days-7 .time-grid-days,
+.time-grid.days-7 .time-grid-head,
+.time-grid.days-7 .time-grid-row,
+.time-grid.days-7 .time-grid-foot {
+  grid-template-columns: 38px repeat(28, 1fr);
+}
+
+.time-grid-days {
+  background: var(--canvas);
+}
+
+.time-grid-head {
+  border-bottom: var(--border-thin);
+  background: var(--canvas);
+}
+
+.time-grid-foot {
+  border-top: var(--border-thin);
+  background: var(--canvas);
+}
+
+/* Der Tageskopf spannt sich ueber die vier Viertelstunden seiner Spalte. */
+.time-day-label,
+.time-day-sum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  grid-column: span 4;
+  padding: 5px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.time-day-label {
+  border-left: var(--border-thin);
+}
+
+.time-day-label.today {
+  background: var(--highlight);
+}
+
+/* Wochenende zaehlt nicht zum Soll und tritt darum optisch zurueck. */
+.time-day-label.weekend {
+  color: var(--ink-soft);
+}
+
+.time-cell.weekend {
+  background: var(--surface-muted);
+}
+
+.time-cell.weekend:hover {
+  background: var(--highlight);
+}
+
+.time-day-sum {
+  border-left: var(--border-thin);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-quarter-label,
+.time-hour-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.time-hour-label {
+  border-right: var(--border-thin);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 10.5px;
+}
+
+.time-grid-row + .time-grid-row .time-cell,
+.time-grid-row + .time-grid-row .time-hour-label {
+  border-top: 1px solid var(--ink-line);
+}
+
+.time-cell {
+  min-height: 30px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--ink-line);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+/* Tagesgrenze: kraeftige Linie, damit die fuenf Spalten auseinanderfallen. */
+.time-cell.day-start,
+.time-quarter-label.day-start {
+  border-left: var(--border-thin);
+}
+
+.time-cell:hover {
+  background: var(--highlight);
+}
+
+.time-cell.booked:hover {
+  filter: brightness(0.94);
+}
+
+.time-empty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 18px;
+  border: var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.time-empty p {
+  margin: 0;
+  flex: 1 1 240px;
+}
+
+.time-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.time-blocks-title {
+  margin: 0;
+  font-family: 'Archivo Black', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.time-block-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.time-block-day {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.time-block-day-sum {
+  padding: 2px 7px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-sunken);
+  color: var(--ink);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-block-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.time-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.time-block-range {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.time-block-duration {
+  padding: 3px 8px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-note-input {
+  flex: 1;
+  min-width: 80px;
+  padding: 6px 9px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+.time-note-input::placeholder {
+  color: var(--ink-faint);
+}
+
+.time-note-input:focus {
+  outline: none;
+  background: var(--surface);
+  box-shadow: 2px 2px 0 var(--accent);
+}
+
+.time-sums {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: var(--border-thin);
+}
+
+.time-sum {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-sum-total {
+  margin-left: auto;
+  padding: 6px 12px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--highlight);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Animationen */

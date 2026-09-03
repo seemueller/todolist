@@ -20,12 +20,24 @@ import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { DebugLogPanel } from "./DebugLogPanel";
+import { TimeTrackingView } from "./TimeTrackingView";
+
+/** Die drei Ansichten der App. */
+type ViewMode = "list" | "kanban" | "time";
+
+/** Reihenfolge und Beschriftung der Segment-Leiste im Kopf. */
+const VIEW_OPTIONS: { mode: ViewMode; label: string; Icon: typeof ListViewIcon }[] = [
+  { mode: "list", label: "Liste", Icon: ListViewIcon },
+  { mode: "kanban", label: "Brett", Icon: BoardViewIcon },
+  { mode: "time", label: "Zeit", Icon: ClockViewIcon },
+];
 import {
   BoardViewIcon,
   CategoryBadge,
   CategorySelect,
   CheckIcon,
   ChevronLeftIcon,
+  ClockViewIcon,
   ColorPicker,
   DueDateBadge,
   FilterChip,
@@ -129,7 +141,7 @@ function App() {
   const [editingCategoryColor, setEditingCategoryColor] = useState("");
 
   // Kanban view state
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [draggedTodoId, setDraggedTodoId] = useState<number | null>(null);
   const [dragOverLane, setDragOverLane] = useState<TodoStatus | null>(null);
 
@@ -458,17 +470,24 @@ function App() {
         <header className="app-header">
           <h1>TodoList</h1>
           <p className="app-subtitle">{headerCount}</p>
-          <button
-            type="button"
-            className={`view-toggle ${viewMode === "kanban" ? "kanban-active" : ""}`}
-            onClick={() => setViewMode((v) => (v === "list" ? "kanban" : "list"))}
-            aria-label={viewMode === "list" ? "Zum Kanban-Brett wechseln" : "Zur Listenansicht wechseln"}
-            title={viewMode === "list" ? "Kanban-Brett" : "Liste"}
-          >
-            {viewMode === "list" ? <BoardViewIcon /> : <ListViewIcon />}
-          </button>
+          <div className="view-switch" role="group" aria-label="Ansicht">
+            {VIEW_OPTIONS.map(({ mode, label, Icon }) => (
+              <FilterChip
+                key={mode}
+                variant="segment"
+                active={viewMode === mode}
+                onClick={() => setViewMode(mode)}
+                aria-label={`Zur Ansicht ${label} wechseln`}
+                title={label}
+              >
+                <Icon />
+                {label}
+              </FilterChip>
+            ))}
+          </div>
         </header>
 
+        {viewMode !== "time" && (
         <form className="add-form" onSubmit={handleAdd}>
           <input
             type="text"
@@ -494,6 +513,7 @@ function App() {
             <PlusIcon />
           </button>
         </form>
+        )}
 
         {viewMode === "list" && (
           <>
@@ -787,6 +807,13 @@ function App() {
               );
             })}
           </div>
+        )}
+
+        {viewMode === "time" && (
+          <TimeTrackingView
+            categories={categories}
+            onManageCategories={() => setShowCategoryManager(true)}
+          />
         )}
 
         <footer className="app-footer">

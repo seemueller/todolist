@@ -96,11 +96,50 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+/** Minus - Sollzeit verringern. */
+export function MinusIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" strokeWidth={2} {...props}>
+      <path d="M3 7h8" />
+    </BaseIcon>
+  );
+}
+
+/** Schieberegler - Einstellungen der Zeiterfassung. Bei 14px lesbarer als ein Zahnrad. */
+export function SlidersIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" strokeWidth={1.6} {...props}>
+      <path d="M1.8 4.2h10.4M1.8 9.8h10.4" />
+      <circle cx="5" cy="4.2" r="1.6" fill="var(--canvas)" />
+      <circle cx="9.2" cy="9.8" r="1.6" fill="var(--canvas)" />
+    </BaseIcon>
+  );
+}
+
+/** Pfeil in eine Ablage - CSV-Export. */
+export function DownloadIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" strokeWidth={1.6} {...props}>
+      <path d="M7 1.8v6.4M4.4 5.8L7 8.4l2.6-2.6" />
+      <path d="M2.2 10.2v1.4a.6.6 0 00.6.6h8.4a.6.6 0 00.6-.6v-1.4" />
+    </BaseIcon>
+  );
+}
+
 /** Pfeil nach links - Kanban-Karte zurueck nach "Zu tun". */
 export function ChevronLeftIcon(props: IconProps) {
   return (
     <BaseIcon viewBox="0 0 14 14" strokeWidth={1.5} {...props}>
       <path d="M9 3L5 7l4 4" />
+    </BaseIcon>
+  );
+}
+
+/** Pfeil nach rechts - Tag vorwaerts in der Zeiterfassung. */
+export function ChevronRightIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" strokeWidth={1.5} {...props}>
+      <path d="M5 3l4 4-4 4" />
     </BaseIcon>
   );
 }
@@ -153,6 +192,16 @@ export function BoardViewIcon(props: IconProps) {
       <rect x="1" y="3" width="4" height="12" rx="1" />
       <rect x="7" y="3" width="4" height="8" rx="1" />
       <rect x="13" y="3" width="4" height="10" rx="1" />
+    </BaseIcon>
+  );
+}
+
+/** Uhr-Symbol im Ansicht-Umschalter (18px). */
+export function ClockViewIcon(props: IconProps) {
+  return (
+    <BaseIcon size={18} viewBox="0 0 18 18" strokeWidth={1.5} {...props}>
+      <circle cx="9" cy="9" r="6.5" />
+      <path d="M9 5.5V9l2.5 1.8" />
     </BaseIcon>
   );
 }
