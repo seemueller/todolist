@@ -3,9 +3,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const select = vi.fn();
 const execute = vi.fn();
 const invoke = vi.fn();
+const getDb = vi.fn(() => Promise.resolve({ select, execute }));
 
 vi.mock("./sqlClient", () => ({
-  getDb: () => Promise.resolve({ select, execute }),
+  getDb: () => getDb(),
   isTauri: () => true,
 }));
 
@@ -23,6 +24,8 @@ describe("sqlTimeStore", () => {
     execute.mockResolvedValue({ rowsAffected: 1 });
     invoke.mockReset();
     invoke.mockResolvedValue(undefined);
+    getDb.mockClear();
+    getDb.mockImplementation(() => Promise.resolve({ select, execute }));
   });
 
   it("falls back to the defaults when no settings row exists", async () => {
@@ -70,6 +73,14 @@ describe("sqlTimeStore", () => {
         { slot: 37, category_id: 2, note: "" },
       ],
     });
+  });
+
+  it("resolves the database connection before invoking the command", async () => {
+    await sqlTimeStore.saveDay("2026-09-03", [{ slot: 36, category_id: 2, note: "" }]);
+
+    expect(getDb).toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalled();
+    expect(getDb.mock.invocationCallOrder[0]).toBeLessThan(invoke.mock.invocationCallOrder[0]);
   });
 
   it("defaults a slot's note to an empty string when it carries none", async () => {

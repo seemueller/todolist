@@ -60,6 +60,11 @@ async function listSlots(date: string): Promise<DaySlot[]> {
 // keine echte Transaktion zusammen. Der Rust-Command haelt eine Verbindung fest
 // und fuehrt DELETE + INSERTs in einer einzigen sqlx-Transaktion aus.
 async function saveDay(date: string, slots: DaySlot[]): Promise<DaySlot[]> {
+  // Laedt den Pool, falls noch niemand die Datenbank angefasst hat: der Rust-
+  // Command loest ihn aus DbInstances auf, das leer bleibt, bis Database.load
+  // gelaufen ist. getDb() cached, also ist das auf jedem bestehenden Pfad ein
+  // No-op auf einem bereits aufgeloesten Promise.
+  await getDb();
   await invoke("replace_time_day", {
     date,
     slots: slots.map((s) => ({ slot: s.slot, category_id: s.category_id, note: s.note ?? "" })),
