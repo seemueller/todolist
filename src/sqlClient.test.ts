@@ -10,7 +10,7 @@ describe("sqlClient", () => {
   beforeEach(() => {
     vi.resetModules();
     load.mockReset();
-    load.mockResolvedValue({ select: vi.fn(), execute: vi.fn() });
+    load.mockImplementation(() => Promise.resolve({ select: vi.fn(), execute: vi.fn() }));
     delete (globalThis as any).window.__TAURI_INTERNALS__;
   });
 
