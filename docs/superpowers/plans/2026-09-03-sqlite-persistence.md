@@ -576,7 +576,10 @@ describe("sqlClient", () => {
   beforeEach(() => {
     vi.resetModules();
     load.mockReset();
-    load.mockResolvedValue({ select: vi.fn(), execute: vi.fn() });
+    // A fresh object per call, so `toBe` below really proves the cache: with
+    // mockResolvedValue both callers would get the same reference even if
+    // load() ran twice, and only the call count would catch it.
+    load.mockImplementation(() => Promise.resolve({ select: vi.fn(), execute: vi.fn() }));
     delete (globalThis as any).window.__TAURI_INTERNALS__;
   });
 
