@@ -1,5 +1,8 @@
+// localStorage-Backend der Zeiterfassung. Implementiert TimeStore aus storeTypes.ts;
+// die dort dokumentierten Vertraege gelten, hier stehen nur Implementierungsdetails.
+
 import { DaySlot, applyPaint, setBlockNote as setNoteOnBlock } from "./timeSlots";
-import { TimeSettings, DEFAULT_SETTINGS, TimeSlotRecord } from "./timeDb";
+import { TimeSettings, DEFAULT_SETTINGS, TimeSlotRecord } from "./timeTypes";
 import { TimeStore } from "./storeTypes";
 
 const SLOTS_KEY = "todolist_timeslots";
@@ -48,7 +51,6 @@ function replaceDay(date: string, slots: DaySlot[]): DaySlot[] {
   return slots;
 }
 
-/** Einstellungen lesen; fehlende oder kaputte Werte fallen auf die Vorgabe zurueck. */
 function getSettings(): Promise<TimeSettings> {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
@@ -63,7 +65,6 @@ function getSettings(): Promise<TimeSettings> {
   }
 }
 
-/** Einstellungen schreiben und die tatsaechlich gespeicherten Werte zurueckgeben. */
 function saveSettings(settings: TimeSettings): Promise<TimeSettings> {
   const stored: TimeSettings = {
     targetSlotsPerDay: clampTarget(settings.targetSlotsPerDay),
@@ -73,23 +74,14 @@ function saveSettings(settings: TimeSettings): Promise<TimeSettings> {
   return Promise.resolve(stored);
 }
 
-/** Alle Buchungen eines Tages, nach Slot sortiert. */
 function listSlots(date: string): Promise<DaySlot[]> {
   return Promise.resolve(selectDay(loadAll(), date));
 }
 
-/**
- * Schreibt den kompletten Tagesstand. Die View nutzt das am Ende eines Zuges:
- * waehrend gezogen wird, rechnet sie die Vorschau selbst, gespeichert wird einmal.
- */
 function saveDay(date: string, slots: DaySlot[]): Promise<DaySlot[]> {
   return Promise.resolve(replaceDay(date, slots));
 }
 
-/**
- * Malt oder leert Slots eines Tages und gibt den neuen Tagesstand zurueck.
- * `categoryId` null leert die Slots.
- */
 function paintSlots(
   date: string,
   indices: number[],
@@ -99,13 +91,11 @@ function paintSlots(
   return Promise.resolve(replaceDay(date, applyPaint(current, indices, categoryId)));
 }
 
-/** Setzt die Notiz des Blocks, in dem `slot` liegt. */
 function setBlockNote(date: string, slot: number, note: string): Promise<DaySlot[]> {
   const current = selectDay(loadAll(), date);
   return Promise.resolve(replaceDay(date, setNoteOnBlock(current, slot, note)));
 }
 
-/** Loescht einen ganzen Block. */
 function clearBlock(date: string, startSlot: number, endSlot: number): Promise<DaySlot[]> {
   const indices: number[] = [];
   for (let slot = startSlot; slot < endSlot; slot++) indices.push(slot);

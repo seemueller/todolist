@@ -1,7 +1,11 @@
+// localStorage backend for todos and categories. Implements TodoStore from
+// storeTypes.ts; the contracts documented there apply here, this file only
+// holds implementation detail.
+
 import { Priority, Todo, TodoStatus, Category } from "./types";
 import { TodoStore } from "./storeTypes";
 
-// ── In-memory + localStorage fallback ────────────────────────────────────
+// ── localStorage persistence ─────────────────────────────────────────────
 
 const TODOS_KEY = "todolist_todos";
 const CATEGORIES_KEY = "todolist_categories";
@@ -50,7 +54,7 @@ function saveCategories(categories: Category[]): void {
   localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
 }
 
-// ── Browser DB implementation ────────────────────────────────────────────
+// ── Derived reads ────────────────────────────────────────────────────────
 
 function selectTodos(categoryId?: number | null): Todo[] {
   let todos = loadTodos();
