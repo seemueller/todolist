@@ -1155,6 +1155,67 @@ git commit -m "feat: add the SQLite store for time tracking"
 
 ---
 
+## Amendment 3 — after Task 5
+
+**The plan's transaction was not a transaction.** Task 5 as written had `saveDay`
+issue `BEGIN`, the statements, and `COMMIT` as separate `db.execute` calls.
+Reading the plugin's source settles it — `tauri-plugin-sql` 2.4.0,
+`src/wrapper.rs:167`:
+
+```rust
+let result = pool.execute(query).await?;
+```
+
+That runs against the **pool**, so sqlx acquires a connection, runs the one
+statement and releases it, for every call. The four calls can land on four
+different connections. `BEGIN` then opens a transaction on a connection that
+nothing else in the sequence necessarily uses, and the `DELETE` and `INSERT`s
+run in autocommit on whatever connection they happen to get. A failure partway
+through would leave a half-deleted day and no rollback — in a time-tracking app,
+silently destroyed work.
+
+**The fix, implemented in `891f26b`:** a Tauri command `replace_time_day` in
+`src-tauri/src/lib.rs` resolves the plugin's own pool from
+`tauri_plugin_sql::DbInstances` and runs the delete-then-insert inside a real
+`pool.begin()` transaction. `sqlx 0.8` is now a direct dependency of the Rust
+crate — the same version the plugin already resolved, verified as a single entry
+in `Cargo.lock`. `timeStoreSql.saveDay` calls the command through `invoke`
+instead of issuing SQL.
+
+The transactional body sits in `replace_time_day_tx(pool, date, slots)`, separate
+from the command, so it is reachable from a test without a running app. Three
+Rust tests run against an in-memory SQLite pool; the third forces a mid-batch
+failure with a duplicate `(date, slot)` and asserts the day is unchanged
+afterwards. These are the first tests in the project that touch a real database.
+
+**Two corrections for anyone reading the plugin's source:**
+
+- `DbPool::sqlite()` does not exist in 2.4.0 — the whole `impl DbPool` block
+  holding it is inside a block comment. Match on the `DbPool::Sqlite(pool)`
+  variant directly; a public enum's tuple-variant fields are public.
+- `#[tauri::command]`'s camelCase conversion applies only to the command's own
+  top-level parameters, not to fields inside a struct argument. `TimeSlotInput`
+  deserializes `category_id` by its literal name, which is what the JS side
+  sends, so no `#[serde(rename_all)]` is needed.
+
+**`clampTarget` is now shared.** It moved from `timeStoreLocal.ts` into
+`timeSlots.ts`, where the storage-agnostic time logic lives, and both stores
+import it. Its non-finite fallback returns the literal `32` rather than
+`DEFAULT_SETTINGS.targetSlotsPerDay`, because importing `timeTypes.ts` into
+`timeSlots.ts` would recreate the cycle Amendment 1 broke.
+
+**One ordering trap closed (`ce4f747`).** `DbInstances` holds no entry until the
+JS side calls `Database.load` at least once, so a `saveDay` that ran before
+anything else touched the database would fail with a confusing message about a
+missing connection string. `saveDay` now awaits the cached `getDb()` first.
+
+**Harmless, but worth knowing:** the plugin binds every JSON number as `f64`.
+SQLite's `INTEGER` affinity converts integral values back losslessly, including
+the timestamp-sized ids the Task 7 migration carries over — verified against a
+real SQLite: `1788444257074` stores as `integer`.
+
+---
+
 ## Task 6: Switch the dispatchers over
 
 **Files:**
