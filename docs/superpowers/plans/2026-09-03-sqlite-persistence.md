@@ -422,8 +422,12 @@ Create `src/migrations.test.ts`:
 ```ts
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { URL as NodeURL } from "node:url";
 
-const source = readFileSync(new URL("../src-tauri/src/lib.rs", import.meta.url), "utf8");
+// Node's URL, not the global one: under environment "jsdom" the global URL
+// resolves this against http://localhost:3000 and ignores the file:// base,
+// so readFileSync would throw "The URL must be of scheme file".
+const source = readFileSync(new NodeURL("../src-tauri/src/lib.rs", import.meta.url), "utf8");
 
 function migrationVersions(): number[] {
   return [...source.matchAll(/version:\s*(\d+)/g)].map((m) => Number(m[1]));
@@ -501,12 +505,47 @@ Expected: PASS — all three tests
 Run: `cd src-tauri && cargo check && cd ..`
 Expected: `Finished` with no errors
 
+> **Amended:** no Rust toolchain exists in the environment this plan was
+> executed in — `cargo`, `rustc` and `rustup` are all absent. This step was
+> skipped and the Rust edit was reviewed by eye instead. See "Amendment 2".
+
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/lib.rs src/migrations.test.ts
 git commit -m "feat: add migrations for status, time tracking and app settings"
 ```
+
+---
+
+## Amendment 2 — after Task 2
+
+**The plan's test snippet was wrong.** `new URL(relative, import.meta.url)` does
+not work under `environment: "jsdom"`: jsdom replaces the global `URL`, resolves
+the relative path against `http://localhost:3000` and discards the `file://`
+base, so `readFileSync` throws `The URL must be of scheme file`. Verified
+directly — the resolved href really is `http://localhost:3000/src-tauri/src/lib.rs`.
+The fix is `import { URL as NodeURL } from "node:url"`. Any later task that reads
+a file from a test must do the same.
+
+**`@types/node` is now a devDependency.** The project had none, so `node:fs` and
+`node:url` did not typecheck. Added at `^22`.
+
+**No Rust toolchain in this environment.** `cargo`, `rustc` and `rustup` are all
+absent, so nothing in this plan can compile or run the Rust side. Consequences:
+
+- Task 2's `cargo check` was skipped; the migration edit was reviewed by reading
+  it, not by compiling it.
+- **Task 9 cannot be executed here at all.** It is the only step that verifies
+  the SQLite stores against a real database instead of mocks: launching the app,
+  creating data, restarting, and inspecting `todolist.db` with `sqlite3`. Until
+  someone runs it on a machine with a Rust toolchain, "done" means "every mock is
+  green", which is not the same thing. Do not mark Phase 1 complete on the
+  strength of the unit suite alone.
+
+The practical risk this leaves: a typo in the migration SQL, a wrong column name
+in a query, or a `tauri-plugin-sql` parameter-binding quirk would pass every test
+in Tasks 3 to 8 and only surface when the desktop app first runs.
 
 ---
 
