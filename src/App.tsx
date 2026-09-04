@@ -164,12 +164,12 @@ function App({ migrationError = null }: AppProps = {}) {
       ]);
       setTodos(items);
       setCategories(cats);
-      // refresh() laeuft nur einmal, beim Mount (siehe useEffect unten). Ein
-      // erfolgreicher Ladevorgang soll die Migrationswarnung aus main.tsx nicht
-      // sofort wieder wegwischen -- die bleibt stehen, bis eine eigene Aktion
-      // (Hinzufuegen, Loeschen, ...) sie ueber ihren eigenen setError-Aufruf
-      // ersetzt.
-      setError((prev) => prev ?? null);
+      // Kein setError(null) hier: refresh() laeuft nur einmal, beim Mount (siehe
+      // useEffect unten), also kann ihm kein anderer Fehler vorausgehen als die
+      // Migrationswarnung aus main.tsx (ueber die migrationError-Prop). Die
+      // wuerde ein erfolgreicher Ladevorgang sonst sofort wieder wegwischen,
+      // bevor sie jemand liest. Jede andere Aktion (Hinzufuegen, Loeschen, ...)
+      // setzt und loescht ihren eigenen Fehler selbst.
     } catch (err) {
       setError(String(err));
     } finally {
