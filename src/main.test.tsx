@@ -36,12 +36,19 @@ describe("main", () => {
     await vi.waitFor(() => expect(render).toHaveBeenCalled());
 
     expect(order).toEqual(["migrate", "render"]);
+
+    const appElement = render.mock.calls[0][0].props.children;
+    expect(appElement.props.migrationError).toBeNull();
   });
 
-  it("still renders when the migration fails", async () => {
+  it("still renders when the migration fails, and passes the failure to App", async () => {
     migrate.mockRejectedValue(new Error("disk full"));
 
     await import("./main");
     await vi.waitFor(() => expect(render).toHaveBeenCalled());
+
+    const appElement = render.mock.calls[0][0].props.children;
+    expect(typeof appElement.props.migrationError).toBe("string");
+    expect(appElement.props.migrationError).toMatch(/erneut versucht/);
   });
 });

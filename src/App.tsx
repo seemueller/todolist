@@ -104,14 +104,21 @@ const filterLabels: Record<DueDateFilter, string> = {
   none: "Ohne Datum",
 };
 
-function App() {
+type AppProps = {
+  /** Fehlermeldung aus der localStorage-Migration in main.tsx, falls sie
+   *  fehlgeschlagen ist. Wird einmalig als Startwert des Fehler-Banners
+   *  uebernommen -- siehe migrateLocalStorage.ts. */
+  migrationError?: string | null;
+};
+
+function App({ migrationError = null }: AppProps = {}) {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState<Priority>("medium");
   const [newDueDate, setNewDueDate] = useState("");
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(migrationError);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDueDate, setEditingDueDate] = useState("");
@@ -157,7 +164,12 @@ function App() {
       ]);
       setTodos(items);
       setCategories(cats);
-      setError(null);
+      // refresh() laeuft nur einmal, beim Mount (siehe useEffect unten). Ein
+      // erfolgreicher Ladevorgang soll die Migrationswarnung aus main.tsx nicht
+      // sofort wieder wegwischen -- die bleibt stehen, bis eine eigene Aktion
+      // (Hinzufuegen, Loeschen, ...) sie ueber ihren eigenen setError-Aufruf
+      // ersetzt.
+      setError((prev) => prev ?? null);
     } catch (err) {
       setError(String(err));
     } finally {
