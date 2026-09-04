@@ -2,7 +2,17 @@
 // storeTypes.ts; the contracts documented there apply here, this file only
 // holds implementation detail.
 
-import { Category, CategoryRow, Priority, Todo, TodoRow, TodoStatus, fromRow, fromCategoryRow } from "./types";
+import {
+  Category,
+  CategoryRow,
+  Priority,
+  Todo,
+  TodoRow,
+  TodoStatus,
+  fromRow,
+  fromCategoryRow,
+  compareCategoryNames,
+} from "./types";
 import { getDb } from "./sqlClient";
 import { TodoStore } from "./storeTypes";
 
@@ -96,9 +106,9 @@ async function listCategories(): Promise<Category[]> {
     "SELECT id, name, color, created_at FROM categories"
   );
   // Sorted here, not in SQL: SQLite's NOCASE collation only case-folds ASCII,
-  // so "Ärzte" would land after "Zebra". localeCompare matches what the
+  // so "Ärzte" would land after "Zebra". compareCategoryNames matches what the
   // localStorage store does, and there are only ever a handful of categories.
-  return rows.map(fromCategoryRow).sort((a, b) => a.name.localeCompare(b.name));
+  return rows.map(fromCategoryRow).sort((a, b) => compareCategoryNames(a.name, b.name));
 }
 
 async function selectCategory(id: number): Promise<Category> {

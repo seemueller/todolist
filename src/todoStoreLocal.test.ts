@@ -60,4 +60,18 @@ describe("localTodoStore", () => {
     const names = (await localTodoStore.listCategories()).map((c) => c.name);
     expect(names).toEqual(["Apfel", "Ärzte", "Zebra"]);
   });
+
+  it("sorts case-insensitively across mixed initial case, not just by locale", async () => {
+    // A bare localeCompare would pass with Apfel/Ärzte/Zebra above but still
+    // fail here: WebKitGTK groups every uppercase-initial name before every
+    // lowercase-initial one, so "Ärzte" (uppercase) would sort before
+    // "apfel" and "sport" (lowercase) instead of between them.
+    await localTodoStore.addCategory("Zebra", "#000000");
+    await localTodoStore.addCategory("apfel", "#000000");
+    await localTodoStore.addCategory("Ärzte", "#000000");
+    await localTodoStore.addCategory("sport", "#000000");
+
+    const names = (await localTodoStore.listCategories()).map((c) => c.name);
+    expect(names).toEqual(["apfel", "Ärzte", "sport", "Zebra"]);
+  });
 });

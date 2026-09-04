@@ -90,6 +90,23 @@ describe("sqlTodoStore", () => {
     expect(categories.map((c) => c.name)).toEqual(["Apfel", "Ärzte", "Zebra"]);
   });
 
+  it("sorts case-insensitively across mixed initial case, not just by locale", async () => {
+    // A bare localeCompare would pass with Apfel/Ärzte/Zebra above but still
+    // fail here: WebKitGTK groups every uppercase-initial name before every
+    // lowercase-initial one, so "Ärzte" (uppercase) would sort before
+    // "apfel" and "sport" (lowercase) instead of between them.
+    select.mockResolvedValue([
+      { id: 1, name: "Zebra", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+      { id: 2, name: "apfel", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+      { id: 3, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+      { id: 4, name: "sport", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    const categories = await sqlTodoStore.listCategories();
+
+    expect(categories.map((c) => c.name)).toEqual(["apfel", "Ärzte", "sport", "Zebra"]);
+  });
+
   it("deletes a category and relies on the foreign key to clear it off todos", async () => {
     execute.mockResolvedValue({ rowsAffected: 1 });
 

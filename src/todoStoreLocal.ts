@@ -2,7 +2,7 @@
 // storeTypes.ts; the contracts documented there apply here, this file only
 // holds implementation detail.
 
-import { Priority, Todo, TodoStatus, Category } from "./types";
+import { Priority, Todo, TodoStatus, Category, compareCategoryNames } from "./types";
 import { TodoStore } from "./storeTypes";
 
 // ── localStorage persistence ─────────────────────────────────────────────
@@ -175,7 +175,7 @@ function deleteTodo(id: number): Promise<number> {
 
 function listCategories(): Promise<Category[]> {
   return Promise.resolve(
-    loadCategories().slice().sort((a, b) => a.name.localeCompare(b.name))
+    loadCategories().slice().sort((a, b) => compareCategoryNames(a.name, b.name))
   );
 }
 

@@ -66,6 +66,30 @@ export function fromCategoryRow(row: CategoryRow): Category {
   };
 }
 
+/**
+ * Sorts category names the way German readers expect, and identically across
+ * both storage backends (localStorage and SQLite).
+ *
+ * A bare `a.localeCompare(b, "de")` is not enough: WebKitGTK (the engine
+ * behind the desktop Tauri build) weighs case at the *primary* collation
+ * level, so it groups every uppercase-initial name before every
+ * lowercase-initial one ("Ärzte, Sport, ärzte, foo#, xxx") — Node and
+ * Chromium weigh case at the tertiary level instead, giving the ordering a
+ * German reader actually expects ("ärzte, Ärzte, foo#, Sport, xxx"). Both
+ * engines agree that "Ärzte" < "B" and both resolve the "de" locale; the
+ * divergence is only in how case is weighted.
+ *
+ * Comparing the lowercased names first keeps case out of the primary
+ * comparison entirely, so both engines land on the same order; the second
+ * `localeCompare` only breaks ties between names that differ solely in case.
+ */
+export function compareCategoryNames(a: string, b: string): number {
+  return (
+    a.toLocaleLowerCase("de").localeCompare(b.toLocaleLowerCase("de"), "de") ||
+    a.localeCompare(b, "de")
+  );
+}
+
 export const CATEGORY_COLORS = [
   "#7cc3f7",
   "#efaee6",

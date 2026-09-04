@@ -30,7 +30,17 @@ export interface TodoStore {
   /** Haelt `status` konsistent zu `done`; lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   toggleTodoDone(id: number, done: boolean): Promise<Todo>;
   deleteTodo(id: number): Promise<number>;
-  /** Alle Kategorien, sortiert nach `name.localeCompare` (nicht nach einer DB-Kollation) — das ist der Vertrag, jedes Backend muss dieselbe Reihenfolge liefern. */
+  /**
+   * Alle Kategorien, sortiert mit `compareCategoryNames` aus `types.ts` (nicht
+   * nach einer DB-Kollation) — das ist der Vertrag, jedes Backend muss
+   * dieselbe Reihenfolge liefern. Ein blosses `name.localeCompare(...)`
+   * reicht dafuer nicht: WebKitGTK (Desktop/Tauri) gewichtet Gross-/
+   * Kleinschreibung auf der primaeren Kollationsstufe und sortiert deshalb
+   * jeden grossgeschriebenen Namen vor jedem kleingeschriebenen, waehrend
+   * Node/Chromium das erst auf der tertiaeren Stufe tun — `compareCategoryNames`
+   * vergleicht zuerst die kleingeschriebenen Namen, um diese Engine-Differenz
+   * zu vermeiden.
+   */
   listCategories(): Promise<Category[]>;
   /** Legt eine neue Kategorie an; `name` wird getrimmt. */
   addCategory(name: string, color: string): Promise<Category>;
