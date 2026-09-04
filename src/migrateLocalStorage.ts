@@ -31,7 +31,7 @@ function readKey(key: string): unknown {
   }
 }
 
-function readArray(key: string): any[] {
+function readArray(key: string): Record<string, unknown>[] {
   const value = readKey(key);
   return Array.isArray(value) ? value : [];
 }
@@ -46,6 +46,16 @@ export async function migrateLocalStorage(): Promise<void> {
   const settings = readKey(SETTINGS_KEY) as
     | { targetSlotsPerDay?: unknown; showWeekend?: unknown }
     | null;
+
+  // Frische Installation ohne Altdaten: kein getDb() und kein SELECT noetig.
+  // Ohne diesen Ausstieg wuerde ein Fehler beim Verbindungsaufbau -- z.B. weil
+  // die DB in diesem Moment noch nicht bereit ist -- als Migrationsfehler
+  // gemeldet, obwohl es nichts zu migrieren gab, und das bei jedem einzelnen
+  // Start neu, weil ohne Erfolg auch das Flag nie gesetzt wird.
+  if (categories.length === 0 && todos.length === 0 && slots.length === 0 && settings === null) {
+    localStorage.setItem(MIGRATED_FLAG, "1");
+    return;
+  }
 
   const db = await getDb();
 
@@ -142,11 +152,18 @@ export async function migrateLocalStorage(): Promise<void> {
   // ist die DB-Zeile neuer als die localStorage-Kopie -- ein Retry darf sie
   // dann nicht mit dem alten Stand ueberschreiben.
   if (settings !== null) {
-    const targetSlotsPerDay = clampTarget(Number(settings?.targetSlotsPerDay));
+    // Number(null) ist 0, nicht NaN -- ohne die explizite Pruefung wuerde ein
+    // gespeichertes { targetSlotsPerDay: null } als Ziel 0 statt als der
+    // Default aus clampTarget (32) migriert.
+    const rawTarget = settings?.targetSlotsPerDay;
+    const targetSlotsPerDay = clampTarget(rawTarget == null ? NaN : Number(rawTarget));
     const showWeekend = settings?.showWeekend === true;
     await db.execute(
       "INSERT OR IGNORE INTO time_settings (id, target_slots_per_day, show_weekend) VALUES (1, $1, $2)",
-      [targetSlotsPerDay, showWeekend]
+      // show_weekend als 0/1 gebunden, wie timeStoreSql.ts es beim regulaeren
+      // Speichern tut -- zwei Schreibpfade fuer dieselbe Spalte sollen densel-
+      // ben Werttyp binden, nicht nur einen, den sqlx zufaellig auch akzeptiert.
+      [targetSlotsPerDay, showWeekend ? 1 : 0]
     );
   }
 

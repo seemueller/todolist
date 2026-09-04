@@ -111,7 +111,7 @@ type AppProps = {
   migrationError?: string | null;
 };
 
-function App({ migrationError = null }: AppProps = {}) {
+function App({ migrationError = null }: AppProps) {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState<Priority>("medium");

@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const select = vi.fn();
 const execute = vi.fn();
+const getDb = vi.fn(() => Promise.resolve({ select, execute }));
+const isTauri = vi.fn();
 
 vi.mock("./sqlClient", () => ({
-  getDb: () => Promise.resolve({ select, execute }),
-  isTauri: () => true,
+  getDb: () => getDb(),
+  isTauri: () => isTauri(),
 }));
 
 import { migrateLocalStorage, MIGRATED_FLAG } from "./migrateLocalStorage";
@@ -23,8 +25,12 @@ describe("migrateLocalStorage", () => {
   beforeEach(() => {
     select.mockReset();
     execute.mockReset();
+    getDb.mockClear();
+    isTauri.mockReset();
     localStorage.clear();
 
+    // Default: inside Tauri, like the shipped app.
+    isTauri.mockReturnValue(true);
     // Default: no rows already present, every insert lands.
     execute.mockResolvedValue({ rowsAffected: 1, lastInsertId: 1 });
     // Default: post-insert category lookup used to resolve ids finds nothing extra.
@@ -34,8 +40,26 @@ describe("migrateLocalStorage", () => {
   it("does nothing when localStorage is empty, but sets the flag", async () => {
     await migrateLocalStorage();
 
+    // Kein Datenbankzugriff ueberhaupt -- nicht mal ein Verbindungsaufbau --
+    // auf einer frischen Installation ohne Altdaten.
+    expect(getDb).not.toHaveBeenCalled();
+    expect(select).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
     expect(localStorage.getItem(MIGRATED_FLAG)).toBe("1");
+  });
+
+  it("does nothing outside Tauri: no database access, flag stays unset", async () => {
+    isTauri.mockReturnValue(false);
+    set(CATEGORIES_KEY, [{ id: 1, name: "Arbeit", color: "#fff", created_at: "2026-01-01" }]);
+
+    await migrateLocalStorage();
+
+    expect(getDb).not.toHaveBeenCalled();
+    expect(select).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+    // Im Browser lief nie eine Migration -- das Flag zu setzen waere falsch,
+    // sollte die App spaeter doch einmal in Tauri laufen.
+    expect(localStorage.getItem(MIGRATED_FLAG)).toBeNull();
   });
 
   it("does not touch the database on a second run once the flag is set", async () => {
@@ -236,5 +260,92 @@ describe("migrateLocalStorage", () => {
     expect(settingsCall).toBeDefined();
     expect(String(settingsCall![0])).toMatch(/INSERT OR IGNORE INTO time_settings/);
     expect(String(settingsCall![0])).not.toMatch(/ON CONFLICT/i);
+  });
+
+  it("clamps an out-of-range target and binds show_weekend as 1, like the regular save path", async () => {
+    set(SETTINGS_KEY, { targetSlotsPerDay: 999, showWeekend: true });
+
+    await migrateLocalStorage();
+
+    const settingsCall = execute.mock.calls.find((c) => String(c[0]).includes("time_settings"));
+    expect(settingsCall).toBeDefined();
+    const params = settingsCall![1] as unknown[];
+    // target_slots_per_day, show_weekend -- id is the literal 1 in the SQL, not bound
+    expect(params[0]).toBe(64); // clampTarget's MAX_TARGET_SLOTS ceiling
+    expect(params[1]).toBe(1); // bound as 0/1, not a JS boolean -- see timeStoreSql.ts
+  });
+
+  it("coerces a non-boolean showWeekend to false / 0, and falls back to the clampTarget default for a null target", async () => {
+    // Number(null) is 0, not NaN -- without an explicit guard this would
+    // migrate as a target of 0 instead of falling back to 32.
+    set(SETTINGS_KEY, { targetSlotsPerDay: null, showWeekend: "yes" });
+
+    await migrateLocalStorage();
+
+    const settingsCall = execute.mock.calls.find((c) => String(c[0]).includes("time_settings"));
+    expect(settingsCall).toBeDefined();
+    const params = settingsCall![1] as unknown[];
+    expect(params[0]).toBe(32);
+    expect(params[1]).toBe(0);
+  });
+
+  it("does not touch time_settings when the settings key is absent, even though other data migrates", async () => {
+    set(TODOS_KEY, [
+      {
+        id: 10,
+        title: "Schreiben",
+        done: false,
+        status: "todo",
+        priority: "medium",
+        created_at: "2026-01-02",
+        due_date: null,
+        category_id: null,
+      },
+    ]);
+
+    await migrateLocalStorage();
+
+    const settingsCall = execute.mock.calls.find((c) => String(c[0]).includes("time_settings"));
+    expect(settingsCall).toBeUndefined();
+    const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
+    expect(todoCall).toBeDefined();
+  });
+
+  it("skips a category with a non-numeric id", async () => {
+    set(CATEGORIES_KEY, [{ id: "not-a-number", name: "Arbeit", color: "#fff", created_at: "2026-01-01" }]);
+
+    await migrateLocalStorage();
+
+    const categoryCalls = execute.mock.calls.filter((c) =>
+      String(c[0]).includes("INSERT OR IGNORE INTO categories")
+    );
+    expect(categoryCalls).toHaveLength(0);
+  });
+
+  it("migrates a todo whose category does not resolve with category_id NULL, rather than dropping it", async () => {
+    // The category referenced by this todo was never in the export (or was
+    // itself skipped), so resolveCategory() has nothing to map it to. The
+    // todo must still be migrated -- category_id NULL, not lost entirely.
+    set(TODOS_KEY, [
+      {
+        id: 10,
+        title: "Verwaist",
+        done: false,
+        status: "todo",
+        priority: "medium",
+        created_at: "2026-01-02",
+        due_date: null,
+        category_id: 999,
+      },
+    ]);
+
+    await migrateLocalStorage();
+
+    const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
+    expect(todoCall).toBeDefined();
+    const params = todoCall![1] as unknown[];
+    // id, title, done, status, priority, created_at, due_date, category_id
+    expect(params[0]).toBe(10);
+    expect(params[7]).toBeNull();
   });
 });

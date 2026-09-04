@@ -42,7 +42,9 @@ describe("main", () => {
   });
 
   it("still renders when the migration fails, and passes the failure to App", async () => {
-    migrate.mockRejectedValue(new Error("disk full"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const failure = new Error("disk full");
+    migrate.mockRejectedValue(failure);
 
     await import("./main");
     await vi.waitFor(() => expect(render).toHaveBeenCalled());
@@ -50,6 +52,9 @@ describe("main", () => {
     const appElement = render.mock.calls[0][0].props.children;
     expect(typeof appElement.props.migrationError).toBe("string");
     expect(appElement.props.migrationError).toMatch(/erneut versucht/);
+
+    expect(consoleError).toHaveBeenCalledWith("localStorage migration failed", failure);
+    consoleError.mockRestore();
   });
 
   it("does not relabel a render failure as a migration failure", async () => {
