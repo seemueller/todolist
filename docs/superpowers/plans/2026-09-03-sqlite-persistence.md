@@ -1741,6 +1741,62 @@ git commit -m "feat: run the localStorage migration before the first render"
 
 ---
 
+## Amendment 4 — after Tasks 6 to 8
+
+**The migration does not use a transaction, deliberately.** The plan wrapped it
+in `BEGIN`/`COMMIT`, which Amendment 3 already established is not a transaction
+through this plugin. Here that would have been worse than useless: a partial run
+leaves the flag unset, the next launch retries, the `INSERT`s hit ids that now
+exist, and the migration wedges permanently on a primary-key violation. So every
+row insert is `INSERT OR IGNORE` and the whole thing is idempotent — a crashed
+run is simply completed by the next launch. Verified against a real SQLite: the
+full statement sequence run twice leaves an identical database.
+
+**`INSERT OR IGNORE` does not suppress foreign-key violations.** Only PRIMARY
+KEY, UNIQUE, CHECK and NOT NULL conflicts are ignored; an FK violation still
+aborts with `SQLITE_CONSTRAINT_FOREIGNKEY`. This is not a footnote — it is the
+reason the migration resolves category ids by re-reading `SELECT id, name FROM
+categories` after inserting them, rather than trusting a local map. Without that
+second pass, any user who already had a category in the database would hit a
+genuine FK error on every todo and slot referencing it, and the migration would
+fail for exactly the people who have data worth migrating.
+
+**A todo whose category cannot be resolved is migrated with `category_id = NULL`,
+not dropped.** The text is the user's data; the category is metadata. Time slots
+must be dropped in that case instead, because `time_slots.category_id` is NOT
+NULL and a slot without a category means nothing.
+
+**Settings are seeded, not upserted.** `time_settings` uses `INSERT OR IGNORE`
+like everything else. With `ON CONFLICT DO UPDATE` a failed first run followed by
+the user changing their daily target would have had the retry silently restore
+the old value.
+
+**`start()` must sit outside the migration's catch.** With `.then(() => start(null))
+.catch(...)`, a render failure lands in the catch, tells the user their data
+migration failed when it succeeded, and renders a second time onto a container
+that already has a root. The chain now converts a failure to a value and calls
+`start` exactly once, at the end.
+
+**Known first-launch cost, accepted.** The migration issues one IPC round trip
+per row. A user with a few hundred todos and a year of bookings waits on the
+order of seconds, once, with a blank window. Every later launch is a single
+`localStorage.getItem`. Not worth a loading screen for a one-time event.
+
+**Known limitation, accepted.** `INSERT OR IGNORE` cannot distinguish "this row
+was already migrated on a previous attempt" from "two localStorage rows collided
+on one id". The collision needs two records created in the same millisecond
+drawing the same value from `Math.floor(Math.random() * 1000)`, and its
+consequence is one record not appearing while the original stays in
+`localStorage`. Detecting it would mean inventing a reporting channel this
+codebase does not have.
+
+**Reading test output:** `npx playwright test` reports 52 passed with 2 flaky out
+of 54 collected — `e2e/timetracking.spec.ts:160` and `e2e/todolist.spec.ts:569`,
+both green on retry and unrelated to this work. Read the summary line, not the
+count.
+
+---
+
 ## Task 9: Verify against the real application
 
 Everything so far ran against mocks. This task is the one that proves SQLite actually works.
