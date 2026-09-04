@@ -107,6 +107,73 @@ describe("sqlTodoStore", () => {
     expect(categories.map((c) => c.name)).toEqual(["apfel", "Ärzte", "sport", "Zebra"]);
   });
 
+  it("rejects creating a category whose name collides case-insensitively", async () => {
+    select.mockResolvedValue([
+      { id: 1, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    await expect(sqlTodoStore.addCategory("ärzte", "#111111")).rejects.toThrow(
+      'Es gibt bereits eine Kategorie "Ärzte".'
+    );
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("allows creating a genuinely new category name", async () => {
+    select.mockResolvedValueOnce([
+      { id: 1, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+    execute.mockResolvedValue({ lastInsertId: 2, rowsAffected: 1 });
+    select.mockResolvedValueOnce([
+      { id: 2, name: "Sport", color: "#111111", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    const created = await sqlTodoStore.addCategory("Sport", "#111111");
+
+    expect(created.name).toBe("Sport");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows renaming a category to its own current name in a different case", async () => {
+    select.mockResolvedValueOnce([
+      { id: 1, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+    execute.mockResolvedValue({ rowsAffected: 1 });
+    select.mockResolvedValueOnce([
+      { id: 1, name: "ärzte", color: "#111111", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    const updated = await sqlTodoStore.updateCategory(1, "ärzte", "#111111");
+
+    expect(updated.name).toBe("ärzte");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects renaming a category to another category's name", async () => {
+    select.mockResolvedValue([
+      { id: 1, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+      { id: 2, name: "Sport", color: "#111111", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    await expect(sqlTodoStore.updateCategory(2, "ärzte", "#222222")).rejects.toThrow(
+      'Es gibt bereits eine Kategorie "Ärzte".'
+    );
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("does not let leading or trailing whitespace slip a duplicate past the check", async () => {
+    select.mockResolvedValue([
+      { id: 1, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    await expect(sqlTodoStore.addCategory("  ärzte  ", "#111111")).rejects.toThrow(
+      'Es gibt bereits eine Kategorie "Ärzte".'
+    );
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("deletes a category and relies on the foreign key to clear it off todos", async () => {
     execute.mockResolvedValue({ rowsAffected: 1 });
 

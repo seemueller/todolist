@@ -67,6 +67,18 @@ export function fromCategoryRow(row: CategoryRow): Category {
 }
 
 /**
+ * Normalises a category name to the key that decides whether two names "are
+ * the same" — for both sorting and uniqueness. Trims whitespace and
+ * lowercases with the German locale so "Ärzte", " ärzte " and "ärzte" all
+ * collapse to one key. Both `compareCategoryNames` and the duplicate checks
+ * in the stores build on this single definition, so ordering and uniqueness
+ * can never disagree about what counts as the same name.
+ */
+export function categoryNameKey(name: string): string {
+  return name.trim().toLocaleLowerCase("de");
+}
+
+/**
  * Sorts category names the way German readers expect, and identically across
  * both storage backends (localStorage and SQLite).
  *
@@ -79,15 +91,12 @@ export function fromCategoryRow(row: CategoryRow): Category {
  * engines agree that "Ärzte" < "B" and both resolve the "de" locale; the
  * divergence is only in how case is weighted.
  *
- * Comparing the lowercased names first keeps case out of the primary
+ * Comparing the lowercased keys first keeps case out of the primary
  * comparison entirely, so both engines land on the same order; the second
  * `localeCompare` only breaks ties between names that differ solely in case.
  */
 export function compareCategoryNames(a: string, b: string): number {
-  return (
-    a.toLocaleLowerCase("de").localeCompare(b.toLocaleLowerCase("de"), "de") ||
-    a.localeCompare(b, "de")
-  );
+  return categoryNameKey(a).localeCompare(categoryNameKey(b), "de") || a.localeCompare(b, "de");
 }
 
 export const CATEGORY_COLORS = [

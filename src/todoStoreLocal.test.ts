@@ -74,4 +74,48 @@ describe("localTodoStore", () => {
     const names = (await localTodoStore.listCategories()).map((c) => c.name);
     expect(names).toEqual(["apfel", "Ärzte", "sport", "Zebra"]);
   });
+
+  it("rejects creating a category whose name collides case-insensitively", async () => {
+    await localTodoStore.addCategory("Ärzte", "#000000");
+
+    await expect(localTodoStore.addCategory("ärzte", "#111111")).rejects.toThrow(
+      'Es gibt bereits eine Kategorie "Ärzte".'
+    );
+
+    const names = (await localTodoStore.listCategories()).map((c) => c.name);
+    expect(names).toEqual(["Ärzte"]);
+  });
+
+  it("allows creating a genuinely new category name", async () => {
+    await localTodoStore.addCategory("Ärzte", "#000000");
+    const created = await localTodoStore.addCategory("Sport", "#111111");
+    expect(created.name).toBe("Sport");
+  });
+
+  it("allows renaming a category to its own current name in a different case", async () => {
+    const cat = await localTodoStore.addCategory("Ärzte", "#000000");
+    const updated = await localTodoStore.updateCategory(cat.id, "ärzte", "#111111");
+    expect(updated.name).toBe("ärzte");
+    expect(updated.color).toBe("#111111");
+  });
+
+  it("rejects renaming a category to another category's name", async () => {
+    await localTodoStore.addCategory("Ärzte", "#000000");
+    const sport = await localTodoStore.addCategory("Sport", "#111111");
+
+    await expect(localTodoStore.updateCategory(sport.id, "ärzte", "#222222")).rejects.toThrow(
+      'Es gibt bereits eine Kategorie "Ärzte".'
+    );
+
+    const reloaded = await localTodoStore.listCategories();
+    expect(reloaded.find((c) => c.id === sport.id)?.name).toBe("Sport");
+  });
+
+  it("does not let leading or trailing whitespace slip a duplicate past the check", async () => {
+    await localTodoStore.addCategory("Ärzte", "#000000");
+
+    await expect(localTodoStore.addCategory("  ärzte  ", "#111111")).rejects.toThrow(
+      'Es gibt bereits eine Kategorie "Ärzte".'
+    );
+  });
 });

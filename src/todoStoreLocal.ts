@@ -2,7 +2,7 @@
 // storeTypes.ts; the contracts documented there apply here, this file only
 // holds implementation detail.
 
-import { Priority, Todo, TodoStatus, Category, compareCategoryNames } from "./types";
+import { Priority, Todo, TodoStatus, Category, compareCategoryNames, categoryNameKey } from "./types";
 import { TodoStore } from "./storeTypes";
 
 // ── localStorage persistence ─────────────────────────────────────────────
@@ -179,8 +179,20 @@ function listCategories(): Promise<Category[]> {
   );
 }
 
-function addCategory(name: string, color: string): Promise<Category> {
+// Rejects a create/rename that collides with an existing category name,
+// case-insensitively and Unicode-aware (see categoryNameKey in types.ts).
+// `excludeId` lets updateCategory allow a category to keep its own name.
+function assertNameAvailable(categories: Category[], name: string, excludeId?: number): void {
+  const key = categoryNameKey(name);
+  const collision = categories.find((c) => c.id !== excludeId && categoryNameKey(c.name) === key);
+  if (collision) {
+    throw new Error(`Es gibt bereits eine Kategorie "${collision.name}".`);
+  }
+}
+
+async function addCategory(name: string, color: string): Promise<Category> {
   const categories = loadCategories();
+  assertNameAvailable(categories, name);
   const cat: Category = {
     id: generateId(),
     name: name.trim(),
@@ -207,6 +219,7 @@ async function updateCategory(id: number, name: string, color: string): Promise<
   const categories = loadCategories();
   const idx = categories.findIndex((c) => c.id === id);
   if (idx === -1) throw new Error(`Category ${id} not found`);
+  assertNameAvailable(categories, name, id);
   categories[idx] = { ...categories[idx], name: name.trim(), color };
   saveCategories(categories);
 

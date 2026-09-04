@@ -12,6 +12,7 @@ import {
   fromRow,
   fromCategoryRow,
   compareCategoryNames,
+  categoryNameKey,
 } from "./types";
 import { getDb } from "./sqlClient";
 import { TodoStore } from "./storeTypes";
@@ -121,7 +122,24 @@ async function selectCategory(id: number): Promise<Category> {
   return fromCategoryRow(rows[0]);
 }
 
+// Rejects a create/rename that collides with an existing category name,
+// case-insensitively and Unicode-aware (see categoryNameKey in types.ts).
+// Done in JavaScript, not left to the DB's `UNIQUE COLLATE NOCASE` constraint:
+// NOCASE only case-folds ASCII (so "Ärzte"/"ärzte" would both be accepted),
+// and its violation would surface as an opaque SQLite error. `excludeId` lets
+// updateCategory allow a category to keep its own name.
+async function assertNameAvailable(name: string, excludeId?: number): Promise<void> {
+  const db = await getDb();
+  const rows = await db.select<CategoryRow[]>("SELECT id, name, color, created_at FROM categories");
+  const key = categoryNameKey(name);
+  const collision = rows.find((r) => r.id !== excludeId && categoryNameKey(r.name) === key);
+  if (collision) {
+    throw new Error(`Es gibt bereits eine Kategorie "${collision.name}".`);
+  }
+}
+
 async function addCategory(name: string, color: string): Promise<Category> {
+  await assertNameAvailable(name);
   const db = await getDb();
   const result = await db.execute(
     "INSERT INTO categories (name, color, created_at) VALUES ($1, $2, $3)",
@@ -131,6 +149,7 @@ async function addCategory(name: string, color: string): Promise<Category> {
 }
 
 async function updateCategory(id: number, name: string, color: string): Promise<Category> {
+  await assertNameAvailable(name, id);
   const db = await getDb();
   await db.execute("UPDATE categories SET name = $1, color = $2 WHERE id = $3", [
     name.trim(),

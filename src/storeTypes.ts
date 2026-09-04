@@ -42,9 +42,23 @@ export interface TodoStore {
    * zu vermeiden.
    */
   listCategories(): Promise<Category[]>;
-  /** Legt eine neue Kategorie an; `name` wird getrimmt. */
+  /**
+   * Legt eine neue Kategorie an; `name` wird getrimmt. Lehnt ab, wenn bereits
+   * eine Kategorie mit demselben `categoryNameKey` (getrimmt, `de`-lowercase,
+   * Unicode-aware — dieselbe Normalisierung wie beim Sortieren) existiert, mit
+   * der Meldung `Es gibt bereits eine Kategorie "<vorhandener Name>".` — als
+   * Promise-Rejection, nie als synchroner throw. Das ist bewusst strenger als
+   * SQLites `UNIQUE COLLATE NOCASE`, das nur ASCII case-faltet.
+   */
   addCategory(name: string, color: string): Promise<Category>;
-  /** Aktualisiert Name (getrimmt) und Farbe und denormalisiert beides auf alle referenzierenden Todos; lehnt mit `Category <id> not found` ab, wenn `id` keine bestehende Kategorie referenziert — als Promise-Rejection, nie als synchroner throw. */
+  /**
+   * Aktualisiert Name (getrimmt) und Farbe und denormalisiert beides auf alle
+   * referenzierenden Todos; lehnt mit `Category <id> not found` ab, wenn `id`
+   * keine bestehende Kategorie referenziert. Lehnt ausserdem wie `addCategory`
+   * ab, wenn der neue Name mit einer *anderen* Kategorie kollidiert (dieselbe
+   * Kategorie darf ihren eigenen Namen in anderer Gross-/Kleinschreibung
+   * behalten) — beides als Promise-Rejection, nie als synchroner throw.
+   */
   updateCategory(id: number, name: string, color: string): Promise<Category>;
   /** Loescht die Kategorie; Todos, die sie referenzierten, verlieren sie (category_id/category_name/category_color werden null), werden aber nicht geloescht. */
   deleteCategory(id: number): Promise<number>;
