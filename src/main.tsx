@@ -20,9 +20,17 @@ function start(migrationError: string | null): void {
 // Migration first, otherwise the first render reads an empty database. A failed
 // migration must not keep the app from starting: the flag stays unset, so the
 // next launch retries.
+//
+// The failure is turned into a value (the banner text or null) before start()
+// is ever called, so start() runs exactly once, outside any catch. Chaining
+// .then(() => start(null)) directly onto the migration's promise would put
+// start()'s own render inside that same try, so a render failure would land
+// in this .catch and get mislabeled as a migration failure -- while the real
+// migration might have succeeded and set its flag.
 migrateLocalStorage()
-  .then(() => start(null))
+  .then(() => null)
   .catch((error) => {
     console.error("localStorage migration failed", error);
-    start(MIGRATION_ERROR_MESSAGE);
-  });
+    return MIGRATION_ERROR_MESSAGE;
+  })
+  .then(start);

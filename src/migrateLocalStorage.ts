@@ -5,10 +5,11 @@
 // Kein echter Transaktionsrahmen: tauri-plugin-sql fuehrt jedes execute() gegen
 // einen Connection-Pool aus (siehe wrapper.rs, pool.execute pro Aufruf), ein
 // separates BEGIN/COMMIT laeuft also nicht garantiert auf derselben Verbindung
-// und bindet nichts. Stattdessen sind alle Inserts idempotent (INSERT OR IGNORE
-// bzw. ON CONFLICT DO UPDATE): bricht der Umzug mittendrin ab, bleibt das Flag
-// ungesetzt, und der naechste Start wiederholt die Arbeit gefahrlos -- bereits
-// vorhandene Zeilen werden uebersprungen statt einen Constraint-Fehler zu werfen.
+// und bindet nichts. Stattdessen sind alle Inserts idempotent (INSERT OR
+// IGNORE): bricht der Umzug mittendrin ab, bleibt das Flag ungesetzt, und der
+// naechste Start wiederholt die Arbeit gefahrlos -- bereits vorhandene Zeilen
+// werden uebersprungen statt einen Constraint-Fehler zu werfen oder eine
+// inzwischen neuere Zeile mit dem alten localStorage-Stand zu ueberschreiben.
 
 import { getDb, isTauri } from "./sqlClient";
 import { clampTarget } from "./timeSlots";
@@ -134,12 +135,17 @@ export async function migrateLocalStorage(): Promise<void> {
   // Nur schreiben, wenn der Key ueberhaupt existierte -- eine ganz leere
   // localStorage (frische Installation ohne Altdaten) soll keine Datenbank-
   // Aufrufe ausloesen.
+  //
+  // OR IGNORE statt Upsert: das Anlegen der Zeile ist einmalig, kein
+  // fortlaufender Abgleich. Bricht die Migration nach diesem Schritt ab, und
+  // aendert die Nutzerin vor dem naechsten Start ihr Tagesziel in der App,
+  // ist die DB-Zeile neuer als die localStorage-Kopie -- ein Retry darf sie
+  // dann nicht mit dem alten Stand ueberschreiben.
   if (settings !== null) {
     const targetSlotsPerDay = clampTarget(Number(settings?.targetSlotsPerDay));
     const showWeekend = settings?.showWeekend === true;
     await db.execute(
-      `INSERT INTO time_settings (id, target_slots_per_day, show_weekend) VALUES (1, $1, $2)
-       ON CONFLICT(id) DO UPDATE SET target_slots_per_day = $1, show_weekend = $2`,
+      "INSERT OR IGNORE INTO time_settings (id, target_slots_per_day, show_weekend) VALUES (1, $1, $2)",
       [targetSlotsPerDay, showWeekend]
     );
   }

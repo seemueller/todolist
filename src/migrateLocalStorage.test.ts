@@ -13,6 +13,7 @@ import { migrateLocalStorage, MIGRATED_FLAG } from "./migrateLocalStorage";
 const TODOS_KEY = "todolist_todos";
 const CATEGORIES_KEY = "todolist_categories";
 const SLOTS_KEY = "todolist_timeslots";
+const SETTINGS_KEY = "todolist_time_settings";
 
 function set(key: string, value: unknown) {
   localStorage.setItem(key, JSON.stringify(value));
@@ -219,5 +220,21 @@ describe("migrateLocalStorage", () => {
     await expect(migrateLocalStorage()).rejects.toThrow("db is locked");
 
     expect(localStorage.getItem(MIGRATED_FLAG)).toBeNull();
+  });
+
+  it("does not overwrite a time_settings row that already exists (retry after a partial migration)", async () => {
+    // The first launch's migration failed after writing settings but before
+    // the flag was set (e.g. a later insert threw). Between that failed
+    // attempt and the retry, the user changed their daily target inside the
+    // app -- that's now the newer value and must win over the stale
+    // localStorage copy the retry is about to see again.
+    set(SETTINGS_KEY, { targetSlotsPerDay: 4, showWeekend: true });
+
+    await migrateLocalStorage();
+
+    const settingsCall = execute.mock.calls.find((c) => String(c[0]).includes("time_settings"));
+    expect(settingsCall).toBeDefined();
+    expect(String(settingsCall![0])).toMatch(/INSERT OR IGNORE INTO time_settings/);
+    expect(String(settingsCall![0])).not.toMatch(/ON CONFLICT/i);
   });
 });
