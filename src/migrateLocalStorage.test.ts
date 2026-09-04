@@ -125,6 +125,45 @@ describe("migrateLocalStorage", () => {
     expect(params).toEqual(["2026-01-05", 3, 1, ""]);
   });
 
+  it("resolves a category that already existed in the database under a different id", async () => {
+    // localStorage still has its own timestamp id for "Kunde" -- the app was
+    // used normally before the update, so the database already has its own
+    // row for the same name (case-insensitively), under a different id. The
+    // INSERT OR IGNORE for id 555 below is a no-op against the real DB
+    // because of the UNIQUE COLLATE NOCASE constraint on name; the mock
+    // reflects that by never including 555 in what `select` reports back.
+    set(CATEGORIES_KEY, [{ id: 555, name: "kunde", color: "#333", created_at: "2026-01-01" }]);
+    set(TODOS_KEY, [
+      {
+        id: 10,
+        title: "Rechnung",
+        done: false,
+        status: "todo",
+        priority: "medium",
+        created_at: "2026-01-02",
+        due_date: null,
+        category_id: 555,
+      },
+    ]);
+    set(SLOTS_KEY, [{ date: "2026-01-05", slot: 3, category_id: 555, note: "" }]);
+    // The database's own pre-existing row: id 1, name "Kunde" -- a different
+    // id than the localStorage timestamp, same name modulo case.
+    select.mockResolvedValue([{ id: 1, name: "Kunde" }]);
+
+    await migrateLocalStorage();
+
+    const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
+    expect(todoCall).toBeDefined();
+    const todoParams = todoCall![1] as unknown[];
+    // id, title, done, status, priority, created_at, due_date, category_id
+    expect(todoParams[7]).toBe(1); // rewritten to the database's id, not 555
+
+    const slotCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO time_slots"));
+    expect(slotCall).toBeDefined();
+    const slotParams = slotCall![1] as unknown[];
+    expect(slotParams).toEqual(["2026-01-05", 3, 1, ""]);
+  });
+
   it("skips a slot whose category does not exist at all", async () => {
     set(SLOTS_KEY, [{ date: "2026-01-05", slot: 3, category_id: 999, note: "" }]);
     select.mockResolvedValue([]); // no categories in the db
