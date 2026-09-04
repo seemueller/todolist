@@ -1,9 +1,11 @@
 import { Priority, Todo, TodoStatus, Category, TodoRow, CategoryRow, fromRow, fromCategoryRow } from "./types";
 import { localTodoStore } from "./todoStoreLocal";
+import { sqlTodoStore } from "./todoStoreSql";
+import { isTauri } from "./sqlClient";
 import { TodoStore } from "./storeTypes";
 
 function store(): TodoStore {
-  return localTodoStore;
+  return isTauri() ? sqlTodoStore : localTodoStore;
 }
 
 export function listTodos(categoryId?: number | null): Promise<Todo[]> {

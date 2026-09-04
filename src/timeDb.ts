@@ -5,6 +5,8 @@
 
 import { DaySlot } from "./timeSlots";
 import { localTimeStore } from "./timeStoreLocal";
+import { sqlTimeStore } from "./timeStoreSql";
+import { isTauri } from "./sqlClient";
 import { TimeStore } from "./storeTypes";
 import { TimeSettings, DEFAULT_SETTINGS, TimeSlotRecord } from "./timeTypes";
 
@@ -12,7 +14,7 @@ export type { TimeSettings, TimeSlotRecord };
 export { DEFAULT_SETTINGS };
 
 function store(): TimeStore {
-  return localTimeStore;
+  return isTauri() ? sqlTimeStore : localTimeStore;
 }
 
 export function getSettings(): Promise<TimeSettings> {
