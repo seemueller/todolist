@@ -25,6 +25,7 @@ use std::cmp::Ordering;
 
 use serde::Serialize;
 use sqlx::{Pool, Sqlite};
+use unicode_normalization::UnicodeNormalization;
 
 use super::slots::{SLOT_MINUTES, SLOTS_PER_DAY, slot_label};
 
@@ -285,8 +286,13 @@ fn count_to_i64(count: usize) -> i64 {
 /// `toLocaleLowerCase("de")`. Das ist der Grund, warum hier ueberhaupt in Rust
 /// verglichen wird statt per `WHERE name = ?`: SQLites `NOCASE` faltet nur
 /// ASCII, "ärzte" wuerde "Ärzte" also nicht finden.
+///
+/// Davor wird nach NFC zusammengesetzt, genau wie `canonicalCategoryName` im
+/// Frontend: ein "Ä" kann ein Codepoint sein oder ein "A" mit kombinierendem
+/// Trema. Beide sehen gleich aus, und ohne diesen Schritt bekaeme der Aufrufer
+/// eine Absage, in der der abgelehnte Name unter den erlaubten aufgefuehrt ist.
 fn category_name_key(name: &str) -> String {
-    name.trim().to_lowercase()
+    name.nfc().collect::<String>().trim().to_lowercase()
 }
 
 /// Primaerschluessel der Sortierung: Umlaute und ß auf ihre Grundbuchstaben,
@@ -1591,6 +1597,35 @@ mod tests {
             let found = resolve_category(&pool, given).await.expect("resolve");
             assert_eq!(found.id, id, "{given} should resolve");
         }
+    }
+
+    #[tokio::test]
+    async fn a_decomposed_umlaut_resolves_to_its_composed_category() {
+        let pool = setup().await;
+        // "A" plus kombinierendes Trema sieht aus wie "\u{c4}", ist aber eine andere
+        // Zeichenfolge. Ohne NFC-Normalisierung bekaeme der Aufrufer eine
+        // Absage, in der der abgelehnte Name in der Liste der erlaubten steht
+        // -- daraus laesst sich nichts lernen und der naechste Versuch waere
+        // derselbe.
+        let id = category(&pool, "\u{c4}rzte").await;
+
+        let found = resolve_category(&pool, "A\u{308}rzte")
+            .await
+            .expect("decomposed name should resolve");
+        assert_eq!(found.id, id);
+    }
+
+    #[tokio::test]
+    async fn a_composed_name_resolves_a_category_stored_decomposed() {
+        let pool = setup().await;
+        // Die andere Richtung: die Datenbank kann den zerlegten Namen bereits
+        // enthalten, angelegt bevor beim Schreiben normalisiert wurde.
+        let id = category(&pool, "A\u{308}rzte").await;
+
+        let found = resolve_category(&pool, "\u{c4}rzte")
+            .await
+            .expect("composed name should resolve");
+        assert_eq!(found.id, id);
     }
 
     #[tokio::test]

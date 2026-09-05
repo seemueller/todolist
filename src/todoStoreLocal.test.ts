@@ -136,4 +136,23 @@ describe("localTodoStore", () => {
       'Es gibt bereits eine Kategorie "Ärzte".'
     );
   });
+
+  it("does not let a decomposed umlaut slip a duplicate past the check", async () => {
+    // "A" plus kombinierendes Trema sieht aus wie "Ä", ist aber eine andere
+    // Zeichenfolge. Ohne Normalisierung entstuenden zwei Kategorien, die in der
+    // Oberflaeche identisch aussehen.
+    await localTodoStore.addCategory("Ärzte", "#000000");
+
+    await expect(localTodoStore.addCategory("A\u0308rzte", "#111111")).rejects.toThrow(
+      'Es gibt bereits eine Kategorie "Ärzte".'
+    );
+  });
+
+  it("stores a decomposed name in its composed form", async () => {
+    const created = await localTodoStore.addCategory("A\u0308rzte", "#000000");
+    expect(created.name).toBe("Ärzte");
+    expect(await localTodoStore.addCategory("Ärzte", "#111111").catch((e) => e.message)).toBe(
+      'Es gibt bereits eine Kategorie "Ärzte".'
+    );
+  });
 });

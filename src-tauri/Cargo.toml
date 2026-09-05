@@ -36,6 +36,9 @@ tokio-util = "0.7"
 subtle = "2"
 rand = "0.9"
 base64 = "0.22"
+# NFC-Normalisierung fuer Kategorienamen; steht ueber idna/url ohnehin schon im
+# Lockfile, kostet als direkte Abhaengigkeit also keine zusaetzliche Crate.
+unicode-normalization = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

@@ -174,6 +174,30 @@ describe("sqlTodoStore", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("does not let a decomposed umlaut slip a duplicate past the check", async () => {
+    select.mockResolvedValue([
+      { id: 1, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    await expect(sqlTodoStore.addCategory("A\u0308rzte", "#111111")).rejects.toThrow(
+      'Es gibt bereits eine Kategorie "Ärzte".'
+    );
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("writes a decomposed name to the database in its composed form", async () => {
+    select.mockResolvedValueOnce([]);
+    execute.mockResolvedValue({ lastInsertId: 1, rowsAffected: 1 });
+    select.mockResolvedValueOnce([
+      { id: 1, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    await sqlTodoStore.addCategory(" A\u0308rzte ", "#000000");
+
+    expect(execute.mock.calls[0][1][0]).toBe("Ärzte");
+  });
+
   it("deletes a category and relies on the foreign key to clear it off todos", async () => {
     execute.mockResolvedValue({ rowsAffected: 1 });
 

@@ -2,7 +2,7 @@
 // storeTypes.ts; the contracts documented there apply here, this file only
 // holds implementation detail.
 
-import { Priority, Todo, TodoStatus, Category, compareCategoryNames, categoryNameKey } from "./types";
+import { Priority, Todo, TodoStatus, Category, compareCategoryNames, categoryNameKey, canonicalCategoryName } from "./types";
 import { TodoStore } from "./storeTypes";
 
 // ── localStorage persistence ─────────────────────────────────────────────
@@ -195,7 +195,7 @@ async function addCategory(name: string, color: string): Promise<Category> {
   assertNameAvailable(categories, name);
   const cat: Category = {
     id: generateId(),
-    name: name.trim(),
+    name: canonicalCategoryName(name),
     color,
     created_at: now(),
   };
@@ -210,7 +210,7 @@ async function updateCategory(id: number, name: string, color: string): Promise<
   const idx = categories.findIndex((c) => c.id === id);
   if (idx === -1) throw new Error(`Category ${id} not found`);
   assertNameAvailable(categories, name, id);
-  categories[idx] = { ...categories[idx], name: name.trim(), color };
+  categories[idx] = { ...categories[idx], name: canonicalCategoryName(name), color };
   saveCategories(categories);
 
   // Update todos referencing this category

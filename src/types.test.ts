@@ -1,5 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { fromRow, TodoRow, Todo, compareCategoryNames } from "./types";
+import {
+  fromRow,
+  TodoRow,
+  Todo,
+  compareCategoryNames,
+  categoryNameKey,
+  canonicalCategoryName,
+} from "./types";
+
+/** "Ärzte" zerlegt: A plus kombinierendes Trema (NFD). */
+const NFD_AERZTE = "A\u0308rzte";
+/** Dasselbe Wort mit einem vorkomponierten Ä (NFC). */
+const NFC_AERZTE = "\u00c4rzte";
 
 describe("fromRow", () => {
   it("converts a database row to a Todo with done=true", () => {
@@ -108,5 +120,25 @@ describe("compareCategoryNames", () => {
       "Sport",
       "xxx",
     ]);
+  });
+});
+
+describe("categoryNameKey", () => {
+  it("gives a decomposed name the same key as its composed twin", () => {
+    // Zwei Schreibweisen desselben Wortes: das Ä einmal als ein Codepoint,
+    // einmal als A plus kombinierendes Trema. Sie sehen identisch aus, also
+    // muessen sie fuer die App derselbe Name sein.
+    expect(NFD_AERZTE).not.toBe(NFC_AERZTE);
+    expect(categoryNameKey(NFD_AERZTE)).toBe(categoryNameKey(NFC_AERZTE));
+  });
+
+  it("still folds case and whitespace", () => {
+    expect(categoryNameKey("  ÄRZTE ")).toBe(categoryNameKey("ärzte"));
+  });
+});
+
+describe("canonicalCategoryName", () => {
+  it("stores the composed form", () => {
+    expect(canonicalCategoryName(` ${NFD_AERZTE} `)).toBe(NFC_AERZTE);
   });
 });
