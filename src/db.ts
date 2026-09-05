@@ -1,4 +1,4 @@
-import { Priority, Todo, TodoStatus, Category, TodoRow, CategoryRow, fromRow, fromCategoryRow } from "./types";
+import { Priority, Todo, TodoStatus, Category } from "./types";
 import { localTodoStore } from "./todoStoreLocal";
 import { sqlTodoStore } from "./todoStoreSql";
 import { isTauri } from "./sqlClient";
@@ -64,7 +64,3 @@ export function updateCategory(id: number, name: string, color: string): Promise
 export function deleteCategory(id: number): Promise<number> {
   return store().deleteCategory(id);
 }
-
-// Type exports for test compatibility
-export type { TodoRow, CategoryRow };
-export { fromRow, fromCategoryRow };

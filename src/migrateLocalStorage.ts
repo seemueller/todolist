@@ -53,6 +53,16 @@ export async function migrateLocalStorage(): Promise<void> {
   // die DB in diesem Moment noch nicht bereit ist -- als Migrationsfehler
   // gemeldet, obwohl es nichts zu migrieren gab, und das bei jedem einzelnen
   // Start neu, weil ohne Erfolg auch das Flag nie gesetzt wird.
+  //
+  // "Ohne Altdaten" heisst hier auch: mit unlesbaren Altdaten. `readKey` macht
+  // aus kaputtem JSON null, ein solcher Key sieht an dieser Stelle also aus wie
+  // ein fehlender -- sind alle vier kaputt, wird das Flag gesetzt, und ihr
+  // Inhalt wird nie migriert und nie erneut versucht. Das ist Absicht, kein
+  // Versehen: aus unlesbarem JSON laesst sich nichts uebernehmen, und ein Retry
+  // bei jedem Start wuerde daran nichts aendern. Der Rohtext bleibt im
+  // localStorage liegen, falls doch noch jemand hineinschauen will. Fuer den
+  // Fall, dass nur einzelne Keys kaputt sind, siehe den Test "skips a key with
+  // corrupt JSON but still migrates the others and sets the flag".
   if (categories.length === 0 && todos.length === 0 && slots.length === 0 && settings === null) {
     localStorage.setItem(MIGRATED_FLAG, "1");
     return;

@@ -33,7 +33,7 @@ describe("db backend selection", () => {
     isTauri.mockReturnValue(true);
     select.mockResolvedValue([]);
     const db = await import("./db");
-    await db.listTodos().catch(() => undefined);
+    await db.listTodos();
     expect(getDb).toHaveBeenCalled();
     expect(localStorage.getItem("todolist_todos")).toBeNull();
   });

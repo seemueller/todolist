@@ -33,4 +33,18 @@ describe("sqlClient", () => {
     expect(load).toHaveBeenCalledTimes(1);
     expect(load).toHaveBeenCalledWith("sqlite:todolist.db");
   });
+
+  it("keeps a failed load for the whole session instead of retrying", async () => {
+    (globalThis as any).window.__TAURI_INTERNALS__ = {};
+    load.mockImplementation(() => Promise.reject(new Error("database locked")));
+    const { getDb } = await import("./sqlClient");
+
+    await expect(getDb()).rejects.toThrow("database locked");
+    await expect(getDb()).rejects.toThrow("database locked");
+
+    // Kein zweiter Ladeversuch: der abgelehnte Promise bleibt gecacht. Erst der
+    // naechste Start der App versucht es wieder -- genau das sagt die App der
+    // Nutzerin auch.
+    expect(load).toHaveBeenCalledTimes(1);
+  });
 });

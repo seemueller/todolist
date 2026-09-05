@@ -202,16 +202,6 @@ async function addCategory(name: string, color: string): Promise<Category> {
   categories.push(cat);
   saveCategories(categories);
 
-  // Update existing todos that reference this category
-  const todos = loadTodos();
-  for (const todo of todos) {
-    if (todo.category_id === cat.id) {
-      todo.category_name = cat.name;
-      todo.category_color = cat.color;
-    }
-  }
-  saveTodos(todos);
-
   return Promise.resolve(cat);
 }
 

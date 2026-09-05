@@ -69,7 +69,7 @@ describe("sqlTodoStore", () => {
     expect(updated.done).toBe(true);
   });
 
-  it("throws when the todo to update does not exist", async () => {
+  it("rejects rather than throwing synchronously for a missing todo", async () => {
     execute.mockResolvedValue({ rowsAffected: 0 });
     select.mockResolvedValue([]);
 

@@ -200,6 +200,8 @@ pub fn run() {
             );",
             kind: MigrationKind::Up,
         },
+        // Noch von nichts gelesen oder geschrieben: Vorarbeit fuer den
+        // MCP-Server (siehe docs/) -- nicht als ungenutzt entfernen.
         Migration {
             version: 8,
             description: "create_app_settings",

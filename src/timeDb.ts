@@ -8,9 +8,9 @@ import { localTimeStore } from "./timeStoreLocal";
 import { sqlTimeStore } from "./timeStoreSql";
 import { isTauri } from "./sqlClient";
 import { TimeStore } from "./storeTypes";
-import { TimeSettings, DEFAULT_SETTINGS, TimeSlotRecord } from "./timeTypes";
+import { TimeSettings, DEFAULT_SETTINGS } from "./timeTypes";
 
-export type { TimeSettings, TimeSlotRecord };
+export type { TimeSettings };
 export { DEFAULT_SETTINGS };
 
 function store(): TimeStore {
