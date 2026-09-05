@@ -13,6 +13,7 @@
 
 import { getDb, isTauri } from "./sqlClient";
 import { clampTarget } from "./timeSlots";
+import { categoryNameKey } from "./types";
 
 export const MIGRATED_FLAG = "todolist_migrated_to_sqlite";
 
@@ -68,14 +69,14 @@ export async function migrateLocalStorage(): Promise<void> {
   // damit ein zweiter Insert nicht abbricht -- weder bei einem Duplikat aus
   // localStorage noch bei einer Kategorie, die schon vor dem Umzug ganz normal
   // ueber die App angelegt wurde.
-  const seenByLowerName = new Map<string, any>();
+  const seenByNameKey = new Map<string, any>();
   for (const category of categories) {
     if (typeof category?.id !== "number" || typeof category?.name !== "string") continue;
-    const key = category.name.trim().toLowerCase();
-    if (!seenByLowerName.has(key)) seenByLowerName.set(key, category);
+    const key = categoryNameKey(category.name);
+    if (!seenByNameKey.has(key)) seenByNameKey.set(key, category);
   }
 
-  for (const category of seenByLowerName.values()) {
+  for (const category of seenByNameKey.values()) {
     await db.execute(
       "INSERT OR IGNORE INTO categories (id, name, color, created_at) VALUES ($1, $2, $3, $4)",
       [
@@ -95,15 +96,29 @@ export async function migrateLocalStorage(): Promise<void> {
   const dbCategories = await db.select<{ id: number; name: string }[]>(
     "SELECT id, name FROM categories"
   );
-  const dbIdByLowerName = new Map<string, number>();
+  const dbIds = new Set<number>();
+  const dbIdByNameKey = new Map<string, number>();
   for (const row of dbCategories) {
-    dbIdByLowerName.set(row.name.trim().toLowerCase(), row.id);
+    dbIds.add(row.id);
+    dbIdByNameKey.set(categoryNameKey(row.name), row.id);
   }
 
+  // Erst ueber die ID, dann ueber den Namen. Die ID zuerst, weil ein
+  // abgebrochener erster Versuch die Kategorien schon geschrieben haben kann:
+  // benennt die Nutzerin eine davon danach um, findet die Namenssuche beim
+  // Retry nichts mehr, und jeder Slot dieser Kategorie fiele stillschweigend
+  // unter den Tisch -- endgueltig, denn danach steht das Flag. Die
+  // localStorage-IDs sind Zeitstempel, eine Verwechslung mit einer fremden
+  // Zeile ist ausgeschlossen. Die Namenssuche bleibt fuer den anderen Fall:
+  // die Kategorie existierte schon vor dem Umzug, unter einer eigenen ID.
   const remappedId = new Map<number, number>();
   for (const category of categories) {
     if (typeof category?.id !== "number" || typeof category?.name !== "string") continue;
-    const resolved = dbIdByLowerName.get(category.name.trim().toLowerCase());
+    if (dbIds.has(category.id)) {
+      remappedId.set(category.id, category.id);
+      continue;
+    }
+    const resolved = dbIdByNameKey.get(categoryNameKey(category.name));
     if (resolved !== undefined) remappedId.set(category.id, resolved);
   }
 

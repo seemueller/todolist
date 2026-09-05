@@ -189,6 +189,25 @@ describe("migrateLocalStorage", () => {
     expect(slotParams).toEqual(["2026-01-05", 3, 1, ""]);
   });
 
+  it("still resolves a category that was renamed between two migration attempts", async () => {
+    // Ein erster Versuch schrieb die Kategorien und brach dann ab, bevor die
+    // Slots dran waren -- das Flag blieb also ungesetzt, wie vorgesehen.
+    // Danach benennt die Nutzerin "Kunde" in "Kundenprojekt" um. Beim Retry
+    // findet eine reine Namenssuche den alten localStorage-Namen nicht mehr;
+    // die Zeile steht aber laengst unter genau der localStorage-ID in der DB.
+    set(CATEGORIES_KEY, [{ id: 555, name: "Kunde", color: "#333", created_at: "2026-01-01" }]);
+    set(SLOTS_KEY, [{ date: "2026-01-05", slot: 3, category_id: 555, note: "Termin" }]);
+    select.mockResolvedValue([{ id: 555, name: "Kundenprojekt" }]);
+
+    await migrateLocalStorage();
+
+    const slotCall = execute.mock.calls.find((c) =>
+      String(c[0]).includes("INSERT OR IGNORE INTO time_slots")
+    );
+    expect(slotCall).toBeDefined();
+    expect(slotCall![1]).toEqual(["2026-01-05", 3, 555, "Termin"]);
+  });
+
   it("skips a slot whose category does not exist at all", async () => {
     set(SLOTS_KEY, [{ date: "2026-01-05", slot: 3, category_id: 999, note: "" }]);
     select.mockResolvedValue([]); // no categories in the db
