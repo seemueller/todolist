@@ -1,0 +1,105 @@
+// localStorage-Backend der Zeiterfassung. Implementiert TimeStore aus storeTypes.ts;
+// die dort dokumentierten Vertraege gelten, hier stehen nur Implementierungsdetails.
+
+import { DaySlot, applyPaint, clampTarget, setBlockNote as setNoteOnBlock } from "./timeSlots";
+import { TimeSettings, DEFAULT_SETTINGS, TimeSlotRecord } from "./timeTypes";
+import { TimeStore } from "./storeTypes";
+
+const SLOTS_KEY = "todolist_timeslots";
+const SETTINGS_KEY = "todolist_time_settings";
+
+function loadAll(): TimeSlotRecord[] {
+  try {
+    const raw = localStorage.getItem(SLOTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is TimeSlotRecord =>
+        typeof entry?.date === "string" &&
+        typeof entry?.slot === "number" &&
+        typeof entry?.category_id === "number"
+    ).map((entry) => ({ ...entry, note: typeof entry.note === "string" ? entry.note : "" }));
+  } catch {
+    return [];
+  }
+}
+
+function saveAll(records: TimeSlotRecord[]): void {
+  localStorage.setItem(SLOTS_KEY, JSON.stringify(records));
+}
+
+function selectDay(records: TimeSlotRecord[], date: string): DaySlot[] {
+  return records
+    .filter((r) => r.date === date)
+    .map(({ slot, category_id, note }) => ({ slot, category_id, note }))
+    .sort((a, b) => a.slot - b.slot);
+}
+
+function replaceDay(date: string, slots: DaySlot[]): DaySlot[] {
+  const others = loadAll().filter((r) => r.date !== date);
+  const updated: TimeSlotRecord[] = slots.map((s) => ({ ...s, date }));
+  saveAll([...others, ...updated]);
+  return slots;
+}
+
+function getSettings(): Promise<TimeSettings> {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return Promise.resolve(DEFAULT_SETTINGS);
+    const parsed = JSON.parse(raw);
+    return Promise.resolve({
+      targetSlotsPerDay: clampTarget(Number(parsed?.targetSlotsPerDay)),
+      showWeekend: parsed?.showWeekend === true,
+    });
+  } catch {
+    return Promise.resolve(DEFAULT_SETTINGS);
+  }
+}
+
+function saveSettings(settings: TimeSettings): Promise<TimeSettings> {
+  const stored: TimeSettings = {
+    targetSlotsPerDay: clampTarget(settings.targetSlotsPerDay),
+    showWeekend: settings.showWeekend === true,
+  };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(stored));
+  return Promise.resolve(stored);
+}
+
+function listSlots(date: string): Promise<DaySlot[]> {
+  return Promise.resolve(selectDay(loadAll(), date));
+}
+
+function saveDay(date: string, slots: DaySlot[]): Promise<DaySlot[]> {
+  return Promise.resolve(replaceDay(date, slots));
+}
+
+function paintSlots(
+  date: string,
+  indices: number[],
+  categoryId: number | null
+): Promise<DaySlot[]> {
+  const current = selectDay(loadAll(), date);
+  return Promise.resolve(replaceDay(date, applyPaint(current, indices, categoryId)));
+}
+
+function setBlockNote(date: string, slot: number, note: string): Promise<DaySlot[]> {
+  const current = selectDay(loadAll(), date);
+  return Promise.resolve(replaceDay(date, setNoteOnBlock(current, slot, note)));
+}
+
+function clearBlock(date: string, startSlot: number, endSlot: number): Promise<DaySlot[]> {
+  const indices: number[] = [];
+  for (let slot = startSlot; slot < endSlot; slot++) indices.push(slot);
+  return paintSlots(date, indices, null);
+}
+
+export const localTimeStore: TimeStore = {
+  getSettings,
+  saveSettings,
+  listSlots,
+  saveDay,
+  paintSlots,
+  setBlockNote,
+  clearBlock,
+};

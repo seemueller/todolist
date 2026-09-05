@@ -104,14 +104,21 @@ const filterLabels: Record<DueDateFilter, string> = {
   none: "Ohne Datum",
 };
 
-function App() {
+type AppProps = {
+  /** Fehlermeldung aus der localStorage-Migration in main.tsx, falls sie
+   *  fehlgeschlagen ist. Wird einmalig als Startwert des Fehler-Banners
+   *  uebernommen -- siehe migrateLocalStorage.ts. */
+  migrationError?: string | null;
+};
+
+function App({ migrationError = null }: AppProps) {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState<Priority>("medium");
   const [newDueDate, setNewDueDate] = useState("");
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(migrationError);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [editingDueDate, setEditingDueDate] = useState("");
@@ -157,7 +164,14 @@ function App() {
       ]);
       setTodos(items);
       setCategories(cats);
-      setError(null);
+      // Kein setError(null) hier: refresh() laeuft nur beim Mount (siehe
+      // useEffect unten, unter React.StrictMode im Dev-Build zweimal), nie als
+      // Reaktion auf eine Nutzeraktion. Ihm kann darum kein anderer Fehler
+      // vorausgehen als die Migrationswarnung aus main.tsx (ueber die
+      // migrationError-Prop). Die wuerde ein erfolgreicher Ladevorgang sonst
+      // sofort wieder wegwischen, bevor sie jemand liest. Jede andere Aktion
+      // (Hinzufuegen, Loeschen, ...) setzt und loescht ihren eigenen Fehler
+      // selbst.
     } catch (err) {
       setError(String(err));
     } finally {

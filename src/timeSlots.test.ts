@@ -5,6 +5,7 @@ import {
   addDays,
   applyPaint,
   buildBlocks,
+  clampTarget,
   dayHours,
   formatDateLabel,
   formatDayLabel,
@@ -177,6 +178,29 @@ describe("Summen", () => {
 
   it("zaehlt die Slots des Tages", () => {
     expect(totalSlots([slot(36, 7), slot(37, 9)])).toBe(2);
+  });
+});
+
+describe("clampTarget", () => {
+  it("kappt einen negativen Wert auf 0", () => {
+    expect(clampTarget(-5)).toBe(0);
+  });
+
+  it("laesst 0 unveraendert", () => {
+    expect(clampTarget(0)).toBe(0);
+  });
+
+  it("laesst einen normalen Wert unveraendert", () => {
+    expect(clampTarget(32)).toBe(32);
+  });
+
+  it("kappt einen Wert ueber 64 auf 64", () => {
+    expect(clampTarget(999)).toBe(64);
+  });
+
+  it("faellt bei einem nicht endlichen Wert auf die Vorgabe zurueck", () => {
+    expect(clampTarget(NaN)).toBe(32);
+    expect(clampTarget(Infinity)).toBe(32);
   });
 });
 

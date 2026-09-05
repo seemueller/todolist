@@ -16,6 +16,8 @@ export const SLOTS_PER_HOUR = 60 / SLOT_MINUTES;
 export const SLOTS_PER_DAY = 24 * SLOTS_PER_HOUR;
 /** Regulaere Arbeitstage einer Woche; das Wochenende zaehlt nicht zum Soll. */
 export const WORKDAYS_PER_WEEK = 5;
+/** Soll je Tag zwischen 0:00 und 16:00; alles andere waere ein Tippfehler. */
+const MAX_TARGET_SLOTS = 64;
 /** Erste Stunde der Matrix. */
 export const DAY_START_HOUR = 6;
 /** Letzte Stunde der Matrix, einschliesslich. */
@@ -70,6 +72,16 @@ export function dayHours(): number[] {
 
 function isValidSlot(slot: number): boolean {
   return Number.isInteger(slot) && slot >= 0 && slot < SLOTS_PER_DAY;
+}
+
+/**
+ * Kappt ein Tagesziel auf den gueltigen Bereich; ein nicht endlicher Wert faellt
+ * auf DEFAULT_SETTINGS.targetSlotsPerDay aus timeTypes.ts zurueck (hier als
+ * Literal, um keinen Importzyklus mit timeTypes.ts einzugehen).
+ */
+export function clampTarget(slots: number): number {
+  if (!Number.isFinite(slots)) return 32;
+  return Math.min(MAX_TARGET_SLOTS, Math.max(0, Math.round(slots)));
 }
 
 function bySlot(a: DaySlot, b: DaySlot): number {

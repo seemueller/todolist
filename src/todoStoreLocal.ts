@@ -1,0 +1,262 @@
+// localStorage backend for todos and categories. Implements TodoStore from
+// storeTypes.ts; the contracts documented there apply here, this file only
+// holds implementation detail.
+
+import { Priority, Todo, TodoStatus, Category, compareCategoryNames, categoryNameKey } from "./types";
+import { TodoStore } from "./storeTypes";
+
+// ── localStorage persistence ─────────────────────────────────────────────
+
+const TODOS_KEY = "todolist_todos";
+const CATEGORIES_KEY = "todolist_categories";
+
+function generateId(): number {
+  return Date.now() + Math.floor(Math.random() * 1000);
+}
+
+function now(): string {
+  return new Date().toISOString();
+}
+
+function loadTodos(): Todo[] {
+  try {
+    const raw = localStorage.getItem(TODOS_KEY);
+    if (!raw) return [];
+    return migrateTodos(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+function migrateTodos(todos: any[]): Todo[] {
+  return todos.map((todo) => {
+    if (todo.status) return todo;
+    const status: TodoStatus = todo.done ? "done" : "todo";
+    return { ...todo, status, done: status === "done" };
+  });
+}
+
+function saveTodos(todos: Todo[]): void {
+  localStorage.setItem(TODOS_KEY, JSON.stringify(todos));
+}
+
+function loadCategories(): Category[] {
+  try {
+    const raw = localStorage.getItem(CATEGORIES_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function saveCategories(categories: Category[]): void {
+  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
+}
+
+// ── Derived reads ────────────────────────────────────────────────────────
+
+function selectTodos(categoryId?: number | null): Todo[] {
+  let todos = loadTodos();
+  if (categoryId !== undefined && categoryId !== null) {
+    todos = todos.filter((t) => t.category_id === categoryId);
+  }
+  return todos
+    .slice()
+    .sort((a, b) => {
+      const dateCmp = b.created_at.localeCompare(a.created_at);
+      if (dateCmp !== 0) return dateCmp;
+      return b.id - a.id;
+    });
+}
+
+function findCategory(id: number): Category | undefined {
+  return loadCategories().find((c) => c.id === id);
+}
+
+// ── Todos ────────────────────────────────────────────────────────────────
+
+function listTodos(categoryId?: number | null): Promise<Todo[]> {
+  return Promise.resolve(selectTodos(categoryId));
+}
+
+function addTodo(
+  title: string,
+  priority: Priority,
+  dueDate: string | null,
+  categoryId?: number | null
+): Promise<Todo> {
+  const todos = loadTodos();
+  const todo: Todo = {
+    id: generateId(),
+    title,
+    done: false,
+    status: "todo",
+    priority,
+    created_at: now(),
+    due_date: dueDate,
+    category_id: categoryId ?? null,
+    category_name: categoryId ? findCategory(categoryId)?.name ?? null : null,
+    category_color: categoryId ? findCategory(categoryId)?.color ?? null : null,
+  };
+  todos.unshift(todo);
+  saveTodos(todos);
+  return Promise.resolve(todo);
+}
+
+async function updateTodoTitle(id: number, title: string): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id);
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+  todos[idx] = { ...todos[idx], title };
+  saveTodos(todos);
+  return Promise.resolve(todos[idx]);
+}
+
+async function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id);
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+  todos[idx] = { ...todos[idx], due_date: dueDate };
+  saveTodos(todos);
+  return Promise.resolve(todos[idx]);
+}
+
+async function updateTodoPriority(id: number, priority: Priority): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id);
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+  todos[idx] = { ...todos[idx], priority };
+  saveTodos(todos);
+  return Promise.resolve(todos[idx]);
+}
+
+async function updateTodoCategory(id: number, categoryId: number | null): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id);
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+  const cat = categoryId ? findCategory(categoryId) : null;
+  todos[idx] = {
+    ...todos[idx],
+    category_id: categoryId,
+    category_name: cat?.name ?? null,
+    category_color: cat?.color ?? null,
+  };
+  saveTodos(todos);
+  return Promise.resolve(todos[idx]);
+}
+
+async function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id);
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+  todos[idx] = { ...todos[idx], status, done: status === "done" };
+  saveTodos(todos);
+  return Promise.resolve(todos[idx]);
+}
+
+async function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id);
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+  const status: TodoStatus = done ? "done" : "todo";
+  todos[idx] = { ...todos[idx], done, status };
+  saveTodos(todos);
+  return Promise.resolve(todos[idx]);
+}
+
+function deleteTodo(id: number): Promise<number> {
+  const todos = loadTodos().filter((t) => t.id !== id);
+  saveTodos(todos);
+  return Promise.resolve(id);
+}
+
+// ── Categories ───────────────────────────────────────────────────────────
+
+function listCategories(): Promise<Category[]> {
+  return Promise.resolve(
+    loadCategories().slice().sort((a, b) => compareCategoryNames(a.name, b.name))
+  );
+}
+
+// Rejects a create/rename that collides with an existing category name,
+// case-insensitively and Unicode-aware (see categoryNameKey in types.ts).
+// `excludeId` lets updateCategory allow a category to keep its own name.
+function assertNameAvailable(categories: Category[], name: string, excludeId?: number): void {
+  const key = categoryNameKey(name);
+  const collision = categories.find((c) => c.id !== excludeId && categoryNameKey(c.name) === key);
+  if (collision) {
+    throw new Error(`Es gibt bereits eine Kategorie "${collision.name}".`);
+  }
+}
+
+async function addCategory(name: string, color: string): Promise<Category> {
+  const categories = loadCategories();
+  assertNameAvailable(categories, name);
+  const cat: Category = {
+    id: generateId(),
+    name: name.trim(),
+    color,
+    created_at: now(),
+  };
+  categories.push(cat);
+  saveCategories(categories);
+
+  return Promise.resolve(cat);
+}
+
+async function updateCategory(id: number, name: string, color: string): Promise<Category> {
+  const categories = loadCategories();
+  const idx = categories.findIndex((c) => c.id === id);
+  if (idx === -1) throw new Error(`Category ${id} not found`);
+  assertNameAvailable(categories, name, id);
+  categories[idx] = { ...categories[idx], name: name.trim(), color };
+  saveCategories(categories);
+
+  // Update todos referencing this category
+  const todos = loadTodos();
+  for (const todo of todos) {
+    if (todo.category_id === id) {
+      todo.category_name = categories[idx].name;
+      todo.category_color = categories[idx].color;
+    }
+  }
+  saveTodos(todos);
+
+  return Promise.resolve(categories[idx]);
+}
+
+function deleteCategory(id: number): Promise<number> {
+  const categories = loadCategories().filter((c) => c.id !== id);
+  saveCategories(categories);
+
+  // Clear the category off todos that referenced it, instead of leaving it
+  // dangling: the SQL store gets this for free via ON DELETE SET NULL.
+  const todos = loadTodos();
+  for (const todo of todos) {
+    if (todo.category_id === id) {
+      todo.category_id = null;
+      todo.category_name = null;
+      todo.category_color = null;
+    }
+  }
+  saveTodos(todos);
+
+  return Promise.resolve(id);
+}
+
+export const localTodoStore: TodoStore = {
+  listTodos,
+  addTodo,
+  updateTodoTitle,
+  updateTodoDueDate,
+  updateTodoPriority,
+  updateTodoCategory,
+  updateTodoStatus,
+  toggleTodoDone,
+  deleteTodo,
+  listCategories,
+  addCategory,
+  updateCategory,
+  deleteCategory,
+};

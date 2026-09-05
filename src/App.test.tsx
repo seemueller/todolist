@@ -67,6 +67,26 @@ describe("App", () => {
     });
   });
 
+  it("shows the migration error banner on mount and keeps it after todos load", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+
+    render(<App migrationError="Die Übernahme deiner bestehenden Daten ist fehlgeschlagen." />);
+
+    expect(
+      screen.getByText(/Die Übernahme deiner bestehenden Daten ist fehlgeschlagen\./i),
+    ).toBeInTheDocument();
+
+    // Das anschliessende erfolgreiche Laden der Liste darf das Banner nicht
+    // sofort wieder wegwischen.
+    await waitFor(() => {
+      expect(db.listTodos).toHaveBeenCalled();
+      expect(screen.queryByText(/Lade Aufgaben/i)).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/Die Übernahme deiner bestehenden Daten ist fehlgeschlagen\./i),
+    ).toBeInTheDocument();
+  });
+
   it("renders existing todos", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
       makeTodo({ id: 1, title: "Buy milk", done: false }),

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fromRow, TodoRow, Todo } from "./types";
+import { fromRow, TodoRow, Todo, compareCategoryNames } from "./types";
 
 describe("fromRow", () => {
   it("converts a database row to a Todo with done=true", () => {
@@ -87,5 +87,26 @@ describe("fromRow", () => {
     const result = fromRow(row);
 
     expect(result.done).toBe(false);
+  });
+});
+
+describe("compareCategoryNames", () => {
+  it("orders umlauts the way German readers expect", () => {
+    const names = ["Zebra", "Apfel", "Ärzte"];
+    expect(names.slice().sort(compareCategoryNames)).toEqual(["Apfel", "Ärzte", "Zebra"]);
+  });
+
+  it("does not group all uppercase-initial names before all lowercase-initial ones", () => {
+    // This is exactly the case a bare `localeCompare` gets wrong in
+    // WebKitGTK: it weighs case at the primary collation level, so it would
+    // produce ["Ärzte", "Sport", "ärzte", "foo#", "xxx"] here instead.
+    const names = ["Ärzte", "ärzte", "Sport", "foo#", "xxx"];
+    expect(names.slice().sort(compareCategoryNames)).toEqual([
+      "ärzte",
+      "Ärzte",
+      "foo#",
+      "Sport",
+      "xxx",
+    ]);
   });
 });
