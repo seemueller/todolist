@@ -2,6 +2,11 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.8.1] - 2026-09-05
+
+### Behoben
+- Die App konnte mit „migration 1 was previously applied but has been modified“ abbrechen, ohne dass an der Datenbank etwas geändert worden war. Ursache waren die Zeilenenden: je nachdem, wie der Quelltext ausgecheckt wurde, entstanden aus demselben Stand unterschiedliche Prüfsummen der Datenbank-Migrationen. Sie sind jetzt festgeschrieben.
+
 ## [0.8.0] - 2026-09-05
 
 ### Hinzugefügt
