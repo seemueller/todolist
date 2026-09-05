@@ -360,6 +360,28 @@ describe("App", () => {
       expect(await screen.findByText("Von Claude")).toBeInTheDocument();
     });
 
+    it("raeumt eine stehende Fehlermeldung weg, wenn das Nachladen glueckt", async () => {
+      // Der Fehler gehoert zu einem frueheren Versuch. Bleibt er nach einem
+      // geglueckten Nachladen stehen, beschwert sich die App ueber etwas, das
+      // inzwischen erledigt ist.
+      vi.mocked(db.listTodos).mockRejectedValue(new Error("DB error"));
+
+      render(<App />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/DB error/i)).toBeInTheDocument();
+      });
+      await waitFor(() => expect(listenMock).toHaveBeenCalled());
+
+      vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ title: "Von Claude" })]);
+      await act(async () => {
+        emit("todolist:data-changed");
+      });
+
+      expect(await screen.findByText("Von Claude")).toBeInTheDocument();
+      expect(screen.queryByText(/DB error/i)).not.toBeInTheDocument();
+    });
+
     it("meldet sich beim Unmount wieder ab", async () => {
       vi.mocked(db.listTodos).mockResolvedValue([]);
 

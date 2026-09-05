@@ -160,7 +160,26 @@ function App({ migrationError = null }: AppProps) {
   const [showMcp, setShowMcp] = useState(false);
   const closeDebug = useCallback(() => setShowDebug(false), []);
 
-  async function refresh() {
+  /**
+   * Laedt Aufgaben und Kategorien neu.
+   *
+   * `clearErrorOnSuccess` entscheidet, ob ein geglueckter Ladevorgang eine
+   * stehende Fehlermeldung wegnimmt. Die Regel dahinter: geloescht wird nur ein
+   * Fehler, der aelter ist als der Anlass des Neuladens.
+   *
+   * * **Mount (`false`).** Der einzige Fehler, der hier schon stehen kann, ist
+   *   die Migrationswarnung aus main.tsx (ueber die migrationError-Prop). Sie
+   *   ist nicht veraltet, sondern gerade erst entstanden -- der erste
+   *   erfolgreiche Ladevorgang wuerde sie wegwischen, bevor sie jemand liest.
+   * * **`todolist:data-changed` (`true`).** Der MCP-Server hat geschrieben, wir
+   *   lesen den neuen Stand. Was hier noch steht, gehoert zu einem frueheren
+   *   Versuch; bleibt es stehen, beschwert sich die App ueber etwas, das
+   *   inzwischen erledigt ist.
+   *
+   * Jede andere Aktion (Hinzufuegen, Loeschen, ...) setzt und loescht ihren
+   * eigenen Fehler selbst und geht nicht durch `refresh()`.
+   */
+  async function refresh(clearErrorOnSuccess = false) {
     try {
       const [items, cats] = await Promise.all([
         listTodos(),
@@ -168,14 +187,7 @@ function App({ migrationError = null }: AppProps) {
       ]);
       setTodos(items);
       setCategories(cats);
-      // Kein setError(null) hier: refresh() laeuft nur beim Mount (siehe
-      // useEffect unten, unter React.StrictMode im Dev-Build zweimal), nie als
-      // Reaktion auf eine Nutzeraktion. Ihm kann darum kein anderer Fehler
-      // vorausgehen als die Migrationswarnung aus main.tsx (ueber die
-      // migrationError-Prop). Die wuerde ein erfolgreicher Ladevorgang sonst
-      // sofort wieder wegwischen, bevor sie jemand liest. Jede andere Aktion
-      // (Hinzufuegen, Loeschen, ...) setzt und loescht ihren eigenen Fehler
-      // selbst.
+      if (clearErrorOnSuccess) setError(null);
     } catch (err) {
       setError(String(err));
     } finally {
@@ -200,7 +212,7 @@ function App({ migrationError = null }: AppProps) {
     let unlisten: UnlistenFn | null = null;
     let dropped = false;
     listen(DATA_CHANGED_EVENT, () => {
-      refresh();
+      refresh(true);
     }).then((stop) => {
       if (dropped) stop();
       else unlisten = stop;
