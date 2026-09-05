@@ -185,4 +185,21 @@ describe("sqlTodoStore", () => {
     expect(execute.mock.calls[0][0]).toContain("DELETE FROM categories WHERE id = $1");
     expect(execute.mock.calls[0][1]).toEqual([2]);
   });
+
+  it("does not touch time bookings when deleting a category", async () => {
+    execute.mockResolvedValue({ rowsAffected: 1 });
+
+    await sqlTodoStore.deleteCategory(2);
+
+    // Der Store ist gemockt, geprueft wird darum das abgesetzte SQL: keine
+    // Anweisung darf time_slots anfassen -- weder loeschen noch leeren. Dass
+    // auch die Datenbank selbst nichts kaskadiert, sichert der Rust-Test
+    // `deleting_a_category_keeps_its_time_bookings` in src-tauri/src/lib.rs;
+    // bis Migration 9 tat sie es (ON DELETE CASCADE aus Migration 7).
+    const statements = [
+      ...execute.mock.calls.map((call) => call[0] as string),
+      ...select.mock.calls.map((call) => call[0] as string),
+    ];
+    expect(statements.some((sql) => sql.includes("time_slots"))).toBe(false);
+  });
 });

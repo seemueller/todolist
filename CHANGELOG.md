@@ -10,6 +10,7 @@ Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokume
 - Kategorien werden im Desktop-Build und im Browser gleich sortiert. Bisher ordnete WebKit sie anders, weil es Groß- und Kleinschreibung stärker gewichtet als Chromium.
 
 ### Behoben
+- Das Löschen einer Kategorie löschte im Desktop-Build alle Zeitbuchungen mit, die sie benutzt hatten. Die Buchungen bleiben jetzt erhalten und erscheinen in der Wochenansicht als „Gelöschte Kategorie“.
 - Beim Löschen einer Kategorie behielten die betroffenen Aufgaben deren Namen und Farbe. Sie verlieren die Kategorie jetzt vollständig.
 - Kategorienamen, die sich nur in der Groß- und Kleinschreibung unterscheiden, lassen sich nicht mehr doppelt anlegen — Umlaute eingeschlossen.
 - Schlägt die einmalige Datenübernahme fehl, sagt die App das jetzt, statt leer zu wirken. Die Daten bleiben unverändert erhalten, der nächste Start versucht es erneut.

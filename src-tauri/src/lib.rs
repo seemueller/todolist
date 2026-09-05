@@ -209,6 +209,32 @@ pub fn run() {
             );",
             kind: MigrationKind::Up,
         },
+        // Nimmt den Fremdschluessel aus Migration 7 wieder zurueck. sqlx setzt
+        // `PRAGMA foreign_keys = ON`, das ON DELETE CASCADE war also scharf:
+        // eine geloeschte Kategorie riss jede Zeitbuchung mit, die sie benutzt
+        // hatte. Der localStorage-Speicher tut das nicht, und die Wochenansicht
+        // rechnet ausdruecklich mit ueberlebenden Buchungen -- sie beschriftet
+        // eine unbekannte Kategorie mit "Geloeschte Kategorie". ON DELETE SET
+        // NULL waere keine Alternative: `applyPaint` in timeSlots.ts liest
+        // category_id === null als "Slot leeren", eine solche Zeile ist im
+        // Datenmodell gar nicht darstellbar. SQLite kann keinen Constraint
+        // loeschen, die Tabelle wird darum umgebaut.
+        Migration {
+            version: 9,
+            description: "drop_time_slots_category_fk",
+            sql: "CREATE TABLE time_slots_new (
+                date TEXT NOT NULL,
+                slot INTEGER NOT NULL,
+                category_id INTEGER NOT NULL,
+                note TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (date, slot)
+            );
+            INSERT INTO time_slots_new (date, slot, category_id, note)
+                SELECT date, slot, category_id, note FROM time_slots;
+            DROP TABLE time_slots;
+            ALTER TABLE time_slots_new RENAME TO time_slots;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -233,6 +259,10 @@ mod tests {
     use super::*;
     use sqlx::SqlitePool;
 
+    /// Muss dem echten Schema nach Migration 9 entsprechen -- insbesondere ohne
+    /// `REFERENCES categories(id)`. Solange hier ein anderes Schema stand als in
+    /// der Migration, konnte kein Rust-Test das ON DELETE CASCADE bemerken, das
+    /// Migration 7 mitbrachte.
     const TIME_SLOTS_SCHEMA: &str = "CREATE TABLE time_slots (
         date TEXT NOT NULL,
         slot INTEGER NOT NULL,
@@ -241,10 +271,28 @@ mod tests {
         PRIMARY KEY (date, slot)
     );";
 
+    const CATEGORIES_SCHEMA: &str = "CREATE TABLE categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        color TEXT NOT NULL DEFAULT '#a78bfa',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );";
+
     async fn setup() -> Pool<Sqlite> {
         let pool = SqlitePool::connect("sqlite::memory:")
             .await
             .expect("in-memory pool");
+        // sqlx setzt das ohnehin per Default auf jeder Verbindung; hier steht es
+        // ausdruecklich, weil sonst ein Fremdschluessel im Schema wirkungslos
+        // waere und der Test unten nichts beweisen wuerde.
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&pool)
+            .await
+            .expect("enable foreign keys");
+        sqlx::query(CATEGORIES_SCHEMA)
+            .execute(&pool)
+            .await
+            .expect("create categories");
         sqlx::query(TIME_SLOTS_SCHEMA)
             .execute(&pool)
             .await
@@ -311,6 +359,34 @@ mod tests {
 
         let stored = day_slots(&pool, "2026-09-03").await;
         assert_eq!(stored, vec![(36, 2, "".to_string())]);
+    }
+
+    #[tokio::test]
+    async fn deleting_a_category_keeps_its_time_bookings() {
+        let pool = setup().await;
+        sqlx::query("INSERT INTO categories (id, name, color) VALUES (1, 'Kunde', '#111111')")
+            .execute(&pool)
+            .await
+            .expect("insert category");
+
+        replace_time_day_tx(&pool, "2026-09-03", &[slot(32, 1, "Meeting"), slot(33, 1, "")])
+            .await
+            .expect("replace should succeed");
+
+        sqlx::query("DELETE FROM categories WHERE id = 1")
+            .execute(&pool)
+            .await
+            .expect("delete category");
+
+        // Die Buchungen behalten ihre jetzt ins Leere zeigende category_id; die
+        // Wochenansicht beschriftet sie mit "Geloeschte Kategorie". Mit dem
+        // ON DELETE CASCADE aus Migration 7 waeren sie hier verschwunden.
+        let stored = day_slots(&pool, "2026-09-03").await;
+        assert_eq!(
+            stored,
+            vec![(32, 1, "Meeting".to_string()), (33, 1, "".to_string())],
+            "deleting a category must not delete the time bookings that used it"
+        );
     }
 
     #[tokio::test]

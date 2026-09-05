@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { localTodoStore } from "./todoStoreLocal";
+import { localTimeStore } from "./timeStoreLocal";
 
 describe("localTodoStore", () => {
   beforeEach(() => {
@@ -50,6 +51,23 @@ describe("localTodoStore", () => {
     expect(reloaded.category_id).toBeNull();
     expect(reloaded.category_name).toBeNull();
     expect(reloaded.category_color).toBeNull();
+  });
+
+  it("keeps time bookings when their category is deleted", async () => {
+    const cat = await localTodoStore.addCategory("Kunde", "#a78bfa");
+    await localTimeStore.paintSlots("2026-09-03", [32, 33], cat.id);
+    await localTimeStore.setBlockNote("2026-09-03", 32, "Meeting");
+
+    await localTodoStore.deleteCategory(cat.id);
+
+    // Die Buchung ueberlebt mitsamt ihrer jetzt ins Leere zeigenden
+    // category_id; die Wochenansicht beschriftet sie mit "Geloeschte
+    // Kategorie". Der Desktop-Build muss das seit Migration 9 genauso tun.
+    const day = await localTimeStore.listSlots("2026-09-03");
+    expect(day).toEqual([
+      { slot: 32, category_id: cat.id, note: "Meeting" },
+      { slot: 33, category_id: cat.id, note: "Meeting" },
+    ]);
   });
 
   it("sorts categories the way German readers expect", async () => {

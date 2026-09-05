@@ -60,7 +60,15 @@ export interface TodoStore {
    * behalten) — beides als Promise-Rejection, nie als synchroner throw.
    */
   updateCategory(id: number, name: string, color: string): Promise<Category>;
-  /** Loescht die Kategorie; Todos, die sie referenzierten, verlieren sie (category_id/category_name/category_color werden null), werden aber nicht geloescht. */
+  /**
+   * Loescht die Kategorie; Todos, die sie referenzierten, verlieren sie
+   * (category_id/category_name/category_color werden null), werden aber nicht
+   * geloescht. Zeitbuchungen bleiben unangetastet: sie behalten ihre jetzt ins
+   * Leere zeigende `category_id` und werden weder geloescht noch geleert. Die
+   * Wochenansicht rechnet damit und beschriftet sie mit "Geloeschte Kategorie";
+   * eine Buchung ohne Kategorie ist im Datenmodell gar nicht darstellbar, weil
+   * `applyPaint` in timeSlots.ts `category_id === null` als "Slot leeren" liest.
+   */
   deleteCategory(id: number): Promise<number>;
 }
 
