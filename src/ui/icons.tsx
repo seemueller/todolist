@@ -216,3 +216,34 @@ export function UpdateIcon(props: IconProps) {
     </BaseIcon>
   );
 }
+
+/** Auge - Token sichtbar machen. */
+export function EyeIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" {...props}>
+      <path d="M1 7s2.2-3.5 6-3.5S13 7 13 7s-2.2 3.5-6 3.5S1 7 1 7z" />
+      <circle cx="7" cy="7" r="1.6" />
+    </BaseIcon>
+  );
+}
+
+/** Durchgestrichenes Auge - Token wieder verdecken. */
+export function EyeOffIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" {...props}>
+      <path d="M2.6 4.3C1.6 5.3 1 7 1 7s2.2 3.5 6 3.5c1 0 1.9-.25 2.7-.63" />
+      <path d="M11.7 9C12.6 8.1 13 7 13 7s-2.2-3.5-6-3.5c-.5 0-.97.06-1.4.17" />
+      <path d="M2 2l10 10" />
+    </BaseIcon>
+  );
+}
+
+/** Zwei Blaetter - in die Zwischenablage kopieren. */
+export function CopyIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" {...props}>
+      <rect x="5" y="5" width="7.5" height="7.5" rx="1.2" />
+      <path d="M9 2.5a1 1 0 00-1-1H2.5a1 1 0 00-1 1V8a1 1 0 001 1" />
+    </BaseIcon>
+  );
+}

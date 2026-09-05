@@ -809,7 +809,8 @@ a:hover {
 }
 
 .changelog-btn,
-.debug-btn {
+.debug-btn,
+.mcp-btn {
   padding: 0 0 2px;
   border: none;
   border-bottom: var(--border-thin);
@@ -825,7 +826,8 @@ a:hover {
 }
 
 .changelog-btn:hover,
-.debug-btn:hover {
+.debug-btn:hover,
+.mcp-btn:hover {
   background: var(--highlight);
 }
 
@@ -2120,4 +2122,80 @@ a:hover {
   text-align: center;
   color: var(--ink-faint);
   font-size: 13px;
+}
+
+/* MCP-Server ────────────────────────────────────────────────────────────────
+   Der Abschnitt liegt im Popup, wie die Einstellungen der Zeiterfassung auch.
+   Aufbau und Abstaende folgen .time-settings; Token und Client-Zeile stehen in
+   Monospace wie im Debug-Panel, damit man beim Vergleichen nicht verrutscht. */
+.mcp-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.mcp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Die Client-Zeile ist laenger als das Popup breit ist und bricht darum um. */
+.mcp-row-command {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.mcp-label {
+  min-width: 62px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mcp-state {
+  padding: 6px 12px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.mcp-state.running {
+  background: var(--success);
+}
+
+.mcp-secret,
+.mcp-command {
+  padding: 6px 10px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+/* Die Zeile bekommt eine eigene Zeile, die Knoepfe stehen darunter. */
+.mcp-command {
+  flex: 1 1 100%;
+}
+
+.mcp-copied {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.mcp-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-wrap: pretty;
 }

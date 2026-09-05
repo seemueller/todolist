@@ -22,6 +22,7 @@ import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { DebugLogPanel } from "./DebugLogPanel";
+import { McpSettings } from "./McpSettings";
 import { TimeTrackingView } from "./TimeTrackingView";
 
 /** Die drei Ansichten der App. */
@@ -156,6 +157,7 @@ function App({ migrationError = null }: AppProps) {
 
   // Debug log panel (Ctrl+Shift+L)
   const [showDebug, setShowDebug] = useState(false);
+  const [showMcp, setShowMcp] = useState(false);
   const closeDebug = useCallback(() => setShowDebug(false), []);
 
   async function refresh() {
@@ -225,6 +227,7 @@ function App({ migrationError = null }: AppProps) {
   }, []);
 
   const closeChangelog = useCallback(() => setShowChangelog(false), []);
+  const closeMcp = useCallback(() => setShowMcp(false), []);
 
   useEffect(() => {
     if (!checkUpdate) return;
@@ -878,6 +881,14 @@ function App({ migrationError = null }: AppProps) {
           </button>
           <button
             type="button"
+            className="mcp-btn"
+            onClick={() => setShowMcp(true)}
+            aria-label="MCP-Server"
+          >
+            MCP
+          </button>
+          <button
+            type="button"
             className="changelog-btn"
             onClick={() => setShowChangelog(true)}
           >
@@ -885,6 +896,13 @@ function App({ migrationError = null }: AppProps) {
           </button>
         </footer>
       </main>
+
+      {/* MCP-Server: Status, Token und die Zeile fuer den Client */}
+      {showMcp && (
+        <Modal variant="category" title="MCP-Server" onClose={closeMcp} closeLabel="Schließen">
+          <McpSettings />
+        </Modal>
+      )}
 
       {/* Changelog Modal */}
       {showChangelog && (

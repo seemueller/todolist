@@ -88,6 +88,51 @@ async fn replace_time_day(
 /// MCP-Server abraeumen kann.
 struct McpCancel(tokio_util::sync::CancellationToken);
 
+/// Was die Oberflaeche ueber den MCP-Server erfahren darf.
+///
+/// Der Token steht hier, weil das eigene Frontend die einzige Stelle ist, die
+/// ihn anzeigen darf: ohne ihn kaeme kein Client herein, und niemand soll dafuer
+/// die Datenbank mit `sqlite3` oeffnen muessen. In eine Log-Zeile gehoert er
+/// nicht, darum taucht er in keinem `eprintln!` dieser Datei auf.
+#[derive(Clone, Serialize)]
+struct McpStatus {
+    running: bool,
+    port: u16,
+    token: String,
+}
+
+impl Default for McpStatus {
+    fn default() -> Self {
+        Self {
+            running: false,
+            port: mcp::PORT,
+            token: String::new(),
+        }
+    }
+}
+
+/// Tauri-State: `start_mcp` schreibt, `mcp_status` liest.
+#[derive(Default)]
+struct McpState(std::sync::Mutex<McpStatus>);
+
+impl McpState {
+    /// Ein vergifteter Mutex darf den Status nicht unlesbar machen -- hier wird
+    /// nur ein Wert im Ganzen ersetzt, einen halb geschriebenen Zustand gibt es
+    /// nicht.
+    fn set(&self, status: McpStatus) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = status;
+    }
+
+    fn get(&self) -> McpStatus {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+}
+
+#[tauri::command]
+fn mcp_status(app: tauri::AppHandle) -> McpStatus {
+    app.state::<McpState>().get()
+}
+
 /// `DbInstances` ist leer, bis das Frontend `Database.load` mindestens einmal
 /// gerufen hat -- im `setup`-Hook ist das noch nicht passiert. Darum warten
 /// statt annehmen: alle 100 ms nachsehen, hoechstens 300 Mal, also 30 Sekunden.
@@ -134,7 +179,21 @@ async fn start_mcp(app: tauri::AppHandle, cancel: tokio_util::sync::Cancellation
     // Schreiben ueber MCP geht darueber `todolist:data-changed` hinaus.
     let notifier: std::sync::Arc<dyn mcp::Notifier> = std::sync::Arc::new(app.clone());
 
-    if let Err(e) = mcp::serve(pool, notifier, token, cancel).await {
+    // Ab hier gilt der Server als laufend. Scheitert das Binden -- besetzter
+    // Port --, kommt `serve` binnen Millisekunden mit einem Fehler zurueck und
+    // der Status faellt zurueck, lange bevor jemand das Popup oeffnet.
+    app.state::<McpState>().set(McpStatus {
+        running: true,
+        port: mcp::PORT,
+        token: token.clone(),
+    });
+
+    let result = mcp::serve(pool, notifier, token, cancel).await;
+
+    // Steht der Server nicht mehr, gibt es auch keinen Token mehr zu zeigen.
+    app.state::<McpState>().set(McpStatus::default());
+
+    if let Err(e) = result {
         eprintln!("MCP: server on port {} stopped: {e}", mcp::PORT);
     }
 }
@@ -307,11 +366,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             check_for_update,
             install_update,
+            mcp_status,
             replace_time_day
         ])
         .setup(|app| {
             let cancel = tokio_util::sync::CancellationToken::new();
             app.manage(McpCancel(cancel.clone()));
+            app.manage(McpState::default());
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(start_mcp(handle, cancel));
             Ok(())
@@ -389,6 +450,34 @@ mod tests {
             category_id,
             note: note.to_string(),
         }
+    }
+
+    #[test]
+    fn the_status_starts_out_not_running_and_without_a_token() {
+        let state = McpState::default();
+        let status = state.get();
+        assert!(!status.running);
+        assert_eq!(status.port, mcp::PORT);
+        assert!(status.token.is_empty(), "no token before the server is up");
+    }
+
+    #[test]
+    fn a_stopped_server_takes_its_token_out_of_the_status() {
+        let state = McpState::default();
+        state.set(McpStatus {
+            running: true,
+            port: mcp::PORT,
+            token: "a-token".to_string(),
+        });
+        assert!(state.get().running);
+
+        state.set(McpStatus::default());
+        let status = state.get();
+        assert!(!status.running);
+        assert!(
+            status.token.is_empty(),
+            "a stopped server must not keep handing out a token"
+        );
     }
 
     #[tokio::test]
