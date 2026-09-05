@@ -4,6 +4,11 @@ Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokume
 
 ## [Unreleased]
 
+### Hinzugefügt
+- Die App spricht MCP: Solange sie läuft, kann ein KI-Assistent wie Claude die Aufgabenliste lesen und pflegen — Aufgaben suchen, anlegen, ändern, abhaken und löschen, die Kategorien nachschlagen, die Zeitbuchungen einer Woche abfragen und Arbeitszeit in Viertelstunden buchen. Kategorien werden dabei nur benutzt, nicht angelegt oder verändert.
+- Der Zugang läuft ausschließlich über den eigenen Rechner (`http://127.0.0.1:4319/mcp`) und ist durch einen Token geschützt, den die App beim ersten Start erzeugt. Er steht im Einstellungs-Popup zum Kopieren; ohne ihn kommt keine Anfrage durch.
+- Was der Assistent ändert, erscheint sofort im offenen Fenster — in der Liste, im Brett und in der Wochenansicht, ohne Neustart.
+
 ### Geändert
 - Todos, Kategorien und Zeitbuchungen liegen jetzt in SQLite statt im `localStorage` des Webviews. Vorhandene Daten werden beim ersten Start nach dem Update einmalig übernommen; die alten `localStorage`-Einträge bleiben als Sicherheitsnetz liegen. Im Browser (Vite-Dev, E2E-Tests) bleibt `localStorage` in Gebrauch.
 - Ein Arbeitstag in der Zeiterfassung wird über ein Tauri-Command in einer echten Transaktion ersetzt. Bricht das Schreiben mittendrin ab, bleibt der Tag unverändert, statt halb gelöscht zurückzubleiben.

@@ -87,6 +87,55 @@ Drei Fallen, in die dieses Projekt schon getreten ist:
   Transaktion. Wo Atomarität nötig ist, gehört die Operation als Tauri-Command nach
   `src-tauri/src/lib.rs` — siehe `replace_time_day`.
 
+## MCP-Server
+
+Solange die Desktop-App läuft, bietet sie ihre Daten zusätzlich über MCP an:
+Streamable HTTP unter `http://127.0.0.1:4319/mcp`, nur auf dem Loopback-Interface,
+Port fest verdrahtet. Der Code liegt unter `src-tauri/src/mcp/`: `mod.rs` (Server
+und `Notifier`), `auth.rs` (Token), `store.rs` (alle Datenbankzugriffe),
+`tools.rs` (die Tools), `slots.rs` (Uhrzeit ↔ Viertelstunde).
+
+Sieben Tools, mehr gibt es nicht: `list_todos`, `add_todo`, `update_todo`,
+`delete_todo`, `list_categories`, `get_week_time`, `book_time`. Kategorien werden
+über ihren **Namen** angesprochen, nicht über die Id, und ein unbekannter Name ist
+ein Fehler — über MCP lassen sich bewusst keine Kategorien anlegen, umbenennen
+oder löschen.
+
+**Der Token steht in der Datenbank**, in `app_settings` unter dem Schlüssel
+`mcp_token`, und entsteht beim ersten Start (32 Zufallsbytes, base64url). Die
+Oberfläche zeigt ihn im Einstellungs-Popup. Jede Anfrage braucht
+`Authorization: Bearer <token>`; alles andere bekommt ein nacktes `401` ohne Body.
+Der Token gehört in keine Log-Zeile und in keine Fehlermeldung.
+
+Zwei Regeln, an denen dieser Server hängt:
+
+- **Ein Tool-Rumpf darf nicht panicken.** Eine Panik im Tool beantwortet die
+  Anfrage überhaupt nicht — der Aufrufer sieht keinen Fehler, sondern hängt bis in
+  seinen Timeout. Das ist der schlechteste aller Ausgänge und deutlich schlimmer
+  als ein hässlicher Fehlertext. Also kein `unwrap`, kein `expect`, keine
+  Index-Zugriffe und keine Arithmetik, die überlaufen kann, auf Werten, die aus
+  den Parametern stammen. Jeder Fehlerfall wird zu einem Wert, den `respond` bzw.
+  `tool_error` in eine Antwort verwandelt.
+- **Die Fehlerart entscheidet, ob der Aufrufer die Meldung je zu sehen bekommt.**
+  Ein `CallToolResult` mit `isError` (aus `tool_error`) transportiert den Text bis
+  ins Modell und ist damit die einzige Form, aus der ein Aufrufer lernen kann, was
+  er falsch gemacht hat. Ein `McpError` ist ein Protokollfehler; er landet im
+  Transport und wird von Clients oft nur als Fehlschlag angezeigt. Alles, was der
+  Aufrufer selbst beheben kann — unbekannte Kategorie, krumme Uhrzeit, kaputtes
+  Datum, leerer Titel —, ist deshalb ein Tool-Fehler, und die Meldung nennt, was
+  stattdessen erlaubt gewesen wäre (bei Kategorien die vorhandenen Namen).
+
+Schreibende Tools melden der offenen Oberfläche über `Notifier::data_changed` das
+Event `todolist:data-changed`; `src/events.ts` hört darauf und lädt die Ansicht
+neu. **Der Name muss auf beiden Seiten gleich lauten** — läuft er auseinander,
+bleibt alles grün, und die Oberfläche zeigt trotzdem veraltete Daten, bis jemand
+die App neu startet.
+
+Die Tests unter `src-tauri/src/mcp/` laufen gegen einen In-Memory-Pool und einen
+zählenden `Notifier`-Stub. Was sie nicht abdecken, ist der echte `emit` und der
+echte Transport; beides wird von Hand geprüft, indem man die App startet, den
+Token aus `app_settings` liest und die Tools über HTTP aufruft.
+
 ## Adding Tests
 
 When adding or modifying functionality, include corresponding tests:
