@@ -16,6 +16,8 @@
 // Wird erst von den Tools in Task 3 benutzt.
 #![allow(dead_code)]
 
+use super::echo::quoted;
+
 /// Minuten je Slot; `SLOT_MINUTES` in `src/timeSlots.ts`.
 pub const SLOT_MINUTES: i64 = 15;
 /// Slots je Stunde; `SLOTS_PER_HOUR` in `src/timeSlots.ts`.
@@ -56,16 +58,22 @@ fn quarter_minutes() -> String {
 /// vollen Viertelstunde.
 pub fn parse_slot(time: &str) -> Result<i64, String> {
     let Some((hours, minutes)) = time.split_once(':') else {
-        return Err(format!("\"{time}\" ist keine Uhrzeit im Format HH:MM"));
+        return Err(format!(
+            "{} ist keine Uhrzeit im Format HH:MM",
+            quoted(time)
+        ));
     };
     let (Some(hour), Some(minute)) = (two_digits(hours), two_digits(minutes)) else {
-        return Err(format!("\"{time}\" ist keine Uhrzeit im Format HH:MM"));
+        return Err(format!(
+            "{} ist keine Uhrzeit im Format HH:MM",
+            quoted(time)
+        ));
     };
     if hour > 23 {
-        return Err(format!("{time} liegt nicht innerhalb eines Tages"));
+        return Err(format!("{} liegt nicht innerhalb eines Tages", quoted(time)));
     }
     if minute > 59 {
-        return Err(format!("{time} hat keine gueltige Minute"));
+        return Err(format!("{} hat keine gueltige Minute", quoted(time)));
     }
     if minute % SLOT_MINUTES != 0 {
         // Die vier Minuten stehen zwar in der Feldbeschreibung -- aber diese
@@ -74,7 +82,8 @@ pub fn parse_slot(time: &str) -> Result<i64, String> {
         // Unterschied zwischen einem naechsten Versuch und einer Schleife aus
         // geratenen Uhrzeiten.
         return Err(format!(
-            "{time} liegt nicht auf einer Viertelstunde; die Minute muss {} sein.",
+            "{} liegt nicht auf einer Viertelstunde; die Minute muss {} sein.",
+            quoted(time),
             quarter_minutes()
         ));
     }
@@ -157,5 +166,21 @@ mod tests {
         for slot in 0..SLOTS_PER_DAY {
             assert_eq!(parse_slot(&slot_label(slot)), Ok(slot));
         }
+    }
+
+    /// Die Uhrzeit kommt als freier String vom Modell und wird in jeder Absage
+    /// zitiert. Ein megabytelanges "from" darf daraus keine megabytelange
+    /// Meldung machen -- die vier Minuten muss sie trotzdem noch nennen.
+    #[test]
+    fn an_over_long_time_is_shortened_but_still_explained() {
+        let message = parse_slot(&"1".repeat(200_000)).expect_err("not a time");
+
+        assert!(
+            message.chars().count() < 400,
+            "got {} chars",
+            message.chars().count()
+        );
+        assert!(message.contains("gekuerzt"), "got: {message}");
+        assert!(message.contains("HH:MM"), "got: {message}");
     }
 }

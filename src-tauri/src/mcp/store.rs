@@ -27,6 +27,7 @@ use serde::Serialize;
 use sqlx::{Pool, Sqlite};
 use unicode_normalization::UnicodeNormalization;
 
+use super::echo::quoted;
 use super::slots::{SLOT_MINUTES, SLOTS_PER_DAY, slot_label};
 
 /// Die beiden Fehlerarten, die Task 3 unterschiedlich beantwortet.
@@ -210,7 +211,8 @@ fn check_status(status: &str) -> Result<(), StoreError> {
         return Ok(());
     }
     bad_request(format!(
-        "\"{status}\" ist kein Status; erlaubt sind {}.",
+        "{} ist kein Status; erlaubt sind {}.",
+        quoted(status),
         STATUSES.join(", ")
     ))
 }
@@ -220,7 +222,8 @@ fn check_priority(priority: &str) -> Result<(), StoreError> {
         return Ok(());
     }
     bad_request(format!(
-        "\"{priority}\" ist keine Prioritaet; erlaubt sind {}.",
+        "{} ist keine Prioritaet; erlaubt sind {}.",
+        quoted(priority),
         PRIORITIES.join(", ")
     ))
 }
@@ -242,8 +245,12 @@ fn days_in_month(year: i64, month: i64) -> i64 {
 /// Buchung ist schlimmer als eine Absage.
 fn check_date(date: &str) -> Result<String, StoreError> {
     let trimmed = date.trim();
-    let malformed =
-        || StoreError::Request(format!("\"{date}\" ist kein Datum im Format YYYY-MM-DD."));
+    let malformed = || {
+        StoreError::Request(format!(
+            "{} ist kein Datum im Format YYYY-MM-DD.",
+            quoted(date)
+        ))
+    };
     let parts: Vec<&str> = trimmed.split('-').collect();
     let [year, month, day] = parts.as_slice() else {
         return Err(malformed());
@@ -262,7 +269,7 @@ fn check_date(date: &str) -> Result<String, StoreError> {
         return Err(malformed());
     };
     if !(1..=12).contains(&month) || day < 1 || day > days_in_month(year, month) {
-        return bad_request(format!("Den Tag \"{date}\" gibt es nicht."));
+        return bad_request(format!("Den Tag {} gibt es nicht.", quoted(date)));
     }
     Ok(trimmed.to_string())
 }
@@ -384,8 +391,8 @@ pub async fn resolve_category(pool: &Pool<Sqlite>, name: &str) -> Result<Categor
         format!("Vorhanden sind: {}.", known.join(", "))
     };
     bad_request(format!(
-        "Es gibt keine Kategorie \"{}\". {hint}",
-        name.trim()
+        "Es gibt keine Kategorie {}. {hint}",
+        quoted(name.trim())
     ))
 }
 
@@ -1644,6 +1651,54 @@ mod tests {
             message.contains("Intern"),
             "the message should list what does exist: {message}"
         );
+    }
+
+    // --- Zitierte Werte in Absagen -------------------------------------------
+
+    /// Der Anfragerumpf darf megabytegross sein, und jede dieser Absagen gibt
+    /// den abgelehnten Wert zurueck. Ungekappt landete er in voller Laenge im
+    /// Kontextfenster des Modells -- brauchbar bleibt die Meldung aber nur,
+    /// wenn sie trotz Kappung sagt, um welches Feld es geht und was gegolten
+    /// haette.
+    #[tokio::test]
+    async fn an_over_long_value_is_shortened_but_the_message_stays_useful() {
+        let huge = "9".repeat(200_000);
+
+        let status = check_status(&huge).expect_err("not a status");
+        let message = status.to_string();
+        assert!(message.chars().count() < 400, "got {} chars", message.chars().count());
+        assert!(message.contains("gekuerzt"), "got: {message}");
+        assert!(message.contains("kein Status"), "got: {message}");
+        assert!(message.contains("in_progress"), "got: {message}");
+
+        let priority = check_priority(&huge).expect_err("not a priority");
+        let message = priority.to_string();
+        assert!(message.chars().count() < 400);
+        assert!(message.contains("gekuerzt"), "got: {message}");
+        assert!(message.contains("medium"), "got: {message}");
+
+        let date = check_date(&huge).expect_err("not a date");
+        let message = date.to_string();
+        assert!(message.chars().count() < 400);
+        assert!(message.contains("gekuerzt"), "got: {message}");
+        assert!(message.contains("YYYY-MM-DD"), "got: {message}");
+    }
+
+    /// Dieselbe Regel fuer den Kategorienamen -- die Stelle, an der die
+    /// Ueberlegung ihren Anfang genommen hat.
+    #[tokio::test]
+    async fn an_over_long_category_name_is_shortened_in_the_rejection() {
+        let pool = setup().await;
+        category(&pool, "Intern").await;
+
+        let error = resolve_category(&pool, &"z".repeat(200_000))
+            .await
+            .expect_err("unknown category");
+        let message = error.to_string();
+
+        assert!(message.chars().count() < 400, "got {} chars", message.chars().count());
+        assert!(message.contains("gekuerzt"), "got: {message}");
+        assert!(message.contains("Intern"), "got: {message}");
     }
 
     // --- Fehlerarten --------------------------------------------------------

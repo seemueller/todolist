@@ -99,9 +99,12 @@ impl TodoServer {
 const MAX_TITLE_CHARS: usize = 500;
 /// Eine Notiz an einer Zeitbuchung darf ein Absatz sein, keine Akte.
 const MAX_NOTE_CHARS: usize = 2000;
-/// Ein Kategoriename ist ein Wort oder zwei. Die Grenze haelt ausserdem die
-/// Absage klein: `resolve_category` gibt den unbekannten Namen zurueck, ein
-/// megabytegrosser Name ergaebe sonst eine megabytegrosse Fehlermeldung.
+/// Ein Kategoriename ist ein Wort oder zwei.
+///
+/// Dass `resolve_category` den unbekannten Namen zurueckgibt, ist hier kein
+/// Argument mehr: gekappt wird beim Zitieren (`echo::quoted`), fuer jedes Feld
+/// nach derselben Regel. `MAX_ECHO_CHARS` liegt bewusst oberhalb dieser Grenze,
+/// damit ein zulaessiger Name vollstaendig in der Absage steht.
 const MAX_CATEGORY_CHARS: usize = 100;
 
 /// Prueft ein Textfeld auf Laenge und Steuerzeichen.
