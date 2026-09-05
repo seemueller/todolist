@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.8.0";
+export const APP_VERSION = "0.8.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.8.1",
+    date: "2026-09-05",
+    changes: [
+      "Startabbruch mit „migration 1 was previously applied but has been modified“ behoben — die Zeilenenden des Quelltexts konnten die Prüfsummen der Datenbank-Migrationen verändern",
+    ],
+  },
   {
     version: "0.8.0",
     date: "2026-09-05",

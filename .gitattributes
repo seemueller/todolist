@@ -1,0 +1,25 @@
+# Zeilenenden festnageln.
+#
+# Die SQL der Migrationen in src-tauri/src/lib.rs sind mehrzeilige Rust-Strings,
+# und sqlx bildet die Pruefsumme jeder Migration ueber genau deren Bytes. Wird
+# die Datei mit CRLF ausgecheckt -- was `core.autocrlf=true` auf Windows und in
+# vielen CI-Umgebungen von sich aus tut --, aendert sich jede dieser Pruefsummen.
+# Die App startet dann mit
+#
+#     migration 1 was previously applied but has been modified
+#
+# und zwar ohne dass jemand die Migration angefasst haette. Derselbe Commit
+# ergibt so je nach Auscheck-Einstellung einen anderen Build.
+#
+# Deshalb: im Arbeitsverzeichnis ueberall LF, unabhaengig von der lokalen
+# Konfiguration. Wer das aendert, aendert die Datenbank-Kompatibilitaet.
+* text=auto eol=lf
+
+# Binaerdateien nie anfassen.
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.woff binary
+*.woff2 binary
+*.db binary
