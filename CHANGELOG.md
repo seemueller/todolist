@@ -2,6 +2,18 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unreleased]
+
+### Geändert
+- Todos, Kategorien und Zeitbuchungen liegen jetzt in SQLite statt im `localStorage` des Webviews. Vorhandene Daten werden beim ersten Start nach dem Update einmalig übernommen; die alten `localStorage`-Einträge bleiben als Sicherheitsnetz liegen. Im Browser (Vite-Dev, E2E-Tests) bleibt `localStorage` in Gebrauch.
+- Ein Arbeitstag in der Zeiterfassung wird über ein Tauri-Command in einer echten Transaktion ersetzt. Bricht das Schreiben mittendrin ab, bleibt der Tag unverändert, statt halb gelöscht zurückzubleiben.
+- Kategorien werden im Desktop-Build und im Browser gleich sortiert. Bisher ordnete WebKit sie anders, weil es Groß- und Kleinschreibung stärker gewichtet als Chromium.
+
+### Behoben
+- Beim Löschen einer Kategorie behielten die betroffenen Aufgaben deren Namen und Farbe. Sie verlieren die Kategorie jetzt vollständig.
+- Kategorienamen, die sich nur in der Groß- und Kleinschreibung unterscheiden, lassen sich nicht mehr doppelt anlegen — Umlaute eingeschlossen.
+- Schlägt die einmalige Datenübernahme fehl, sagt die App das jetzt, statt leer zu wirken. Die Daten bleiben unverändert erhalten, der nächste Start versucht es erneut.
+
 ## [0.7.0] - 2026-09-03
 - Neue Ansicht „Zeit“: Arbeitszeit auf 15 Minuten genau buchen, indem man Viertelstunden in einem Wochenraster anklickt oder überstreicht
 - Wochenraster Montag bis Freitag von 6 bis 22 Uhr, Samstag und Sonntag zuschaltbar; gebucht wird auf die bestehenden Kategorien
