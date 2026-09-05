@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod slots;
 pub mod store;
+pub mod tools;
 
 use std::sync::Arc;
 
@@ -8,7 +9,7 @@ use rmcp::{
     ServerHandler,
     handler::server::router::tool::ToolRouter,
     model::{ServerCapabilities, ServerInfo},
-    tool_handler, tool_router,
+    tool_handler,
     transport::streamable_http_server::{
         StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
     },
@@ -19,12 +20,13 @@ use tokio_util::sync::CancellationToken;
 /// Fest verdrahtet; ein konfigurierbarer Port ist ausdruecklich nicht vorgesehen.
 pub const PORT: u16 = 4319;
 
-/// Haelt den Pool, ueber den die Tools spaeter lesen und schreiben. Noch ohne
-/// Tools -- die kommen in Task 3 dazu.
+/// Haelt den Pool, ueber den die Tools lesen und schreiben.
+///
+/// Die Tools selbst stehen in `tools.rs`; von dort kommt auch der
+/// `#[tool_router]`-Block, der `Self::tool_router()` erzeugt.
 #[derive(Clone)]
 pub struct TodoServer {
-    #[allow(dead_code)]
-    pool: Pool<Sqlite>,
+    pub(crate) pool: Pool<Sqlite>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -36,9 +38,6 @@ impl TodoServer {
         }
     }
 }
-
-#[tool_router]
-impl TodoServer {}
 
 // Ohne `#[tool_handler]` kompiliert alles, und `tools/list` kommt leer zurueck.
 #[tool_handler(router = self.tool_router)]
