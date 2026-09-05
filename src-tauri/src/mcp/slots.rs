@@ -32,6 +32,23 @@ fn two_digits(part: &str) -> Option<i64> {
     part.parse::<i64>().ok()
 }
 
+/// Die erlaubten Minuten als "00, 15, 30 oder 45".
+///
+/// Abgeleitet aus `SLOT_MINUTES` statt hingeschrieben, damit Meldung und
+/// Rechnung nicht auseinanderlaufen koennen.
+fn quarter_minutes() -> String {
+    let mut minutes: Vec<String> = Vec::new();
+    let mut minute = 0;
+    while minute < 60 {
+        minutes.push(format!("{minute:02}"));
+        minute += SLOT_MINUTES;
+    }
+    match minutes.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} oder {last}", rest.join(", ")),
+        _ => minutes.join(", "),
+    }
+}
+
 /// Slot-Index fuer eine Uhrzeit `HH:MM`.
 ///
 /// Akzeptiert ausschliesslich zwei zweistellige, durch genau einen Doppelpunkt
@@ -51,7 +68,15 @@ pub fn parse_slot(time: &str) -> Result<i64, String> {
         return Err(format!("{time} hat keine gueltige Minute"));
     }
     if minute % SLOT_MINUTES != 0 {
-        return Err(format!("{time} liegt nicht auf einer Viertelstunde"));
+        // Die vier Minuten stehen zwar in der Feldbeschreibung -- aber diese
+        // Meldung ist genau das, was der Aufrufer sieht, wenn ihm die
+        // Beschreibung nicht geholfen hat. Sie hier zu wiederholen ist der
+        // Unterschied zwischen einem naechsten Versuch und einer Schleife aus
+        // geratenen Uhrzeiten.
+        return Err(format!(
+            "{time} liegt nicht auf einer Viertelstunde; die Minute muss {} sein.",
+            quarter_minutes()
+        ));
     }
     Ok(hour * SLOTS_PER_HOUR + minute / SLOT_MINUTES)
 }
@@ -85,6 +110,20 @@ mod tests {
     #[test]
     fn rejects_times_that_are_not_on_a_quarter_hour() {
         assert!(parse_slot("09:07").is_err());
+    }
+
+    /// Die Absage ist das, was der Aufrufer sieht, wenn die Feldbeschreibung
+    /// ihm nicht geholfen hat. Sie muss die vier Minuten nennen, sonst
+    /// probiert er es mit der naechsten geratenen Uhrzeit noch einmal.
+    #[test]
+    fn the_quarter_hour_error_names_the_four_valid_minutes() {
+        let message = parse_slot("09:07").expect_err("09:07 is not a quarter hour");
+        for minute in ["00", "15", "30", "45"] {
+            assert!(
+                message.contains(minute),
+                "the message should name {minute}, got: {message}"
+            );
+        }
     }
 
     #[test]

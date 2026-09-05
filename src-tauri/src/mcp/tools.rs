@@ -329,7 +329,7 @@ impl TodoServer {
         self.respond_write(
             store::add_todo(
                 &self.pool,
-                &params.title,
+                params.title.trim(),
                 non_empty(&params.priority),
                 non_empty(&params.due_date),
                 non_empty(&params.category),
@@ -355,7 +355,7 @@ impl TodoServer {
             return Ok(tool_error(message));
         }
         let update = TodoUpdate {
-            title: params.title.clone(),
+            title: params.title.as_deref().map(str::trim).map(str::to_string),
             status: non_empty(&params.status).map(str::to_string),
             priority: non_empty(&params.priority).map(str::to_string),
             due_date: clearable(&params.due_date),
@@ -391,7 +391,7 @@ impl TodoServer {
         &self,
         Parameters(params): Parameters<GetWeekTime>,
     ) -> Result<CallToolResult, McpError> {
-        respond(store::week_time(&self.pool, &params.date).await)
+        respond(store::week_time(&self.pool, params.date.trim()).await)
     }
 
     #[tool(
@@ -406,11 +406,11 @@ impl TodoServer {
         if let Err(message) = checked {
             return Ok(tool_error(message));
         }
-        let from_slot = match parse_slot(&params.from) {
+        let from_slot = match parse_slot(params.from.trim()) {
             Ok(slot) => slot,
             Err(message) => return Ok(tool_error(message)),
         };
-        let to_slot = match parse_slot(&params.to) {
+        let to_slot = match parse_slot(params.to.trim()) {
             Ok(slot) => slot,
             // "24:00" ist als Ende zulaessig, als Uhrzeit aber keine gueltige
             // Eingabe fuer `parse_slot` -- der Sonderfall gehoert hierher, nicht
@@ -421,10 +421,10 @@ impl TodoServer {
         self.respond_write(
             store::book_time(
                 &self.pool,
-                &params.date,
+                params.date.trim(),
                 from_slot,
                 to_slot,
-                &params.category,
+                params.category.trim(),
                 non_empty(&params.note),
             )
             .await,
@@ -1184,6 +1184,61 @@ mod tests {
                 }
             }
         }
+    }
+
+    // --- Getrimmte Eingaben -------------------------------------------------
+
+    /// Ein Datum mit Leerraum drumherum wurde bisher angenommen, eine Uhrzeit
+    /// nicht. Beides geht denselben Weg, also gilt dieselbe Regel.
+    #[tokio::test]
+    async fn book_time_trims_its_string_fields() {
+        let (server, pool) = server().await;
+        category(&pool, "Kundenprojekt").await;
+
+        let result = server
+            .book_time(Parameters(super::BookTime {
+                date: " 2026-09-07 ".to_string(),
+                from: " 09:00 ".to_string(),
+                to: " 10:00 ".to_string(),
+                category: " Kundenprojekt ".to_string(),
+                note: None,
+            }))
+            .await
+            .expect("no protocol error");
+        let json = ok_json(&result);
+        assert_eq!(json["from"], "09:00");
+        assert_eq!(json["to"], "10:00");
+        assert_eq!(json["slot_count"], 4);
+    }
+
+    #[tokio::test]
+    async fn book_time_still_refuses_a_time_that_is_not_a_quarter_hour() {
+        let (server, pool) = server().await;
+        category(&pool, "Kundenprojekt").await;
+
+        let result = server
+            .book_time(Parameters(super::BookTime {
+                date: "2026-09-07".to_string(),
+                from: " 09:07 ".to_string(),
+                to: "10:00".to_string(),
+                category: "Kundenprojekt".to_string(),
+                note: None,
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&result, "Viertelstunde");
+    }
+
+    #[tokio::test]
+    async fn get_week_time_trims_its_date() {
+        let (server, _pool) = server().await;
+        let result = server
+            .get_week_time(Parameters(super::GetWeekTime {
+                date: " 2026-09-07 ".to_string(),
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["monday"], "2026-09-07");
     }
 
     // --- Grenzen fuer freien Text -------------------------------------------
