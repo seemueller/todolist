@@ -1,4 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { DragEvent, FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
   addTodo,
@@ -16,6 +17,7 @@ import {
   updateTodoTitle,
 } from "./db";
 import { installDebugInterceptor } from "./debug";
+import { DATA_CHANGED_EVENT } from "./events";
 import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
@@ -181,6 +183,30 @@ function App({ migrationError = null }: AppProps) {
 
   useEffect(() => {
     refresh();
+  }, []);
+
+  // Der MCP-Server schreibt am Frontend vorbei in dieselbe Datenbank. Ohne
+  // dieses Ereignis sieht die offene App eine ueber Claude angelegte Aufgabe
+  // erst nach einem Neustart.
+  //
+  // `listen` gibt sein Abmelden erst spaeter zurueck. Faellt die Komponente
+  // vorher weg -- unter React.StrictMode passiert genau das bei jedem Mount --,
+  // muss das eintreffende Abmelden sofort gerufen werden, sonst bleibt ein
+  // Zuhoerer haengen und jedes Ereignis laedt doppelt nach.
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: UnlistenFn | null = null;
+    let dropped = false;
+    listen(DATA_CHANGED_EVENT, () => {
+      refresh();
+    }).then((stop) => {
+      if (dropped) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      dropped = true;
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {

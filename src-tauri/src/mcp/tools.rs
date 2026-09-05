@@ -63,6 +63,25 @@ fn respond<T: Serialize>(result: Result<T, StoreError>) -> Result<CallToolResult
     }
 }
 
+impl TodoServer {
+    /// Wie `respond`, sagt der Oberflaeche vorher aber, dass sie neu laden
+    /// soll. Genau die vier schreibenden Tools nehmen diesen Weg.
+    ///
+    /// Gemeldet wird ausschliesslich bei `Ok`: ein Tool-Fehler ("keine
+    /// Kategorie dieses Namens") und ein Datenbankfehler haben nichts
+    /// geschrieben, und ein Nachladen, dem kein Schreiben vorausging, waere
+    /// eine Falschaussage ueber den Zustand.
+    fn respond_write<T: Serialize>(
+        &self,
+        result: Result<T, StoreError>,
+    ) -> Result<CallToolResult, McpError> {
+        if result.is_ok() {
+            self.notifier.data_changed();
+        }
+        respond(result)
+    }
+}
+
 /// `None` fuer einen Parameter, der leer oder nur Leerraum ist.
 ///
 /// Ein Modell schickt fuer "nicht gesetzt" gerne `""` statt das Feld wegzulassen;
@@ -235,7 +254,7 @@ impl TodoServer {
         &self,
         Parameters(params): Parameters<AddTodo>,
     ) -> Result<CallToolResult, McpError> {
-        respond(
+        self.respond_write(
             store::add_todo(
                 &self.pool,
                 &params.title,
@@ -261,7 +280,7 @@ impl TodoServer {
             due_date: clearable(&params.due_date),
             category: clearable(&params.category),
         };
-        respond(store::update_todo(&self.pool, params.id, update).await)
+        self.respond_write(store::update_todo(&self.pool, params.id, update).await)
     }
 
     #[tool(
@@ -271,7 +290,7 @@ impl TodoServer {
         &self,
         Parameters(params): Parameters<DeleteTodo>,
     ) -> Result<CallToolResult, McpError> {
-        respond(store::delete_todo(&self.pool, params.id).await)
+        self.respond_write(store::delete_todo(&self.pool, params.id).await)
     }
 
     #[tool(
@@ -313,7 +332,7 @@ impl TodoServer {
             Err(_) if params.to.trim() == "24:00" => super::slots::SLOTS_PER_DAY,
             Err(message) => return Ok(tool_error(message)),
         };
-        respond(
+        self.respond_write(
             store::book_time(
                 &self.pool,
                 &params.date,
@@ -334,6 +353,8 @@ mod tests {
     use rmcp::model::CallToolResult;
     use serde_json::Value;
     use sqlx::{Pool, Sqlite, SqlitePool};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// Dasselbe Schema wie in `store.rs` -- das echte nach Migration 9.
     const SCHEMA: &[&str] = &[
@@ -385,9 +406,35 @@ mod tests {
         pool
     }
 
+    /// Zaehlt, wie oft die Oberflaeche zum Nachladen aufgefordert wurde.
+    #[derive(Default)]
+    struct CountingNotifier(AtomicUsize);
+
+    impl super::super::Notifier for CountingNotifier {
+        fn data_changed(&self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
     async fn server() -> (TodoServer, Pool<Sqlite>) {
+        let (server, pool, _) = server_with_notifier().await;
+        (server, pool)
+    }
+
+    /// Wie `server`, gibt den Zaehler aber mit heraus.
+    async fn server_with_notifier() -> (TodoServer, Pool<Sqlite>, Arc<CountingNotifier>) {
         let pool = setup().await;
-        (TodoServer::new(pool.clone()), pool)
+        let notifier = Arc::new(CountingNotifier::default());
+        (
+            TodoServer::new(pool.clone(), notifier.clone()),
+            pool,
+            notifier,
+        )
+    }
+
+    /// Wie oft bisher gemeldet wurde.
+    fn notified(notifier: &CountingNotifier) -> usize {
+        notifier.0.load(Ordering::SeqCst)
     }
 
     async fn category(pool: &Pool<Sqlite>, name: &str) -> i64 {
@@ -797,6 +844,148 @@ mod tests {
             .await
             .expect("count");
         assert_eq!(count, 0, "nothing should have been written");
+    }
+
+    // --- Die Meldung an die Oberflaeche --------------------------------------
+
+    #[tokio::test]
+    async fn a_write_tells_the_ui_to_reload() {
+        let (server, _pool, notifier) = server_with_notifier().await;
+        server
+            .add_todo(Parameters(super::AddTodo {
+                title: "Rechnung pruefen".into(),
+                priority: None,
+                due_date: None,
+                category: None,
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(notified(&notifier), 1);
+
+        server
+            .update_todo(Parameters(super::UpdateTodo {
+                id: 1,
+                title: Some("Rechnung bezahlen".into()),
+                status: None,
+                priority: None,
+                due_date: None,
+                category: None,
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(notified(&notifier), 2);
+
+        server
+            .delete_todo(Parameters(super::DeleteTodo { id: 1 }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(notified(&notifier), 3);
+    }
+
+    #[tokio::test]
+    async fn book_time_tells_the_ui_to_reload() {
+        let (server, pool, notifier) = server_with_notifier().await;
+        category(&pool, "Intern").await;
+        server
+            .book_time(Parameters(super::BookTime {
+                date: "2026-09-02".into(),
+                from: "09:00".into(),
+                to: "10:00".into(),
+                category: "Intern".into(),
+                note: None,
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(notified(&notifier), 1);
+    }
+
+    #[tokio::test]
+    async fn a_read_tells_the_ui_nothing() {
+        let (server, _pool, notifier) = server_with_notifier().await;
+        server
+            .list_todos(Parameters(super::ListTodos {
+                status: None,
+                category: None,
+                due_before: None,
+            }))
+            .await
+            .expect("no protocol error");
+        server
+            .list_categories()
+            .await
+            .expect("no protocol error");
+        server
+            .get_week_time(Parameters(super::GetWeekTime {
+                date: "2026-09-02".into(),
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(notified(&notifier), 0);
+    }
+
+    /// Ein Nachladen, dem kein Schreiben vorausging, waere eine Falschaussage
+    /// ueber den Zustand -- die Oberflaeche wuerde sich neu laden, obwohl sich
+    /// nichts geaendert hat.
+    #[tokio::test]
+    async fn a_failed_write_tells_the_ui_nothing() {
+        let (server, _pool, notifier) = server_with_notifier().await;
+
+        // Kategorie gibt es nicht: Tool-Fehler, nichts geschrieben.
+        server
+            .add_todo(Parameters(super::AddTodo {
+                title: "Rechnung pruefen".into(),
+                priority: None,
+                due_date: None,
+                category: Some("Kundenprojekt".into()),
+            }))
+            .await
+            .expect("an unknown category is not a protocol error");
+
+        // Id gibt es nicht.
+        server
+            .update_todo(Parameters(super::UpdateTodo {
+                id: 404,
+                title: Some("egal".into()),
+                status: None,
+                priority: None,
+                due_date: None,
+                category: None,
+            }))
+            .await
+            .expect("an unknown id is not a protocol error");
+
+        server
+            .delete_todo(Parameters(super::DeleteTodo { id: 404 }))
+            .await
+            .expect("an unknown id is not a protocol error");
+
+        // Ende vor Beginn: die Pruefung greift, bevor der Store ueberhaupt
+        // gerufen wird.
+        server
+            .book_time(Parameters(super::BookTime {
+                date: "2026-09-02".into(),
+                from: "10:00".into(),
+                to: "09:00".into(),
+                category: "Intern".into(),
+                note: None,
+            }))
+            .await
+            .expect("an empty range is not a protocol error");
+
+        // Auch eine unbrauchbare Uhrzeit, die schon in `book_time` selbst
+        // abgefangen wird und den Store nie erreicht.
+        server
+            .book_time(Parameters(super::BookTime {
+                date: "2026-09-02".into(),
+                from: "neun".into(),
+                to: "10:00".into(),
+                category: "Intern".into(),
+                note: None,
+            }))
+            .await
+            .expect("a malformed time is not a protocol error");
+
+        assert_eq!(notified(&notifier), 0);
     }
 
     // --- Robustheit ---------------------------------------------------------

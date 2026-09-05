@@ -130,7 +130,11 @@ async fn start_mcp(app: tauri::AppHandle, cancel: tokio_util::sync::Cancellation
         }
     };
 
-    if let Err(e) = mcp::serve(pool, token, cancel).await {
+    // Der Handle ist der Weg zurueck zur offenen Oberflaeche: nach jedem
+    // Schreiben ueber MCP geht darueber `todolist:data-changed` hinaus.
+    let notifier: std::sync::Arc<dyn mcp::Notifier> = std::sync::Arc::new(app.clone());
+
+    if let Err(e) = mcp::serve(pool, notifier, token, cancel).await {
         eprintln!("MCP: server on port {} stopped: {e}", mcp::PORT);
     }
 }

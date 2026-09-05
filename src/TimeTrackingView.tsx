@@ -18,8 +18,11 @@
 // gilt je regulaerem Arbeitstag; Samstag und Sonntag zaehlen nie mit, auch wenn sie
 // angezeigt werden.
 
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Category } from "./types";
+import { DATA_CHANGED_EVENT } from "./events";
+import { isTauri } from "./sqlClient";
 import {
   DaySlot,
   SLOTS_PER_HOUR,
@@ -95,6 +98,9 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
   // Zaehler aller Schreibvorgaenge. Eine Ladezusage, die spaeter als ein Schreiben
   // ankommt, wird verworfen, statt die frische Buchung zu ueberschreiben.
   const writeSeq = useRef(0);
+  // Wird hochgezaehlt, wenn das Backend meldet, dass sich Daten geaendert
+  // haben; der Ladeeffekt unten haengt daran und laeuft dann noch einmal.
+  const [reloadKey, setReloadKey] = useState(0);
 
   const days = useMemo(() => weekDays(monday, settings.showWeekend), [monday, settings.showWeekend]);
   const today = toDateKey(new Date());
@@ -118,7 +124,30 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
     return () => {
       active = false;
     };
-  }, [days]);
+  }, [days, reloadKey]);
+
+  // Der MCP-Server bucht am Frontend vorbei in dieselbe Datenbank. Ohne dieses
+  // Ereignis stuende die offene Woche bis zum Neustart auf einem alten Stand.
+  //
+  // `listen` gibt sein Abmelden erst spaeter zurueck. Faellt die Komponente
+  // vorher weg -- unter React.StrictMode passiert genau das bei jedem Mount --,
+  // muss das eintreffende Abmelden sofort gerufen werden, sonst bleibt ein
+  // Zuhoerer haengen und jedes Ereignis laedt doppelt nach.
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: UnlistenFn | null = null;
+    let dropped = false;
+    listen(DATA_CHANGED_EVENT, () => {
+      setReloadKey((key) => key + 1);
+    }).then((stop) => {
+      if (dropped) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      dropped = true;
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;

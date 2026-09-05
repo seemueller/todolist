@@ -20,20 +20,48 @@ use tokio_util::sync::CancellationToken;
 /// Fest verdrahtet; ein konfigurierbarer Port ist ausdruecklich nicht vorgesehen.
 pub const PORT: u16 = 4319;
 
-/// Haelt den Pool, ueber den die Tools lesen und schreiben.
+/// Der Name muss mit `src/events.ts` uebereinstimmen, sonst hoert niemand zu.
+pub const DATA_CHANGED_EVENT: &str = "todolist:data-changed";
+
+/// Sagt der offenen Oberflaeche, dass sich in der Datenbank etwas geaendert hat.
+///
+/// Ein eigener Trait statt eines `AppHandle` im Server: der Handle ist in einem
+/// Test nicht zu bekommen, ohne Tauri mit seinem `test`-Feature hereinzuziehen.
+/// So bleibt pruefbar, was hier tatsaechlich zu entscheiden ist -- naemlich
+/// welcher Aufruf meldet und welcher nicht -- waehrend die eine echte
+/// Implementierung darunter nur noch `emit` ruft.
+pub trait Notifier: Send + Sync + 'static {
+    fn data_changed(&self);
+}
+
+impl Notifier for tauri::AppHandle {
+    fn data_changed(&self) {
+        use tauri::Emitter;
+        // Ein fehlgeschlagenes Senden ist folgenlos: geschrieben ist bereits,
+        // und die Ansicht laedt spaetestens beim naechsten Start neu.
+        if let Err(e) = self.emit(DATA_CHANGED_EVENT, ()) {
+            eprintln!("MCP: could not emit {DATA_CHANGED_EVENT}: {e}");
+        }
+    }
+}
+
+/// Haelt den Pool, ueber den die Tools lesen und schreiben, und den Weg zurueck
+/// zur Oberflaeche.
 ///
 /// Die Tools selbst stehen in `tools.rs`; von dort kommt auch der
 /// `#[tool_router]`-Block, der `Self::tool_router()` erzeugt.
 #[derive(Clone)]
 pub struct TodoServer {
     pub(crate) pool: Pool<Sqlite>,
+    pub(crate) notifier: Arc<dyn Notifier>,
     tool_router: ToolRouter<Self>,
 }
 
 impl TodoServer {
-    pub fn new(pool: Pool<Sqlite>) -> Self {
+    pub fn new(pool: Pool<Sqlite>, notifier: Arc<dyn Notifier>) -> Self {
         Self {
             pool,
+            notifier,
             tool_router: Self::tool_router(),
         }
     }
@@ -62,12 +90,15 @@ impl ServerHandler for TodoServer {
 /// auf offene Verbindungen wartet und SSE-Streams von sich aus nie enden.
 pub async fn serve(
     pool: Pool<Sqlite>,
+    notifier: Arc<dyn Notifier>,
     token: String,
     cancel: CancellationToken,
 ) -> Result<(), std::io::Error> {
     let service: StreamableHttpService<TodoServer, LocalSessionManager> =
         StreamableHttpService::new(
-            move || Ok(TodoServer::new(pool.clone())),
+            // Laeuft einmal je Session; Pool und Notifier sind beide billig zu
+            // klonen.
+            move || Ok(TodoServer::new(pool.clone(), notifier.clone())),
             Arc::new(LocalSessionManager::default()),
             StreamableHttpServerConfig::default().with_cancellation_token(cancel.child_token()),
         );
