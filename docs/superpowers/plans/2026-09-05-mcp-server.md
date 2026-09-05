@@ -485,8 +485,23 @@ git commit -m "feat: add the MCP store and slot conversion layers"
 | `update_todo` | `id`, plus any of `title`, `status`, `priority`, `due_date`, `category` | Changes only what was given |
 | `delete_todo` | `id` | Deletes it |
 | `list_categories` | — | Names, colors, ids |
-| `get_week_time` | `monday` (ISO date) | The week's slots plus per-category totals |
+| `get_week_time` | `date` (any day of that week, ISO) | The week's slots plus per-category totals |
 | `book_time` | `date`, `from`, `to` (HH:MM), `category`, `note?` | Books a run of quarter hours |
+
+> **Amended during Task 3.** The parameter was originally called `monday`. A field
+> named `monday` that accepts any day is the kind of contradiction a model reads
+> wrongly, and the name invites it to compute the Monday itself — weekday
+> arithmetic being something models get wrong, especially around Sundays and year
+> boundaries. The store normalises any day to that week's Monday and reports which
+> one it picked.
+>
+> Three semantics were settled while building the store, and they live in the tool
+> descriptions because a caller cannot infer them: `due_before` is **exclusive** and
+> never returns undated todos; `book_time`'s `to` is **exclusive** and both times
+> must land on minute 00, 15, 30 or 45, with no rounding; and in `update_todo`,
+> JSON `null` clears a field while omitting it leaves the field alone — expressed
+> with `Option<Option<String>>` plus a `double_option` deserializer, because serde
+> otherwise folds "null" and "absent" into the same `None`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -563,7 +578,16 @@ Without this, a todo created through Claude appears only after a restart, which 
 
 - [ ] **Step 1: Emit the event from every writing tool**
 
-Give `TodoServer` an `AppHandle` alongside the pool, and after each successful write emit `todolist:data-changed`. `add_todo`, `update_todo`, `delete_todo` and `book_time` emit; the three reading tools do not.
+Give `TodoServer` a way to notify the UI alongside the pool, and after each successful write emit `todolist:data-changed`. `add_todo`, `update_todo`, `delete_todo` and `book_time` emit; the three reading tools do not.
+
+> **Wie gebaut (Nachtrag).** Statt eines `AppHandle` bekam `TodoServer` ein
+> `Arc<dyn Notifier>` (`mcp/mod.rs`), mit dem einen echten Impl fuer
+> `tauri::AppHandle`. Grund: an einen `AppHandle` kommt ein Test nur heran,
+> wenn er Tauri mit dessen `test`-Feature hereinzieht. Genau die Entscheidung,
+> um die es hier geht -- welcher Aufruf meldet und welcher nicht, und dass ein
+> **fehlgeschlagener** Schreibvorgang gar nichts meldet -- waere damit nur am
+> echten Tool-Code pruefbar gewesen, also gar nicht. Mit dem Trait haengen die
+> Tests am echten Tool-Code und zaehlen die Meldungen.
 
 - [ ] **Step 2: Write the failing frontend test**
 

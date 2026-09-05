@@ -1,4 +1,5 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { DragEvent, FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
   addTodo,
@@ -16,10 +17,13 @@ import {
   updateTodoTitle,
 } from "./db";
 import { installDebugInterceptor } from "./debug";
+import { DATA_CHANGED_EVENT } from "./events";
+import { isTauri } from "./sqlClient";
 import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { DebugLogPanel } from "./DebugLogPanel";
+import { McpSettings } from "./McpSettings";
 import { TimeTrackingView } from "./TimeTrackingView";
 
 /** Die drei Ansichten der App. */
@@ -154,9 +158,29 @@ function App({ migrationError = null }: AppProps) {
 
   // Debug log panel (Ctrl+Shift+L)
   const [showDebug, setShowDebug] = useState(false);
+  const [showMcp, setShowMcp] = useState(false);
   const closeDebug = useCallback(() => setShowDebug(false), []);
 
-  async function refresh() {
+  /**
+   * Laedt Aufgaben und Kategorien neu.
+   *
+   * `clearErrorOnSuccess` entscheidet, ob ein geglueckter Ladevorgang eine
+   * stehende Fehlermeldung wegnimmt. Die Regel dahinter: geloescht wird nur ein
+   * Fehler, der aelter ist als der Anlass des Neuladens.
+   *
+   * * **Mount (`false`).** Der einzige Fehler, der hier schon stehen kann, ist
+   *   die Migrationswarnung aus main.tsx (ueber die migrationError-Prop). Sie
+   *   ist nicht veraltet, sondern gerade erst entstanden -- der erste
+   *   erfolgreiche Ladevorgang wuerde sie wegwischen, bevor sie jemand liest.
+   * * **`todolist:data-changed` (`true`).** Der MCP-Server hat geschrieben, wir
+   *   lesen den neuen Stand. Was hier noch steht, gehoert zu einem frueheren
+   *   Versuch; bleibt es stehen, beschwert sich die App ueber etwas, das
+   *   inzwischen erledigt ist.
+   *
+   * Jede andere Aktion (Hinzufuegen, Loeschen, ...) setzt und loescht ihren
+   * eigenen Fehler selbst und geht nicht durch `refresh()`.
+   */
+  async function refresh(clearErrorOnSuccess = false) {
     try {
       const [items, cats] = await Promise.all([
         listTodos(),
@@ -164,14 +188,7 @@ function App({ migrationError = null }: AppProps) {
       ]);
       setTodos(items);
       setCategories(cats);
-      // Kein setError(null) hier: refresh() laeuft nur beim Mount (siehe
-      // useEffect unten, unter React.StrictMode im Dev-Build zweimal), nie als
-      // Reaktion auf eine Nutzeraktion. Ihm kann darum kein anderer Fehler
-      // vorausgehen als die Migrationswarnung aus main.tsx (ueber die
-      // migrationError-Prop). Die wuerde ein erfolgreicher Ladevorgang sonst
-      // sofort wieder wegwischen, bevor sie jemand liest. Jede andere Aktion
-      // (Hinzufuegen, Loeschen, ...) setzt und loescht ihren eigenen Fehler
-      // selbst.
+      if (clearErrorOnSuccess) setError(null);
     } catch (err) {
       setError(String(err));
     } finally {
@@ -181,6 +198,30 @@ function App({ migrationError = null }: AppProps) {
 
   useEffect(() => {
     refresh();
+  }, []);
+
+  // Der MCP-Server schreibt am Frontend vorbei in dieselbe Datenbank. Ohne
+  // dieses Ereignis sieht die offene App eine ueber Claude angelegte Aufgabe
+  // erst nach einem Neustart.
+  //
+  // `listen` gibt sein Abmelden erst spaeter zurueck. Faellt die Komponente
+  // vorher weg -- unter React.StrictMode passiert genau das bei jedem Mount --,
+  // muss das eintreffende Abmelden sofort gerufen werden, sonst bleibt ein
+  // Zuhoerer haengen und jedes Ereignis laedt doppelt nach.
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: UnlistenFn | null = null;
+    let dropped = false;
+    listen(DATA_CHANGED_EVENT, () => {
+      refresh(true);
+    }).then((stop) => {
+      if (dropped) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      dropped = true;
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -199,6 +240,7 @@ function App({ migrationError = null }: AppProps) {
   }, []);
 
   const closeChangelog = useCallback(() => setShowChangelog(false), []);
+  const closeMcp = useCallback(() => setShowMcp(false), []);
 
   useEffect(() => {
     if (!checkUpdate) return;
@@ -852,6 +894,14 @@ function App({ migrationError = null }: AppProps) {
           </button>
           <button
             type="button"
+            className="mcp-btn"
+            onClick={() => setShowMcp(true)}
+            aria-label="MCP-Server"
+          >
+            MCP
+          </button>
+          <button
+            type="button"
             className="changelog-btn"
             onClick={() => setShowChangelog(true)}
           >
@@ -859,6 +909,13 @@ function App({ migrationError = null }: AppProps) {
           </button>
         </footer>
       </main>
+
+      {/* MCP-Server: Status, Token und die Zeile fuer den Client */}
+      {showMcp && (
+        <Modal variant="category" title="MCP-Server" onClose={closeMcp} closeLabel="Schließen">
+          <McpSettings />
+        </Modal>
+      )}
 
       {/* Changelog Modal */}
       {showChangelog && (

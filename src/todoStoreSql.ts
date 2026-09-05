@@ -13,6 +13,7 @@ import {
   fromCategoryRow,
   compareCategoryNames,
   categoryNameKey,
+  canonicalCategoryName,
 } from "./types";
 import { getDb } from "./sqlClient";
 import { TodoStore } from "./storeTypes";
@@ -143,7 +144,7 @@ async function addCategory(name: string, color: string): Promise<Category> {
   const db = await getDb();
   const result = await db.execute(
     "INSERT INTO categories (name, color, created_at) VALUES ($1, $2, $3)",
-    [name.trim(), color, new Date().toISOString()]
+    [canonicalCategoryName(name), color, new Date().toISOString()]
   );
   return selectCategory(result.lastInsertId as number);
 }
@@ -152,7 +153,7 @@ async function updateCategory(id: number, name: string, color: string): Promise<
   await assertNameAvailable(name, id);
   const db = await getDb();
   await db.execute("UPDATE categories SET name = $1, color = $2 WHERE id = $3", [
-    name.trim(),
+    canonicalCategoryName(name),
     color,
     id,
   ]);

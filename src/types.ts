@@ -67,15 +67,32 @@ export function fromCategoryRow(row: CategoryRow): Category {
 }
 
 /**
+ * The canonical stored form of a category name: composed (NFC) and trimmed.
+ *
+ * Applied when a name is written, so the database never holds two spellings of
+ * the same word. `categoryNameKey` normalises on the way out too, so names
+ * stored before this existed still compare correctly.
+ */
+export function canonicalCategoryName(name: string): string {
+  return name.normalize("NFC").trim();
+}
+
+/**
  * Normalises a category name to the key that decides whether two names "are
- * the same" — for both sorting and uniqueness. Trims whitespace and
- * lowercases with the German locale so "Ärzte", " ärzte " and "ärzte" all
- * collapse to one key. Both `compareCategoryNames` and the duplicate checks
- * in the stores build on this single definition, so ordering and uniqueness
- * can never disagree about what counts as the same name.
+ * the same" — for both sorting and uniqueness. Composes to NFC, trims
+ * whitespace and lowercases with the German locale, so "Ärzte", " ärzte " and
+ * "ärzte" all collapse to one key. Both `compareCategoryNames` and the
+ * duplicate checks in the stores build on this single definition, so ordering
+ * and uniqueness can never disagree about what counts as the same name.
+ *
+ * The NFC step is not cosmetic: "Ä" can be one codepoint or an "A" followed by
+ * a combining diaeresis. The two render identically, so without composing them
+ * first the app would happily create two categories a reader cannot tell
+ * apart — the same duplicate-category bug the case folding already closes,
+ * arriving through a different door.
  */
 export function categoryNameKey(name: string): string {
-  return name.trim().toLocaleLowerCase("de");
+  return canonicalCategoryName(name).toLocaleLowerCase("de");
 }
 
 /**

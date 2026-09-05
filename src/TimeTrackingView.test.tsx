@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TimeTrackingView } from "./TimeTrackingView";
 import type { Category } from "./types";
@@ -48,6 +48,30 @@ vi.mock("./timeDb", () => ({
     return Promise.resolve(next);
   },
 }));
+
+// Pro Test umschaltbar: ausserhalb von Tauri darf sich die Ansicht gar nicht
+// erst auf Ereignisse anmelden -- darauf baut die Playwright-Suite im Browser.
+let insideTauri = true;
+vi.mock("./sqlClient", () => ({
+  isTauri: () => insideTauri,
+  getDb: () => Promise.reject(new Error("in Tests nicht verfuegbar")),
+}));
+
+type EventHandler = (event: { payload: unknown }) => void;
+const handlers = new Map<string, EventHandler[]>();
+const unlistenMock = vi.fn();
+const listenMock = vi.fn((name: string, handler: EventHandler) => {
+  handlers.set(name, [...(handlers.get(name) ?? []), handler]);
+  return Promise.resolve(unlistenMock);
+});
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: (name: string, handler: EventHandler) => listenMock(name, handler),
+}));
+
+/** Feuert ein Backend-Ereignis auf allen angemeldeten Zuhoerern. */
+function emit(name: string) {
+  for (const handler of handlers.get(name) ?? []) handler({ payload: null });
+}
 
 const categories: Category[] = [
   { id: 7, name: "Alpha", color: "#7cc3f7", created_at: "2026-09-01T08:00:00.000Z" },
@@ -117,6 +141,9 @@ describe("TimeTrackingView", () => {
   beforeEach(() => {
     store.clear();
     settings = { targetSlotsPerDay: 32, showWeekend: false };
+    vi.clearAllMocks();
+    handlers.clear();
+    insideTauri = true;
   });
 
   it("zeigt fuenf Arbeitstage von 6 bis 22 Uhr", async () => {
@@ -327,18 +354,16 @@ describe("TimeTrackingView", () => {
   });
 
   it("zeigt eine positive Differenz, sobald das Soll erreicht ist", async () => {
+    // Das Soll kommt aus den Einstellungen, statt es mit 32 Klicks auf null zu
+    // drehen: jeder Klick war ein eigener Speicher-Umlauf, und die Summe davon
+    // hat den Test regelmaessig in seine Zeitgrenze laufen lassen -- zuletzt in
+    // der CI. Den Verringern-Knopf deckt "verstellt die Sollzeit in
+    // Viertelstunden-Schritten" ab; hier geht es allein um die Anzeige der
+    // positiven Differenz.
+    settings = { targetSlotsPerDay: 0, showWeekend: false };
     renderView();
-    await waitFor(() => expect(target().difference).toBe("-40:00"));
-    openSettings();
+    await waitFor(() => expect(target().difference).toBe("0:00"));
 
-    // Soll auf 0:00 stellen, dann eine Viertelstunde buchen.
-    for (let i = 0; i < 32; i++) {
-      fireEvent.click(
-        screen.getByRole("button", { name: "Sollzeit je Tag um 15 Minuten verringern" })
-      );
-    }
-    await waitFor(() => expect(target().perDay).toBe("0:00"));
-    fireEvent.click(screen.getByRole("button", { name: "Schließen" }));
     paintCell(at(MO, "09:00, frei"));
 
     await waitFor(() => expect(target().difference).toBe("+0:15"));
@@ -429,5 +454,46 @@ describe("TimeTrackingView", () => {
     expect(document.querySelectorAll(".time-cell")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Kategorien verwalten" }));
     expect(onManageCategories).toHaveBeenCalled();
+  });
+
+  describe("Nachladen, wenn der MCP-Server schreibt", () => {
+    it("meldet sich beim Mount auf todolist:data-changed an", async () => {
+      renderView();
+      await screen.findByRole("button", { name: at(MO, "06:00, frei") });
+
+      expect(listenMock).toHaveBeenCalledWith("todolist:data-changed", expect.any(Function));
+    });
+
+    it("laedt die Woche neu, sobald das Ereignis feuert", async () => {
+      renderView();
+      await screen.findByRole("button", { name: at(MO, "09:00, frei") });
+
+      // Was der MCP-Server geschrieben haette: eine Viertelstunde, die die
+      // Ansicht beim Mount noch nicht gesehen hat.
+      store.set(MO, [{ slot: 36, category_id: 7, note: "" }]);
+      await act(async () => {
+        emit("todolist:data-changed");
+      });
+
+      expect(await screen.findByRole("button", { name: at(MO, "09:00, Alpha") })).toBeInTheDocument();
+      expect(weekTotal()).toBe("0:15");
+    });
+
+    it("meldet sich beim Unmount wieder ab", async () => {
+      const { unmount } = renderView();
+      await screen.findByRole("button", { name: at(MO, "06:00, frei") });
+
+      unmount();
+
+      await waitFor(() => expect(unlistenMock).toHaveBeenCalled());
+    });
+
+    it("meldet sich ausserhalb von Tauri gar nicht erst an", async () => {
+      insideTauri = false;
+      renderView();
+      await screen.findByRole("button", { name: at(MO, "06:00, frei") });
+
+      expect(listenMock).not.toHaveBeenCalled();
+    });
   });
 });
