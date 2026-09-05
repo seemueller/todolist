@@ -27,7 +27,7 @@ use rmcp::{
     model::{CallToolResult, ContentBlock},
     schemars, tool, tool_router,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
 
 use super::TodoServer;
@@ -74,6 +74,34 @@ fn non_empty(value: &Option<String>) -> Option<&str> {
         .filter(|text| !text.is_empty())
 }
 
+/// Haelt `null` von "gar nicht angegeben" auseinander.
+///
+/// Serde faltet beides sonst auf `None` zusammen, und damit waere ueber
+/// `update_todo` nicht mehr auszudruecken, dass eine Faelligkeit weg soll.
+/// Mit `#[serde(default)]` bleibt ein fehlendes Feld `None`, waehrend `null`
+/// hier durchlaeuft und `Some(None)` ergibt.
+fn double_option<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::deserialize(deserializer).map(Some)
+}
+
+/// `Some(None)` heisst "leeren", `Some(Some(_))` "setzen", `None` "unveraendert".
+///
+/// `null` ist der dokumentierte Weg zu leeren; ein leerer String kommt hier
+/// genauso an. Das ist Nachsicht mit Absicht: `""` ist weder ein Datum noch ein
+/// Kategoriename, und ein Modell, das es statt `null` schickt, meint dasselbe.
+fn clearable(value: &Option<Option<String>>) -> Option<Option<String>> {
+    value.as_ref().map(|inner| {
+        inner
+            .as_deref()
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(str::to_string)
+    })
+}
+
 // --- Parameter --------------------------------------------------------------
 
 /// Filter fuer `list_todos`. Alle Felder sind optional; ohne Angabe kommt alles.
@@ -118,14 +146,20 @@ pub struct UpdateTodo {
     pub status: Option<String>,
     /// Neue Prioritaet: "low", "medium" oder "high".
     pub priority: Option<String>,
-    /// Neuer Faelligkeitstag, ISO-Format YYYY-MM-DD. Ein leerer String ""
-    /// entfernt die Faelligkeit; das Feld wegzulassen laesst sie unveraendert.
-    pub due_date: Option<String>,
+    /// Neuer Faelligkeitstag, ISO-Format YYYY-MM-DD. null entfernt die
+    /// Faelligkeit; das Feld wegzulassen laesst sie unveraendert. Das ist ein
+    /// Unterschied: null loescht, weglassen aendert nichts.
+    #[serde(default, deserialize_with = "double_option")]
+    #[schemars(with = "Option<String>")]
+    pub due_date: Option<Option<String>>,
     /// Name einer bereits bestehenden Kategorie (Gross-/Kleinschreibung egal).
-    /// Ein leerer String "" nimmt die Aufgabe aus ihrer Kategorie heraus; das
-    /// Feld wegzulassen laesst sie unveraendert. Ein unbekannter Name ist ein
-    /// Fehler; ueber dieses Tool entsteht keine neue Kategorie.
-    pub category: Option<String>,
+    /// null nimmt die Aufgabe aus ihrer Kategorie heraus; das Feld wegzulassen
+    /// laesst sie unveraendert. Das ist ein Unterschied: null loescht,
+    /// weglassen aendert nichts. Ein unbekannter Name ist ein Fehler; ueber
+    /// dieses Tool entsteht keine neue Kategorie.
+    #[serde(default, deserialize_with = "double_option")]
+    #[schemars(with = "Option<String>")]
+    pub category: Option<Option<String>>,
 }
 
 /// Die zu loeschende Aufgabe.
@@ -138,11 +172,12 @@ pub struct DeleteTodo {
 /// Die abzufragende Woche.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct GetWeekTime {
-    /// Ein Tag der gewuenschten Woche, ISO-Format YYYY-MM-DD. Es muss nicht der
-    /// Montag sein: jeder Tag wird auf den Montag seiner Woche zurueckgerechnet,
-    /// wobei der Sonntag noch zur Woche davor gehoert. Der so bestimmte Montag
-    /// steht im Ergebnis.
-    pub monday: String,
+    /// Ein beliebiger Tag der Woche, ISO-Format YYYY-MM-DD. Der Montag ist
+    /// nicht selbst auszurechnen: jeder Tag wird auf den Montag seiner Woche
+    /// zurueckgerechnet, wobei der Sonntag noch zur Woche davor gehoert. Fuer
+    /// "diese Woche" genuegt also das heutige Datum. Welcher Montag es geworden
+    /// ist, steht im Ergebnis unter "monday".
+    pub date: String,
 }
 
 /// Ein zu buchender Block Arbeitszeit.
@@ -150,12 +185,17 @@ pub struct GetWeekTime {
 pub struct BookTime {
     /// Tag der Buchung, ISO-Format YYYY-MM-DD.
     pub date: String,
-    /// Beginn als HH:MM, z.B. "09:00". Muss auf einer Viertelstunde liegen;
-    /// "09:07" wird abgelehnt und nicht gerundet. Der Beginn gehoert dazu.
+    /// Beginn als HH:MM auf einer vollen Viertelstunde, die Minute also genau
+    /// 00, 15, 30 oder 45 -- z.B. "09:00" oder "09:15". Andere Minuten werden
+    /// abgelehnt und nicht gerundet: "09:07" ist ein Fehler und bleibt einer,
+    /// die Uhrzeit ist auf eine der vier Minuten zu legen. Der Beginn gehoert
+    /// zur Buchung dazu.
     pub from: String,
-    /// Ende als HH:MM, z.B. "10:00". Muss auf einer Viertelstunde liegen und
-    /// nach dem Beginn. Das Ende gehoert NICHT dazu: 09:00 bis 10:00 sind vier
-    /// Viertelstunden, also genau eine Stunde. "24:00" ist als Ende erlaubt.
+    /// Ende als HH:MM auf einer vollen Viertelstunde, die Minute also genau 00,
+    /// 15, 30 oder 45 -- dieselbe Regel wie beim Beginn, und ebenfalls ohne
+    /// Rundung. Muss nach dem Beginn liegen. Das Ende gehoert NICHT mehr zur
+    /// Buchung: 09:00 bis 10:00 sind vier Viertelstunden, also genau eine
+    /// Stunde. "24:00" ist als Ende erlaubt und meint Mitternacht.
     pub to: String,
     /// Name einer bereits bestehenden Kategorie (Gross-/Kleinschreibung egal).
     /// Ein unbekannter Name ist ein Fehler; ueber dieses Tool entsteht keine
@@ -214,13 +254,6 @@ impl TodoServer {
         &self,
         Parameters(params): Parameters<UpdateTodo>,
     ) -> Result<CallToolResult, McpError> {
-        // Ein leerer String heisst "loeschen", ein fehlendes Feld
-        // "unveraendert lassen" -- daher die zwei Ebenen Option.
-        let clearable = |value: &Option<String>| -> Option<Option<String>> {
-            value
-                .as_deref()
-                .map(|text| Some(text.trim()).filter(|t| !t.is_empty()).map(str::to_string))
-        };
         let update = TodoUpdate {
             title: params.title.clone(),
             status: non_empty(&params.status).map(str::to_string),
@@ -258,7 +291,7 @@ impl TodoServer {
         &self,
         Parameters(params): Parameters<GetWeekTime>,
     ) -> Result<CallToolResult, McpError> {
-        respond(store::week_time(&self.pool, &params.monday).await)
+        respond(store::week_time(&self.pool, &params.date).await)
     }
 
     #[tool(
@@ -526,7 +559,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn update_todo_clears_a_due_date_when_given_an_empty_string() {
+    async fn update_todo_clears_a_due_date_when_given_null() {
         let (server, pool) = server().await;
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO todos (title, created_at, due_date)
@@ -542,13 +575,40 @@ mod tests {
                 title: None,
                 status: None,
                 priority: None,
-                due_date: Some(String::new()),
+                due_date: Some(None),
                 category: None,
             }))
             .await
             .expect("no protocol error");
         let json = ok_json(&result);
         assert!(json["due_date"].is_null(), "due date should be cleared");
+    }
+
+    /// Die ganze Unterscheidung haengt daran, dass `null` und ein fehlendes
+    /// Feld verschieden ankommen -- serde faltet beides von sich aus auf `None`
+    /// zusammen, und dann waere "Faelligkeit entfernen" nicht ausdrueckbar.
+    #[test]
+    fn null_and_a_missing_field_mean_different_things_on_the_wire() {
+        let cleared: super::UpdateTodo =
+            serde_json::from_str(r#"{"id":1,"due_date":null,"category":null}"#)
+                .expect("null parses");
+        assert_eq!(cleared.due_date, Some(None), "null must mean: clear it");
+        assert_eq!(cleared.category, Some(None), "null must mean: clear it");
+
+        let untouched: super::UpdateTodo =
+            serde_json::from_str(r#"{"id":1,"status":"done"}"#).expect("missing fields parse");
+        assert_eq!(
+            untouched.due_date, None,
+            "a missing field must mean: leave it alone"
+        );
+        assert_eq!(
+            untouched.category, None,
+            "a missing field must mean: leave it alone"
+        );
+
+        let set: super::UpdateTodo =
+            serde_json::from_str(r#"{"id":1,"due_date":"2026-12-24"}"#).expect("a value parses");
+        assert_eq!(set.due_date, Some(Some("2026-12-24".into())));
     }
 
     #[tokio::test]
@@ -658,7 +718,7 @@ mod tests {
         // Sonntag, 2026-09-06 -- gehoert zur Woche ab Montag, 2026-08-31.
         let result = server
             .get_week_time(Parameters(super::GetWeekTime {
-                monday: "2026-09-06".into(),
+                date: "2026-09-06".into(),
             }))
             .await
             .expect("no protocol error");
@@ -675,7 +735,7 @@ mod tests {
         let (server, _pool) = server().await;
         let result = server
             .get_week_time(Parameters(super::GetWeekTime {
-                monday: "naechste Woche".into(),
+                date: "naechste Woche".into(),
             }))
             .await
             .expect("a malformed date is not a protocol error");
