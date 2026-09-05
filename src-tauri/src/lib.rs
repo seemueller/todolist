@@ -1,3 +1,5 @@
+mod mcp;
+
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite};
 use tauri::Manager;
@@ -80,6 +82,57 @@ async fn replace_time_day(
     replace_time_day_tx(&pool, &date, &slots)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Wird als Tauri-State gehalten, damit `RunEvent::ExitRequested` den
+/// MCP-Server abraeumen kann.
+struct McpCancel(tokio_util::sync::CancellationToken);
+
+/// `DbInstances` ist leer, bis das Frontend `Database.load` mindestens einmal
+/// gerufen hat -- im `setup`-Hook ist das noch nicht passiert. Darum warten
+/// statt annehmen: alle 100 ms nachsehen, hoechstens 300 Mal, also 30 Sekunden.
+/// Das ueberdeckt auch einen langsam startenden Dev-Server und endet trotzdem,
+/// statt einen Task fuer immer laufen zu lassen.
+async fn wait_for_pool(app: &tauri::AppHandle) -> Option<Pool<Sqlite>> {
+    const ATTEMPTS: u32 = 300;
+    const INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+
+    for _ in 0..ATTEMPTS {
+        let instances = app.state::<DbInstances>();
+        let found = {
+            let map = instances.0.read().await;
+            map.get(DB_URL).map(|db_pool| match db_pool {
+                DbPool::Sqlite(pool) => pool.clone(),
+            })
+        };
+        if let Some(pool) = found {
+            return Some(pool);
+        }
+        tokio::time::sleep(INTERVAL).await;
+    }
+    None
+}
+
+/// Startet den MCP-Server, sobald der Pool da ist. Jeder Fehlschlag bleibt
+/// folgenlos fuer die App selbst: ein besetzter Port darf die Todo-Liste nicht
+/// aufhalten. Der Token taucht in keiner dieser Meldungen auf.
+async fn start_mcp(app: tauri::AppHandle, cancel: tokio_util::sync::CancellationToken) {
+    let Some(pool) = wait_for_pool(&app).await else {
+        eprintln!("MCP: database {DB_URL} never showed up, server not started");
+        return;
+    };
+
+    let token = match mcp::auth::load_or_create_token(&pool).await {
+        Ok(token) => token,
+        Err(e) => {
+            eprintln!("MCP: could not read or create the token: {e}");
+            return;
+        }
+    };
+
+    if let Err(e) = mcp::serve(pool, token, cancel).await {
+        eprintln!("MCP: server on port {} stopped: {e}", mcp::PORT);
+    }
 }
 
 #[tauri::command]
@@ -252,8 +305,22 @@ pub fn run() {
             install_update,
             replace_time_day
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .setup(|app| {
+            let cancel = tokio_util::sync::CancellationToken::new();
+            app.manage(McpCancel(cancel.clone()));
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(start_mcp(handle, cancel));
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            // Beendet Sessions und Listener zusammen; ohne das haengt der
+            // Prozess beim Schliessen des Fensters an offenen SSE-Streams.
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                app.state::<McpCancel>().0.cancel();
+            }
+        });
 }
 
 #[cfg(test)]
