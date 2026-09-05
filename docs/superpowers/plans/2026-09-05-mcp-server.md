@@ -485,8 +485,23 @@ git commit -m "feat: add the MCP store and slot conversion layers"
 | `update_todo` | `id`, plus any of `title`, `status`, `priority`, `due_date`, `category` | Changes only what was given |
 | `delete_todo` | `id` | Deletes it |
 | `list_categories` | — | Names, colors, ids |
-| `get_week_time` | `monday` (ISO date) | The week's slots plus per-category totals |
+| `get_week_time` | `date` (any day of that week, ISO) | The week's slots plus per-category totals |
 | `book_time` | `date`, `from`, `to` (HH:MM), `category`, `note?` | Books a run of quarter hours |
+
+> **Amended during Task 3.** The parameter was originally called `monday`. A field
+> named `monday` that accepts any day is the kind of contradiction a model reads
+> wrongly, and the name invites it to compute the Monday itself — weekday
+> arithmetic being something models get wrong, especially around Sundays and year
+> boundaries. The store normalises any day to that week's Monday and reports which
+> one it picked.
+>
+> Three semantics were settled while building the store, and they live in the tool
+> descriptions because a caller cannot infer them: `due_before` is **exclusive** and
+> never returns undated todos; `book_time`'s `to` is **exclusive** and both times
+> must land on minute 00, 15, 30 or 45, with no rounding; and in `update_todo`,
+> JSON `null` clears a field while omitting it leaves the field alone — expressed
+> with `Option<Option<String>>` plus a `double_option` deserializer, because serde
+> otherwise folds "null" and "absent" into the same `None`.
 
 - [ ] **Step 1: Write the failing tests**
 
