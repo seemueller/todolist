@@ -1,4 +1,6 @@
 pub mod auth;
+pub mod slots;
+pub mod store;
 
 use std::sync::Arc;
 
