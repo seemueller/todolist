@@ -2,7 +2,7 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [Unreleased]
+## [0.8.0] - 2026-09-05
 
 ### Hinzugefügt
 - Die App spricht MCP: Solange sie läuft, kann ein KI-Assistent wie Claude die Aufgabenliste lesen und pflegen — Aufgaben suchen, anlegen, ändern, abhaken und löschen, die Kategorien nachschlagen, die Zeitbuchungen einer Woche abfragen und Arbeitszeit in Viertelstunden buchen. Kategorien werden dabei nur benutzt, nicht angelegt oder verändert.
@@ -17,7 +17,7 @@ Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokume
 ### Behoben
 - Das Löschen einer Kategorie löschte im Desktop-Build alle Zeitbuchungen mit, die sie benutzt hatten. Die Buchungen bleiben jetzt erhalten und erscheinen in der Wochenansicht als „Gelöschte Kategorie“.
 - Beim Löschen einer Kategorie behielten die betroffenen Aufgaben deren Namen und Farbe. Sie verlieren die Kategorie jetzt vollständig.
-- Kategorienamen, die sich nur in der Groß- und Kleinschreibung unterscheiden, lassen sich nicht mehr doppelt anlegen — Umlaute eingeschlossen.
+- Kategorienamen, die sich nur in der Groß- und Kleinschreibung unterscheiden, lassen sich nicht mehr doppelt anlegen — Umlaute eingeschlossen. Das gilt auch für Namen, die dasselbe Zeichen unterschiedlich zusammensetzen: „Ärzte“ mit einem vorgefertigten Ä und „Ärzte“ mit nachgestelltem Umlautzeichen sehen gleich aus und gelten jetzt auch als gleich.
 - Schlägt die einmalige Datenübernahme fehl, sagt die App das jetzt, statt leer zu wirken. Die Daten bleiben unverändert erhalten, der nächste Start versucht es erneut.
 
 ## [0.7.0] - 2026-09-03

@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.7.0";
+export const APP_VERSION = "0.8.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,19 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.8.0",
+    date: "2026-09-05",
+    changes: [
+      "Die App spricht MCP: Solange sie läuft, kann ein KI-Assistent wie Claude Aufgaben suchen, anlegen, ändern, abhaken und löschen, Kategorien nachschlagen und Arbeitszeit in Viertelstunden buchen",
+      "Der Zugang läuft nur über den eigenen Rechner und ist durch einen Token geschützt, der im MCP-Popup zum Kopieren steht",
+      "Was der Assistent ändert, erscheint sofort im offenen Fenster — ohne Neustart",
+      "Aufgaben, Kategorien und Zeitbuchungen liegen jetzt in einer Datenbank statt im Browserspeicher; vorhandene Daten werden beim ersten Start übernommen",
+      "Ein Arbeitstag wird beim Speichern nicht mehr halb überschrieben, wenn etwas dazwischenkommt",
+      "Löschen einer Kategorie nimmt die zugehörigen Zeitbuchungen nicht mehr mit; sie erscheinen als „Gelöschte Kategorie“",
+      "Kategorienamen, die sich nur in Groß- und Kleinschreibung oder in der Schreibweise von Umlauten unterscheiden, lassen sich nicht mehr doppelt anlegen",
+    ],
+  },
   {
     version: "0.7.0",
     date: "2026-09-03",
