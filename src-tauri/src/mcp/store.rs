@@ -18,24 +18,22 @@
 //! * **Platzhalter sind `?`.** Das hier ist sqlx direkt, wie
 //!   `replace_time_day_tx` in `lib.rs`, nicht die JS-Plugin-Schicht mit `$N`.
 
-// Wird erst von den Tools in Task 3 benutzt.
-#![allow(dead_code)]
-
 use std::cmp::Ordering;
 
 use serde::Serialize;
 use sqlx::{Pool, Sqlite};
 use unicode_normalization::UnicodeNormalization;
+use unicode_normalization::char::is_combining_mark;
 
 use super::echo::quoted;
 use super::slots::{SLOT_MINUTES, SLOTS_PER_DAY, slot_label};
 
-/// Die beiden Fehlerarten, die Task 3 unterschiedlich beantwortet.
+/// Die beiden Fehlerarten, die die Tools unterschiedlich beantworten.
 ///
 /// `Request` wird zu `Ok(CallToolResult::error(...))`: der Aufrufer liest den
 /// Text und kann etwas damit anfangen. `Db` wird zu `Err(McpError::…)` und
 /// kommt beim Aufrufer nur als undurchsichtiger interner Fehler an. Stuende die
-/// Unterscheidung nicht im Typ, koennte Task 3 sie nicht treffen.
+/// Unterscheidung nicht im Typ, koennte `tools.rs` sie nicht treffen.
 #[derive(Debug)]
 pub enum StoreError {
     /// Der Aufrufer hat nach etwas gefragt, das es nicht gibt oder das so nicht
@@ -302,17 +300,32 @@ fn category_name_key(name: &str) -> String {
     name.nfc().collect::<String>().trim().to_lowercase()
 }
 
-/// Primaerschluessel der Sortierung: Umlaute und ß auf ihre Grundbuchstaben,
+/// Primaerschluessel der Sortierung: Akzente weg, auf den Grundbuchstaben,
 /// wie es die deutsche Sortierung (DIN 5007-1, und so auch die CLDR-Kollation
 /// "de") auf der ersten Stufe tut.
+///
+/// Zerlegt dafuer nach NFD und wirft die kombinierenden Zeichen weg. Das deckt
+/// jeden Buchstaben ab, der sich zerlegen laesst -- die deutschen Umlaute
+/// genauso wie é, è, å, à, ñ, ç. Was sich nicht zerlegen laesst, muss
+/// einzeln stehen: ß ist "ss" (so DIN 5007-1), ø ein "o" (so die CLDR-Kollation
+/// "de", die es mit o auf der ersten Stufe gleichsetzt).
+///
+/// Nicht abgedeckt sind die uebrigen unzerlegbaren Buchstaben -- æ, œ, đ, ł, ð,
+/// þ und ihresgleichen. Sie behalten ihren Codepoint, der ueber jedem
+/// ASCII-Buchstaben liegt, und sortieren darum ans Ende. Siehe
+/// `compare_category_names`.
 fn category_sort_key(name: &str) -> String {
     let mut key = String::new();
-    for ch in category_name_key(name).chars() {
+    for ch in category_name_key(name).nfd() {
         match ch {
-            'ä' => key.push('a'),
-            'ö' => key.push('o'),
-            'ü' => key.push('u'),
             'ß' => key.push_str("ss"),
+            'æ' => key.push_str("ae"),
+            'œ' => key.push_str("oe"),
+            'ø' => key.push('o'),
+            'ð' => key.push('d'),
+            'ł' => key.push('l'),
+            // Alles, was NFD abgetrennt hat: Trema, Akut, Ring, Tilde, ...
+            _ if is_combining_mark(ch) => {}
             other => key.push(other),
         }
     }
@@ -338,17 +351,26 @@ fn category_case_ranks(name: &str) -> Vec<u8> {
 /// dann die Gross-/Kleinschreibung, zuletzt der Rohname als letzter Halt.
 ///
 /// **Nicht exakt dieselbe Ordnung.** Rust hat ohne zusaetzliche Abhaengigkeit
-/// keine ICU-Kollation, hier wird darum nach Codepoint verglichen. Das deckt
-/// sich mit ICU fuer Buchstaben samt Umlauten und ß, fuer Ziffern und fuer
-/// Akzente (é, ø, å) -- und ueberall dort, wo ein Name mit einem Buchstaben
-/// beginnt.
+/// keine ICU-Kollation, hier wird darum nach Codepoint verglichen -- ueber dem
+/// gefalteten Schluessel aus `category_sort_key`. Zwei Klassen von Zeichen
+/// weichen darum bis heute ab, beide gemessen gegen Nodes
+/// `localeCompare(…, "de")` und beide unten festgehalten:
 ///
-/// Es weicht in genau einem Fall ab: wenn ein Name mit einem der Zeichen
-/// `@ [ \ ] ^ _ ` { | } ~` beginnt und mit einem verglichen wird, der mit einer
-/// Ziffer oder einem der niedrigeren Satzzeichen (`! # ( . + -`) beginnt. ICU
-/// stellt Satzzeichen geschlossen vor die Ziffern, der Codepoint zerschneidet
-/// sie an der Ziffernreihe. `"_intern"` vs. `"2fa"` ist der Fall; `"#tag"` vs.
-/// `"2fa"` stimmt dagegen ueberein. Der Test weiter unten haelt beides fest.
+/// 1. **Unzerlegbare Buchstaben ausserhalb der gefalteten Liste**: `đ`, `ħ`,
+///    `ı` und ihresgleichen. NFD zerlegt sie nicht, und gefaltet werden nur
+///    `ß æ œ ø ð ł` (siehe `category_sort_key`). Ihr Codepoint liegt ueber
+///    jedem ASCII-Buchstaben, sie sortieren also ans Ende, waehrend ICU sie bei
+///    ihrem Grundbuchstaben einreiht: `"Đjango"` gehoerte vor `"Fisch"`, steht
+///    hier aber dahinter. Wer das braucht, traegt den Buchstaben in
+///    `category_sort_key` nach.
+/// 2. **`@ [ \ ] ^ _ ` { | } ~` gegen Ziffern**: ICU stellt Satzzeichen
+///    geschlossen vor die Ziffern, der Codepoint zerschneidet sie an der
+///    Ziffernreihe. `"_intern"` vs. `"2fa"` ist der Fall; `"#tag"` vs. `"2fa"`
+///    stimmt dagegen ueberein.
+///
+/// Alles andere deckt sich: Buchstaben, Ziffern, die deutschen Umlaute, ß --
+/// und seit der NFD-Faltung auch jeder zerlegbare Akzent, einschliesslich am
+/// Wortanfang (`"Émile"` vor `"Fisch"`, `"Åke"` vor `"Beta"`).
 pub fn compare_category_names(a: &str, b: &str) -> Ordering {
     category_sort_key(a)
         .cmp(&category_sort_key(b))
@@ -1301,15 +1323,15 @@ mod tests {
     ///   console.log([…].sort(c))'
     /// ```
     ///
-    /// Fuer alles, was ein deutscher Kategoriename ueblicherweise enthaelt,
-    /// stimmen beide Ordnungen ueberein: Umlaute stehen bei ihrem
-    /// Grundbuchstaben, ß bei "ss", "Cafe" vor "Café", "Strasse" vor "Straße".
-    /// Nicht uebereinstimmen tut die Gewichtung der Zeichen
-    /// `@ [ \ ] ^ _ ` { | } ~` gegenueber Ziffern: ICU stellt "_intern" vor
-    /// "2fa", der Vergleich nach Codepoint andersherum. Bei den niedrigeren
-    /// Satzzeichen -- "#tag" gegen "2fa" -- sind sich beide wieder einig, darum
-    /// steht dieser Fall hier daneben. Das ist ein bekannter Unterschied und
-    /// kein Fehler; die Begruendung steht an `compare_category_names`.
+    /// Umlaute stehen bei ihrem Grundbuchstaben, ß bei "ss", "Cafe" vor
+    /// "Café", "Strasse" vor "Straße" -- und ein Akzent faellt auch dann weg,
+    /// wenn er im ersten Buchstaben steckt und keine spaetere Vergleichsstufe
+    /// mehr rettet.
+    ///
+    /// Die beiden bekannten Abweichungen stehen daneben, jede mit einem
+    /// eigenen Block: der unzerlegbare Buchstabe ausserhalb der Faltliste und
+    /// die Satzzeichen gegen die Ziffern. Die Begruendung fuer beide steht an
+    /// `compare_category_names`.
     #[test]
     fn the_sort_matches_the_javascript_collation_except_for_punctuation() {
         let mut names = vec![
@@ -1322,6 +1344,26 @@ mod tests {
                 "Apfel", "Cafe", "Café", "Öl", "ßeta", "Strasse", "Straße", "über", "Zebra"
             ],
             "same order as compareCategoryNames in src/types.ts"
+        );
+
+        // Der Akzent im ersten Buchstaben: hier entscheidet allein der
+        // gefaltete Schluessel, keine spaetere Stufe faengt es auf.
+        let mut accents = vec!["Fisch", "Émile", "Papier", "Øre", "Beta", "Åke"];
+        accents.sort_by(|a, b| compare_category_names(a, b));
+        assert_eq!(
+            accents,
+            vec!["Åke", "Beta", "Émile", "Fisch", "Øre", "Papier"],
+            "same order as compareCategoryNames in src/types.ts"
+        );
+
+        // Nicht gefaltet, weil NFD ihn nicht zerlegt und er nicht in der Liste
+        // steht: er sortiert ans Ende statt zu "d". Bekannt und beabsichtigt.
+        let mut unfolded = vec!["Fisch", "Đjango", "Apfel"];
+        unfolded.sort_by(|a, b| compare_category_names(a, b));
+        assert_eq!(
+            unfolded,
+            vec!["Apfel", "Fisch", "Đjango"],
+            "known divergence: JavaScript sorts \"Đjango\" at \"d\""
         );
 
         let mut agrees = vec!["2fa", "#tag", "Apfel"];
@@ -1705,10 +1747,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_database_failure_is_a_different_error_kind_than_a_bad_request() {
-        // Ohne Schema schlaegt jede Abfrage in der Datenbank fehl. Task 3 macht
-        // daraus einen Protokollfehler, waehrend StoreError::Request als
+        // Ohne Schema schlaegt jede Abfrage in der Datenbank fehl. `tools.rs`
+        // macht daraus einen Protokollfehler, waehrend StoreError::Request als
         // Tool-Fehler beim Aufrufer landet -- die Unterscheidung muss hier im
-        // Typ stecken, sonst kann Task 3 sie nicht treffen.
+        // Typ stecken, sonst kann sie dort nicht getroffen werden.
         let pool = SqlitePool::connect("sqlite::memory:")
             .await
             .expect("in-memory pool");

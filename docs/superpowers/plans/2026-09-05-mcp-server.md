@@ -578,7 +578,16 @@ Without this, a todo created through Claude appears only after a restart, which 
 
 - [ ] **Step 1: Emit the event from every writing tool**
 
-Give `TodoServer` an `AppHandle` alongside the pool, and after each successful write emit `todolist:data-changed`. `add_todo`, `update_todo`, `delete_todo` and `book_time` emit; the three reading tools do not.
+Give `TodoServer` a way to notify the UI alongside the pool, and after each successful write emit `todolist:data-changed`. `add_todo`, `update_todo`, `delete_todo` and `book_time` emit; the three reading tools do not.
+
+> **Wie gebaut (Nachtrag).** Statt eines `AppHandle` bekam `TodoServer` ein
+> `Arc<dyn Notifier>` (`mcp/mod.rs`), mit dem einen echten Impl fuer
+> `tauri::AppHandle`. Grund: an einen `AppHandle` kommt ein Test nur heran,
+> wenn er Tauri mit dessen `test`-Feature hereinzieht. Genau die Entscheidung,
+> um die es hier geht -- welcher Aufruf meldet und welcher nicht, und dass ein
+> **fehlgeschlagener** Schreibvorgang gar nichts meldet -- waere damit nur am
+> echten Tool-Code pruefbar gewesen, also gar nicht. Mit dem Trait haengen die
+> Tests am echten Tool-Code und zaehlen die Meldungen.
 
 - [ ] **Step 2: Write the failing frontend test**
 

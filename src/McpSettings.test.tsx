@@ -2,10 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 const invokeMock = vi.fn();
-let insideTauri = true;
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
+}));
+
+let insideTauri = true;
+vi.mock("./sqlClient", () => ({
   isTauri: () => insideTauri,
+  getDb: () => Promise.reject(new Error("in Tests nicht verfuegbar")),
 }));
 
 import { McpSettings } from "./McpSettings";

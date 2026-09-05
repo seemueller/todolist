@@ -8,8 +8,9 @@
 // sich und wird deshalb genauso verdeckt.
 
 import { useCallback, useEffect, useState } from "react";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 
+import { isTauri } from "./sqlClient";
 import { CopyIcon, EyeIcon, EyeOffIcon, IconButton } from "./ui";
 
 /** Rueckgabe des Tauri-Commands `mcp_status`. */

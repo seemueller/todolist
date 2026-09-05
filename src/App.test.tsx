@@ -5,12 +5,16 @@ import * as db from "./db";
 import { debugLogs, clearDebugLogs } from "./debug";
 
 const invokeMock = vi.fn();
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invokeMock(...args),
+}));
+
 // Pro Test umschaltbar: ausserhalb von Tauri darf sich die App gar nicht erst
 // auf Ereignisse anmelden -- darauf baut die Playwright-Suite im Browser.
 let insideTauri = true;
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => invokeMock(...args),
+vi.mock("./sqlClient", () => ({
   isTauri: () => insideTauri,
+  getDb: () => Promise.reject(new Error("in Tests nicht verfuegbar")),
 }));
 
 type EventHandler = (event: { payload: unknown }) => void;

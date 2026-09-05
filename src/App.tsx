@@ -1,4 +1,4 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { DragEvent, FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
@@ -18,6 +18,7 @@ import {
 } from "./db";
 import { installDebugInterceptor } from "./debug";
 import { DATA_CHANGED_EVENT } from "./events";
+import { isTauri } from "./sqlClient";
 import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";

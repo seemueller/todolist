@@ -13,9 +13,6 @@
 //!
 //! Fehlertexte gehen ueber MCP direkt an den Leser und sind darum deutsch.
 
-// Wird erst von den Tools in Task 3 benutzt.
-#![allow(dead_code)]
-
 use super::echo::quoted;
 
 /// Minuten je Slot; `SLOT_MINUTES` in `src/timeSlots.ts`.
