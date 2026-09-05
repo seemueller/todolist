@@ -354,18 +354,16 @@ describe("TimeTrackingView", () => {
   });
 
   it("zeigt eine positive Differenz, sobald das Soll erreicht ist", async () => {
+    // Das Soll kommt aus den Einstellungen, statt es mit 32 Klicks auf null zu
+    // drehen: jeder Klick war ein eigener Speicher-Umlauf, und die Summe davon
+    // hat den Test regelmaessig in seine Zeitgrenze laufen lassen -- zuletzt in
+    // der CI. Den Verringern-Knopf deckt "verstellt die Sollzeit in
+    // Viertelstunden-Schritten" ab; hier geht es allein um die Anzeige der
+    // positiven Differenz.
+    settings = { targetSlotsPerDay: 0, showWeekend: false };
     renderView();
-    await waitFor(() => expect(target().difference).toBe("-40:00"));
-    openSettings();
+    await waitFor(() => expect(target().difference).toBe("0:00"));
 
-    // Soll auf 0:00 stellen, dann eine Viertelstunde buchen.
-    for (let i = 0; i < 32; i++) {
-      fireEvent.click(
-        screen.getByRole("button", { name: "Sollzeit je Tag um 15 Minuten verringern" })
-      );
-    }
-    await waitFor(() => expect(target().perDay).toBe("0:00"));
-    fireEvent.click(screen.getByRole("button", { name: "Schließen" }));
     paintCell(at(MO, "09:00, frei"));
 
     await waitFor(() => expect(target().difference).toBe("+0:15"));
