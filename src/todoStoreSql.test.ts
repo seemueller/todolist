@@ -13,6 +13,7 @@ import { sqlTodoStore } from "./todoStoreSql";
 const ROW = {
   id: 7,
   title: "Schreiben",
+  description: "Vorbereitung fuer den Kunden",
   done: 0,
   status: "todo",
   priority: "high",
@@ -229,9 +230,10 @@ describe("sqlTodoStore", () => {
 
   it("selects the description column", async () => {
     select.mockResolvedValue([ROW]);
-    await sqlTodoStore.listTodos();
+    const [todo] = await sqlTodoStore.listTodos();
 
     expect(select.mock.calls[0][0]).toContain("t.description");
+    expect(todo.description).toBe("Vorbereitung fuer den Kunden");
   });
 
   it("writes the description when creating a todo", async () => {
@@ -241,7 +243,14 @@ describe("sqlTodoStore", () => {
     await sqlTodoStore.addTodo("Mit Text", "medium", null, null, "Zeile eins\nZeile zwei");
 
     expect(execute.mock.calls[0][0]).toContain("description");
-    expect(execute.mock.calls[0][1]).toContain("Zeile eins\nZeile zwei");
+    expect(execute.mock.calls[0][1]).toEqual([
+      "Mit Text",
+      "Zeile eins\nZeile zwei",
+      "medium",
+      expect.any(String),
+      null,
+      null,
+    ]);
   });
 
   it("writes an empty description when none was given", async () => {
@@ -250,6 +259,13 @@ describe("sqlTodoStore", () => {
 
     await sqlTodoStore.addTodo("Ohne Text", "medium", null);
 
-    expect(execute.mock.calls[0][1]).toContain("");
+    expect(execute.mock.calls[0][1]).toEqual([
+      "Ohne Text",
+      "",
+      "medium",
+      expect.any(String),
+      null,
+      null,
+    ]);
   });
 });
