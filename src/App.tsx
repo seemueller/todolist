@@ -142,9 +142,12 @@ function App({ migrationError = null }: AppProps) {
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(migrationError);
-  // Die Aufgabe, deren Detail-Fenster offen ist. Ueber die Id, nicht ueber
-  // das Objekt: nach einem Neuladen (auch durch MCP) zeigt das Fenster so den
-  // frischen Stand und nicht eine Kopie von vorhin.
+  // Die Aufgabe, deren Detail-Fenster offen ist. Ueber die Id, nicht ueber das
+  // Objekt: die Liste bleibt so die einzige Quelle dafuer, ob die Aufgabe noch
+  // existiert -- darauf baut die Loesch-Erkennung weiter unten. Das Fenster
+  // selbst haelt bewusst einen eigenen, eingefrorenen Entwurf und folgt
+  // spaeteren Aenderungen der Aufgabe nicht -- siehe die Begruendung in
+  // TodoDetailModal.
   const [detailTodoId, setDetailTodoId] = useState<number | null>(null);
   const [burstId, setBurstId] = useState<number | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
