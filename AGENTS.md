@@ -101,6 +101,13 @@ Sieben Tools, mehr gibt es nicht: `list_todos`, `add_todo`, `update_todo`,
 ein Fehler — über MCP lassen sich bewusst keine Kategorien anlegen, umbenennen
 oder löschen.
 
+Eine Aufgabe trägt neben dem Titel eine optionale **Beschreibung**: frei
+formulierter Text, höchstens 4000 Zeichen, mehrzeilig. Zeilenumbrüche sind als
+`\n` zu schicken; `\r`, Tabulator und Nullbyte werden abgelehnt, statt still
+umgeschrieben zu werden. Bei `update_todo` leert `null` die Beschreibung,
+Weglassen lässt sie unverändert — dieselbe Regel wie bei Fälligkeit und
+Kategorie.
+
 **Der Token steht in der Datenbank**, in `app_settings` unter dem Schlüssel
 `mcp_token`, und entsteht beim ersten Start (32 Zufallsbytes, base64url). Die
 Oberfläche zeigt ihn im Einstellungs-Popup. Jede Anfrage braucht
