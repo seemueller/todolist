@@ -1,6 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { DragEvent, FormEvent, KeyboardEvent, ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  DragEvent,
+  FormEvent,
+  KeyboardEvent,
+  ReactNode,
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import {
   addTodo,
   addCategory,
@@ -16,13 +26,11 @@ import {
   updateTodoStatus,
   updateTodoTitle,
 } from "./db";
-import { installDebugInterceptor } from "./debug";
 import { DATA_CHANGED_EVENT } from "./events";
 import { isTauri } from "./sqlClient";
 import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
-import { DebugLogPanel } from "./DebugLogPanel";
 import { McpSettings } from "./McpSettings";
 import { TimeTrackingView } from "./TimeTrackingView";
 
@@ -107,6 +115,15 @@ const filterLabels: Record<DueDateFilter, string> = {
   upcoming: "Künftig",
   none: "Ohne Datum",
 };
+
+// Das Debug-Panel ist ein Werkzeug der Entwicklung und hat im ausgelieferten
+// Programm nichts zu suchen. `import.meta.env.DEV` ist im Produktionsbuild die
+// Konstante false, der Zweig faellt also samt `import()` weg -- das Panel
+// landet dort weder im Bundle noch als eigener Chunk. In der Entwicklung wird
+// es erst geladen, wenn es zum ersten Mal gezeigt wird.
+const DebugLogPanel = import.meta.env.DEV
+  ? lazy(() => import("./DebugLogPanel").then((mod) => ({ default: mod.DebugLogPanel })))
+  : null;
 
 type AppProps = {
   /** Fehlermeldung aus der localStorage-Migration in main.tsx, falls sie
@@ -224,11 +241,11 @@ function App({ migrationError = null }: AppProps) {
     };
   }, []);
 
-  useEffect(() => {
-    installDebugInterceptor();
-  }, []);
+  // Der Interceptor selbst wird in main.tsx installiert, noch vor dem ersten
+  // Render -- sonst fehlten im Panel genau die Meldungen des Starts.
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     function handleKey(e: KeyboardEvent) {
       if (e.ctrlKey && e.shiftKey && e.key === "L") {
         e.preventDefault();
@@ -884,14 +901,16 @@ function App({ migrationError = null }: AppProps) {
             {checkingUpdate ? "Prüfe..." : "Update"}
           </button>
           <span className="version">v{APP_VERSION}</span>
-          <button
-            type="button"
-            className="debug-btn"
-            onClick={() => setShowDebug(true)}
-            aria-label="Debug Logs"
-          >
-            Debug
-          </button>
+          {import.meta.env.DEV && (
+            <button
+              type="button"
+              className="debug-btn"
+              onClick={() => setShowDebug(true)}
+              aria-label="Debug Logs"
+            >
+              Debug
+            </button>
+          )}
           <button
             type="button"
             className="mcp-btn"
@@ -1051,7 +1070,11 @@ function App({ migrationError = null }: AppProps) {
         </Modal>
       )}
 
-      {showDebug && <DebugLogPanel onClose={closeDebug} />}
+      {DebugLogPanel && showDebug && (
+        <Suspense fallback={null}>
+          <DebugLogPanel onClose={closeDebug} />
+        </Suspense>
+      )}
     </div>
   );
 }

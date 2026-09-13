@@ -1,7 +1,22 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { installDebugInterceptor } from "./debug";
 import { migrateLocalStorage } from "./migrateLocalStorage";
+
+// Vor allem anderen: das Debug-Panel soll auch die Ausgaben zeigen, die noch
+// vor dem ersten Render anfallen -- die Migration und der asynchrone Aufbau der
+// Titelleiste protokollieren genau dann, wenn etwas schiefgeht. Der Aufruf
+// steht absichtlich synchron hier und nicht in einem Effekt in App: ein Effekt
+// laeuft erst nach den Effekten der Kinder, ein nachgeladenes Modul noch
+// spaeter, und was in dieser Luecke passiert, fehlt im Panel.
+//
+// `import.meta.env.DEV` ist im Produktionsbuild eine Konstante (false), der
+// Aufruf faellt dort samt Modul weg: das Panel und der Interceptor gehoeren
+// nicht in ein ausgeliefertes Programm.
+if (import.meta.env.DEV) {
+  installDebugInterceptor();
+}
 
 // Wird der Nutzerin gezeigt, wenn die Migration scheitert -- die eigentliche
 // Fehlermeldung landet in der Konsole, hier steht nur, was fuer sie zaehlt:
