@@ -1989,7 +1989,7 @@ In `e2e/todolist.spec.ts`, im `describe`-Block „Layout and UI" oder in einem e
     await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
     await expect(page.getByText("Mit Beschreibung")).toBeVisible();
 
-    await page.getByRole("button", { name: /Bearbeiten/i }).first().click();
+    await page.getByRole("button", { name: "Aufgabe bearbeiten" }).first().click();
     await page.getByLabel(/Beschreibung/i).fill("Belege aus dem Ordner");
     await page.getByRole("button", { name: /Sichern/i }).click();
 
