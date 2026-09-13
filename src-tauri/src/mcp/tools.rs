@@ -499,46 +499,13 @@ impl TodoServer {
 #[cfg(test)]
 mod tests {
     use super::super::TodoServer;
+    use super::super::store::SCHEMA;
     use rmcp::handler::server::wrapper::Parameters;
     use rmcp::model::CallToolResult;
     use serde_json::Value;
     use sqlx::{Pool, Sqlite, SqlitePool};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
-
-    /// Dasselbe Schema wie in `store.rs` -- das echte nach Migration 9.
-    const SCHEMA: &[&str] = &[
-        "CREATE TABLE categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
-            color TEXT NOT NULL DEFAULT '#a78bfa',
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );",
-        "CREATE TABLE todos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            done INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            due_date TEXT DEFAULT NULL,
-            category_id INTEGER DEFAULT NULL REFERENCES categories(id) ON DELETE SET NULL,
-            priority TEXT NOT NULL DEFAULT 'medium',
-            status TEXT NOT NULL DEFAULT 'todo',
-            description TEXT NOT NULL DEFAULT ''
-        );",
-        "CREATE TABLE time_slots (
-            date TEXT NOT NULL,
-            slot INTEGER NOT NULL,
-            category_id INTEGER NOT NULL,
-            note TEXT NOT NULL DEFAULT '',
-            PRIMARY KEY (date, slot)
-        );",
-        "CREATE TABLE time_settings (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            target_slots_per_day INTEGER NOT NULL DEFAULT 32,
-            show_weekend INTEGER NOT NULL DEFAULT 0
-        );",
-        "CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
-    ];
 
     async fn setup() -> Pool<Sqlite> {
         let pool = SqlitePool::connect("sqlite::memory:")
