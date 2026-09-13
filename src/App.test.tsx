@@ -461,6 +461,26 @@ describe("App", () => {
     });
   });
 
+  it("closes the detail modal and says so when the todo is deleted elsewhere", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    await waitFor(() => expect(listenMock).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
+    expect(await screen.findByLabelText("Beschreibung")).toBeInTheDocument();
+
+    // Ein anderer Client loescht die Aufgabe; die App laedt nach.
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    await act(async () => {
+      emit("todolist:data-changed");
+    });
+
+    expect(await screen.findByText(/zwischenzeitlich gelöscht/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Beschreibung")).not.toBeInTheDocument();
+  });
+
   it("renames a todo through the detail modal", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
     vi.mocked(db.updateTodoFields).mockResolvedValue(makeTodo({ id: 7, title: "Umbenannt" }));

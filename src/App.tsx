@@ -368,6 +368,21 @@ function App({ migrationError = null }: AppProps) {
 
   const closeDetail = useCallback(() => setDetailTodoId(null), []);
 
+  // Verschwindet die offene Aufgabe aus der Liste -- etwa weil ein anderer
+  // MCP-Client sie geloescht hat --, faellt `detailTodo` auf null und das
+  // Fenster waere kommentarlos weg. Der Entwurf ist nicht zu retten, es gibt
+  // nichts mehr, wohin man ihn schreiben koennte; aber wer gerade getippt hat,
+  // muss erfahren, warum sein Fenster zugeht.
+  //
+  // `loading` schuetzt den ersten Ladevorgang: solange er laeuft, ist die leere
+  // Liste kein Loeschen, sondern nur noch kein Ergebnis.
+  useEffect(() => {
+    if (loading || detailTodoId === null) return;
+    if (todos.some((t) => t.id === detailTodoId)) return;
+    setDetailTodoId(null);
+    setError("Die Aufgabe wurde zwischenzeitlich gelöscht. Nicht gespeicherte Änderungen sind verloren.");
+  }, [loading, detailTodoId, todos]);
+
   // Faengt bewusst nichts ab: das Detail-Fenster zeigt den Fehler selbst und
   // bleibt offen, damit der Entwurf nicht verloren geht.
   async function handleSaveDetail(id: number, patch: TodoFieldsPatch) {
