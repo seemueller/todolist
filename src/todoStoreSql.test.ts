@@ -291,5 +291,36 @@ describe("sqlTodoStore", () => {
 
       expect(execute).not.toHaveBeenCalled();
     });
+
+    it("sets category_id when a category is given", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, { categoryId: 3 });
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("category_id = $1");
+      expect(params).toEqual([3, 7]);
+    });
+
+    it("clears category_id when the patch sets it to null", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, { categoryId: null });
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("category_id = $1");
+      expect(params).toEqual([null, 7]);
+    });
+
+    it("rejects rather than throwing synchronously for an unknown id", async () => {
+      execute.mockResolvedValue({ rowsAffected: 0 });
+      select.mockResolvedValue([]);
+
+      const result = sqlTodoStore.updateTodoFields(999, { title: "Neu" });
+
+      await expect(result).rejects.toThrow("Todo 999 not found");
+    });
   });
 });
