@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import App from "./App";
 import * as db from "./db";
-import { debugLogs, clearDebugLogs } from "./debug";
+import { debugLogs, clearDebugLogs, installDebugInterceptor } from "./debug";
 
 const invokeMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -253,6 +253,9 @@ describe("App", () => {
   });
 
   it("moves a card between lanes on drop and records it in the debug log", async () => {
+    // Im laufenden Programm installiert main.tsx den Interceptor vor dem
+    // ersten Render; hier rendert der Test App direkt, also uebernimmt er das.
+    installDebugInterceptor();
     clearDebugLogs();
     vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
     vi.mocked(db.updateTodoStatus).mockResolvedValue(

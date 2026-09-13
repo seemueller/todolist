@@ -27,7 +27,15 @@ export function clearDebugLogs() {
   logs.length = 0;
 }
 
+// Der Interceptor haengt sich vor die vorhandenen console-Funktionen. Ein
+// zweiter Aufruf wuerde die eigenen Wrapper noch einmal einpacken, jede Zeile
+// also doppelt protokollieren -- darum wird nur beim ersten Mal installiert.
+let interceptorInstalled = false;
+
 export function installDebugInterceptor() {
+  if (interceptorInstalled) return;
+  interceptorInstalled = true;
+
   const origLog = console.log;
   const origWarn = console.warn;
   const origError = console.error;
