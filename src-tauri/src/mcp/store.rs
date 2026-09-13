@@ -787,7 +787,7 @@ mod tests {
     use super::*;
     use sqlx::SqlitePool;
 
-    /// Muss dem echten Schema nach Migration 9 entsprechen -- insbesondere
+    /// Muss dem echten Schema nach Migration 10 entsprechen -- insbesondere
     /// `categories.name` mit `UNIQUE COLLATE NOCASE` und `time_slots` OHNE
     /// Fremdschluessel auf die Kategorie. Ein Testschema, das vom echten
     /// abweicht, ist der Grund, warum das ON DELETE CASCADE aus Migration 7
@@ -807,7 +807,8 @@ mod tests {
             due_date TEXT DEFAULT NULL,
             category_id INTEGER DEFAULT NULL REFERENCES categories(id) ON DELETE SET NULL,
             priority TEXT NOT NULL DEFAULT 'medium',
-            status TEXT NOT NULL DEFAULT 'todo'
+            status TEXT NOT NULL DEFAULT 'todo',
+            description TEXT NOT NULL DEFAULT ''
         );",
         "CREATE TABLE time_slots (
             date TEXT NOT NULL,
