@@ -104,6 +104,17 @@ describe("TodoDetailModal", () => {
     });
   });
 
+  it("puts an empty description alone in the patch when a filled one is cleared", async () => {
+    const { onSave } = renderModal({ description: "Belege holen" });
+
+    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(7, { description: "" });
+    });
+  });
+
   it("refuses an empty title and stays open", async () => {
     const { onSave } = renderModal();
 

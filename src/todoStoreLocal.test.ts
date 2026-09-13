@@ -253,6 +253,15 @@ describe("localTodoStore", () => {
       expect(updated.category_color).toBe("#7cc3f7");
     });
 
+    it("clears a description with the empty string rather than skipping the field", async () => {
+      const todo = await localTodoStore.addTodo("Titel", "medium", null);
+      await localTodoStore.updateTodoFields(todo.id, { description: "Text" });
+
+      const updated = await localTodoStore.updateTodoFields(todo.id, { description: "" });
+
+      expect(updated.description).toBe("");
+    });
+
     it("returns the todo unchanged for an empty patch", async () => {
       const todo = await localTodoStore.addTodo("Titel", "medium", null);
 

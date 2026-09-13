@@ -512,6 +512,43 @@ describe("App", () => {
     expect(screen.getAllByLabelText("Hat eine Beschreibung")).toHaveLength(1);
   });
 
+  it("opens the detail modal on a double click on the kanban card", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+
+    const card = await waitFor(() => screen.getByText("Task").closest(".kanban-card"));
+    fireEvent.doubleClick(card!);
+
+    expect(await screen.findByLabelText(/Beschreibung/i)).toBeInTheDocument();
+  });
+
+  it("clears the description through the detail modal", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 7, title: "Task", description: "Belege holen" }),
+    ]);
+    vi.mocked(db.updateTodoFields).mockResolvedValue(
+      makeTodo({ id: 7, title: "Task", description: "" }),
+    );
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
+    // Exakt, nicht als Muster: mit gesetzter Beschreibung matcht /Beschreibung/i
+    // auch die Notiz-Markierung "Hat eine Beschreibung" in der Zeile dahinter.
+    fireEvent.change(await screen.findByLabelText("Beschreibung"), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(db.updateTodoFields).toHaveBeenCalledWith(7, { description: "" });
+    });
+  });
+
   it("previews the description on the kanban card", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
       makeTodo({ id: 7, title: "Task", description: "Zeile eins\nZeile zwei" }),

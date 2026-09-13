@@ -284,6 +284,18 @@ describe("sqlTodoStore", () => {
       expect(params).toEqual(["Neu", "Text", 7]);
     });
 
+    it("clears a description with the empty string rather than skipping the field", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, { description: "" });
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("description = $1");
+      expect(params).toEqual(["", 7]);
+    });
+
     it("writes nothing for an empty patch", async () => {
       select.mockResolvedValue([ROW]);
 
