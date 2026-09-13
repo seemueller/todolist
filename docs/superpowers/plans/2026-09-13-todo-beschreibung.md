@@ -52,7 +52,7 @@ Ein paar Dinge, die in diesem Projekt anders sind, als man vermuten würde:
 - Modify: `src-tauri/src/mcp/store.rs` (`SCHEMA` im Testmodul)
 - Test: `src/migrations.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `src/migrations.test.ts`, ans Ende des `describe`-Blocks:
 
@@ -62,12 +62,12 @@ In `src/migrations.test.ts`, ans Ende des `describe`-Blocks:
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/migrations.test.ts -t "description column"`
 Expected: FAIL — `expected '…' to contain 'ALTER TABLE todos ADD COLUMN description'`
 
-- [ ] **Step 3: Migration 10 anhängen**
+- [x] **Step 3: Migration 10 anhängen**
 
 In `src-tauri/src/lib.rs`, in der Liste `let migrations = vec![…]`, direkt **hinter** der Migration mit `version: 9` und vor dem schließenden `];`:
 
@@ -84,7 +84,7 @@ In `src-tauri/src/lib.rs`, in der Liste `let migrations = vec![…]`, direkt **h
         },
 ```
 
-- [ ] **Step 4: Das Rust-Testschema nachziehen**
+- [x] **Step 4: Das Rust-Testschema nachziehen**
 
 In `src-tauri/src/mcp/store.rs`, im `SCHEMA`-Array, die `todos`-Tabelle um die Spalte ergänzen (letzte Spalte, hinter `status`):
 
@@ -104,7 +104,7 @@ In `src-tauri/src/mcp/store.rs`, im `SCHEMA`-Array, die `todos`-Tabelle um die S
 
 Den Doc-Kommentar über `SCHEMA` von „nach Migration 9" auf „nach Migration 10" ändern.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `npx vitest run src/migrations.test.ts`
 Expected: PASS, 4 Tests — insbesondere `numbers migrations consecutively from 1 without duplicates`, das die lückenlose 1..10 prüft.
@@ -112,7 +112,7 @@ Expected: PASS, 4 Tests — insbesondere `numbers migrations consecutively from 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml`
 Expected: PASS — das geänderte Testschema bricht nichts, die Spalte hat eine Vorgabe.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/lib.rs src-tauri/src/mcp/store.rs src/migrations.test.ts
@@ -127,7 +127,7 @@ git commit -m "feat: give todos a description column"
 - Modify: `src/types.ts:4-42`
 - Test: `src/types.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `src/types.test.ts`, im vorhandenen `describe("fromRow", …)`-Block (ab `src/types.test.ts:16`), hinter den dortigen Tests:
 
@@ -168,12 +168,12 @@ In `src/types.test.ts`, im vorhandenen `describe("fromRow", …)`-Block (ab `src
 
 Falls `fromRow` in der Datei noch nicht importiert ist, den Import oben ergänzen: `import { fromRow } from "./types";`
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/types.test.ts -t "description"`
 Expected: FAIL — `Property 'description' does not exist on type 'Todo'` bzw. `expected undefined to be ""`
 
-- [ ] **Step 3: Die Felder ergänzen**
+- [x] **Step 3: Die Felder ergänzen**
 
 In `src/types.ts`, in `interface Todo` hinter `title`:
 
@@ -196,7 +196,7 @@ In `fromRow`, im zurückgegebenen Objekt hinter `title: row.title,`:
     description: row.description ?? "",
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/types.test.ts`
 Expected: PASS
@@ -204,7 +204,7 @@ Expected: PASS
 Run: `npm run typecheck`
 Expected: Fehler in `src/todoStoreLocal.ts` — `addTodo` baut ein `Todo` ohne `description`. Das ist erwartet und wird in Task 3 behoben. Wer zwischendurch einen grünen Typecheck braucht, zieht Task 3 sofort nach.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/types.ts src/types.test.ts
@@ -222,7 +222,7 @@ git commit -m "feat: carry a description on the todo type"
 - Modify: `src/db.ts:15-22`
 - Test: `src/todoStoreSql.test.ts`, `src/todoStoreLocal.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/todoStoreLocal.test.ts` ans Ende des äußeren `describe`-Blocks:
 
@@ -292,12 +292,12 @@ In `src/todoStoreSql.test.ts` ans Ende des äußeren `describe`-Blocks (die Date
   });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/todoStoreLocal.test.ts src/todoStoreSql.test.ts`
 Expected: FAIL — `Expected 4 arguments, but got 5` bzw. `expected '…' to contain 't.description'`
 
-- [ ] **Step 3: Den Vertrag erweitern**
+- [x] **Step 3: Den Vertrag erweitern**
 
 In `src/storeTypes.ts`, `addTodo` im `TodoStore`-Interface ersetzen:
 
@@ -316,7 +316,7 @@ In `src/storeTypes.ts`, `addTodo` im `TodoStore`-Interface ersetzen:
   ): Promise<Todo>;
 ```
 
-- [ ] **Step 4: Den SQL-Speicher anpassen**
+- [x] **Step 4: Den SQL-Speicher anpassen**
 
 In `src/todoStoreSql.ts`:
 
@@ -349,7 +349,7 @@ async function addTodo(
 }
 ```
 
-- [ ] **Step 5: Den localStorage-Speicher anpassen**
+- [x] **Step 5: Den localStorage-Speicher anpassen**
 
 In `src/todoStoreLocal.ts`:
 
@@ -399,7 +399,7 @@ function addTodo(
 }
 ```
 
-- [ ] **Step 6: Die Durchreiche in db.ts anpassen**
+- [x] **Step 6: Die Durchreiche in db.ts anpassen**
 
 In `src/db.ts`:
 
@@ -415,7 +415,7 @@ export function addTodo(
 }
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `npx vitest run src/todoStoreLocal.test.ts src/todoStoreSql.test.ts src/types.test.ts`
 Expected: PASS
@@ -423,7 +423,7 @@ Expected: PASS
 Run: `npm run typecheck`
 Expected: keine Fehler
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/storeTypes.ts src/todoStoreSql.ts src/todoStoreLocal.ts src/db.ts src/todoStoreSql.test.ts src/todoStoreLocal.test.ts
@@ -441,7 +441,7 @@ git commit -m "feat: read and create todos with a description"
 - Modify: `src/db.ts`
 - Test: `src/todoStoreLocal.test.ts`, `src/todoStoreSql.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/todoStoreLocal.test.ts`:
 
@@ -544,12 +544,12 @@ In `src/todoStoreSql.test.ts` (am Mock-Muster der Datei orientieren):
   });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/todoStoreLocal.test.ts src/todoStoreSql.test.ts -t "updateTodoFields"`
 Expected: FAIL — `sqlTodoStore.updateTodoFields is not a function`
 
-- [ ] **Step 3: Den Vertrag schreiben**
+- [x] **Step 3: Den Vertrag schreiben**
 
 In `src/storeTypes.ts`, oberhalb von `export interface TodoStore`:
 
@@ -586,7 +586,7 @@ Und im `TodoStore`-Interface, hinter `updateTodoCategory`:
   updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Todo>;
 ```
 
-- [ ] **Step 4: Den SQL-Speicher umsetzen**
+- [x] **Step 4: Den SQL-Speicher umsetzen**
 
 In `src/todoStoreSql.ts` den Import um `TodoFieldsPatch` erweitern:
 
@@ -630,7 +630,7 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
 
 Und `updateTodoFields` in das exportierte `sqlTodoStore`-Objekt aufnehmen, hinter `updateTodoCategory`.
 
-- [ ] **Step 5: Den localStorage-Speicher umsetzen**
+- [x] **Step 5: Den localStorage-Speicher umsetzen**
 
 In `src/todoStoreLocal.ts` den Import erweitern:
 
@@ -666,7 +666,7 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
 
 Und `updateTodoFields` in das exportierte `localTodoStore`-Objekt aufnehmen.
 
-- [ ] **Step 6: Durchreichen in db.ts**
+- [x] **Step 6: Durchreichen in db.ts**
 
 In `src/db.ts` den Import erweitern und die Funktion hinter `updateTodoCategory` ergänzen:
 
@@ -678,7 +678,7 @@ export function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<To
 }
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `npx vitest run src/todoStoreLocal.test.ts src/todoStoreSql.test.ts`
 Expected: PASS
@@ -686,7 +686,7 @@ Expected: PASS
 Run: `npm run typecheck`
 Expected: keine Fehler
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/storeTypes.ts src/todoStoreSql.ts src/todoStoreLocal.ts src/db.ts src/todoStoreSql.test.ts src/todoStoreLocal.test.ts
@@ -703,7 +703,7 @@ git commit -m "feat: change several todo fields in one write"
 
 Diese Datei übernimmt beim ersten Start nach dem Update die `localStorage`-Daten in die SQLite-Datenbank. Sie schreibt `INSERT`s und muss die neue Spalte kennen.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `src/migrateLocalStorage.test.ts`, am Muster der vorhandenen Tests:
 
@@ -753,12 +753,12 @@ In `src/migrateLocalStorage.test.ts`, am Muster der vorhandenen Tests:
 
 `seedTodos` und `executed` sind die Helfer, die die Datei bereits benutzt — beim Schreiben der Tests die vorhandenen Namen übernehmen, nicht neue erfinden.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/migrateLocalStorage.test.ts -t "description"`
 Expected: FAIL — die `INSERT`-Parameter enthalten die Beschreibung nicht
 
-- [ ] **Step 3: Die Spalte in den INSERT aufnehmen**
+- [x] **Step 3: Die Spalte in den INSERT aufnehmen**
 
 In `src/migrateLocalStorage.ts`, in der Todo-Schleife (um `src/migrateLocalStorage.ts:150`), bei den übrigen Feldvorgaben ergänzen:
 
@@ -788,12 +788,12 @@ Und die Anweisung austauschen — Spaltenliste, Platzhalter und Parameter-Array 
 
 Die Typprüfung mit `typeof` statt `?? ""` folgt dem Muster der Nachbarzeilen: die Daten kommen aus `localStorage` und sind nicht typsicher, ein `{ description: 42 }` soll nicht in die Spalte wandern.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/migrateLocalStorage.test.ts`
 Expected: PASS, alle Tests der Datei
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/migrateLocalStorage.ts src/migrateLocalStorage.test.ts
@@ -812,7 +812,7 @@ git commit -m "feat: carry descriptions through the localStorage migration"
 
 Reine Bausteinarbeit ohne eigenes Verhalten; die Tests dafür kommen in Task 7 und 8 mit den Komponenten, die sie benutzen.
 
-- [ ] **Step 1: Die dritte Panelbreite**
+- [x] **Step 1: Die dritte Panelbreite**
 
 In `src/ui/Modal.tsx`:
 
@@ -826,7 +826,7 @@ const VARIANT_CLASS: Record<ModalVariant, string> = {
 };
 ```
 
-- [ ] **Step 2: Das Notiz-Symbol**
+- [x] **Step 2: Das Notiz-Symbol**
 
 In `src/ui/icons.tsx`, alphabetisch zwischen `MinusIcon` und `PencilIcon`:
 
@@ -843,7 +843,7 @@ export function NoteIcon(props: IconProps) {
 
 In `src/ui/index.ts` den Namen `NoteIcon` in die `export { … } from "./icons";`-Liste aufnehmen, alphabetisch zwischen `MinusIcon` und `PencilIcon`.
 
-- [ ] **Step 3: Das Styling**
+- [x] **Step 3: Das Styling**
 
 In `src/App.css`, bei den Modal-Regeln (ab `.changelog-modal,`):
 
@@ -964,12 +964,12 @@ In `src/App.css`, bei den Modal-Regeln (ab `.changelog-modal,`):
 
 `--radius-md` und die Farbtoken stehen im `:root`-Block derselben Datei; falls ein Name abweicht, den dort vorhandenen nehmen — keine neuen Token anlegen.
 
-- [ ] **Step 4: Typecheck**
+- [x] **Step 4: Typecheck**
 
 Run: `npm run typecheck`
 Expected: keine Fehler
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/Modal.tsx src/ui/icons.tsx src/ui/index.ts src/App.css
@@ -984,7 +984,7 @@ git commit -m "feat: add a todo modal width and a note icon"
 - Create: `src/TodoDetailModal.tsx`
 - Test: `src/TodoDetailModal.test.tsx`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Neue Datei `src/TodoDetailModal.test.tsx`:
 
@@ -1112,12 +1112,12 @@ describe("TodoDetailModal", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/TodoDetailModal.test.tsx`
 Expected: FAIL — `Failed to resolve import "./TodoDetailModal"`
 
-- [ ] **Step 3: Die Komponente schreiben**
+- [x] **Step 3: Die Komponente schreiben**
 
 Neue Datei `src/TodoDetailModal.tsx`:
 
@@ -1278,7 +1278,7 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
 
 `todo-modal-cancel` und `todo-modal-save` sind in Task 6 angelegt worden. `edit-input` und `edit-date-input` gibt es bereits — sie stammen aus der Inline-Bearbeitung, die Task 8 aus der Zeile entfernt, und werden hier weiterverwendet.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/TodoDetailModal.test.tsx`
 Expected: PASS, 7 Tests
@@ -1286,7 +1286,7 @@ Expected: PASS, 7 Tests
 Run: `npm run typecheck`
 Expected: keine Fehler
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/TodoDetailModal.tsx src/TodoDetailModal.test.tsx
@@ -1303,7 +1303,7 @@ git commit -m "feat: add a todo detail modal"
 
 Hier verschwindet die Inline-Bearbeitung des Titels. Betroffen sind in `src/App.tsx`: der Import von `updateTodoTitle` und `updateTodoDueDate` (nur noch nötig, falls sie anderswo benutzt werden — sonst entfernen), die Zustände `editingId`, `editingTitle`, `editingDueDate`, die Funktionen `startEdit` und `commitEdit` sowie der `editingId === todo.id`-Zweig in der Listenzeile.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/App.test.tsx`, ans Ende des `describe("App", …)`-Blocks:
 
@@ -1380,12 +1380,12 @@ In `src/App.test.tsx`, ans Ende des `describe("App", …)`-Blocks:
 
 Der Helfer `makeTodo` steht bereits in der Datei — er braucht jetzt ein `description: ""` in seinen Vorgabewerten. Ebenso muss `db.updateTodoFields` im `vi.mock("./db", …)`-Block als `vi.fn()` auftauchen; die vorhandenen Einträge zeigen die Form.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/App.test.tsx -t "detail modal"`
 Expected: FAIL — `Unable to find a label with the text of: /Beschreibung/i`
 
-- [ ] **Step 3: Die Inline-Bearbeitung ausbauen**
+- [x] **Step 3: Die Inline-Bearbeitung ausbauen**
 
 In `src/App.tsx`:
 
@@ -1431,7 +1431,7 @@ In `src/App.tsx`:
 
 5. Ist `InlineEditInput` danach in `App.tsx` nur noch für Kategorien im Einsatz, bleibt der Import; wird er gar nicht mehr benutzt, entfernen. Gleiches gilt für `updateTodoTitle` und `updateTodoDueDate` aus `./db`.
 
-- [ ] **Step 4: Zustand und Speichern ergänzen**
+- [x] **Step 4: Zustand und Speichern ergänzen**
 
 In `src/App.tsx`, bei den übrigen `useState`-Zeilen:
 
@@ -1486,7 +1486,7 @@ import { NoteIcon } from "./ui";
 
 (`updateTodoFields` gehört in die bestehende `from "./db"`-Liste, `NoteIcon` in die bestehende `from "./ui"`-Liste.)
 
-- [ ] **Step 5: Die Kanban-Karte**
+- [x] **Step 5: Die Kanban-Karte**
 
 In `src/App.tsx`, in der Karte direkt hinter `<span className="kanban-card-title">{todo.title}</span>`:
 
@@ -1506,7 +1506,7 @@ Und am Kartencontainer den Doppelklick ergänzen:
 
 Der Umbruch wird für die Vorschau durch ein Leerzeichen ersetzt, damit `-webkit-line-clamp` zwei Zeilen Text zeigt statt zwei Zeilen bis zum ersten Umbruch.
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `npx vitest run src/App.test.tsx`
 Expected: PASS — auch die vorhandenen Tests, die bisher die Inline-Bearbeitung geprüft haben. Ein Test, der ausdrücklich das Inline-Titelfeld erwartet, wird durch den Modal-Weg ersetzt, nicht gelöscht: was er geprüft hat (Umbenennen funktioniert), muss weiter geprüft werden.
@@ -1514,7 +1514,7 @@ Expected: PASS — auch die vorhandenen Tests, die bisher die Inline-Bearbeitung
 Run: `npm run typecheck && npm test`
 Expected: beides grün
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/App.tsx src/App.test.tsx
@@ -1529,7 +1529,7 @@ git commit -m "feat: edit a todo in a detail modal"
 - Modify: `src-tauri/src/mcp/store.rs` (`Todo`, `TodoRow`, `From<TodoRow>`, `TodoUpdate`, `TODO_COLUMNS`, `add_todo`, `update_todo`)
 - Test: `src-tauri/src/mcp/store.rs` (Testmodul am Dateiende)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src-tauri/src/mcp/store.rs`, im `mod tests`-Block bei den übrigen Aufgaben-Tests:
 
@@ -1612,12 +1612,12 @@ In `src-tauri/src/mcp/store.rs`, im `mod tests`-Block bei den übrigen Aufgaben-
     }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml description`
 Expected: FAIL — `this function takes 5 arguments but 6 arguments were supplied`, `no field 'description' on type 'TodoUpdate'`
 
-- [ ] **Step 3: Typen und Spaltenliste**
+- [x] **Step 3: Typen und Spaltenliste**
 
 In `src-tauri/src/mcp/store.rs`:
 
@@ -1670,7 +1670,7 @@ impl TodoUpdate {
 }
 ```
 
-- [ ] **Step 4: `add_todo` erweitern**
+- [x] **Step 4: `add_todo` erweitern**
 
 ```rust
 pub async fn add_todo(
@@ -1706,7 +1706,7 @@ Und das `INSERT` austauschen:
     .await?;
 ```
 
-- [ ] **Step 5: `update_todo` erweitern**
+- [x] **Step 5: `update_todo` erweitern**
 
 In `update_todo`, bei der Prüfung der übrigen Felder:
 
@@ -1739,7 +1739,7 @@ Und bei den `bind`-Aufrufen, in derselben Reihenfolge wie die `assignments`:
 
 **Reihenfolge beachten:** `assignments` und `bind`-Aufrufe müssen dieselbe Folge haben, sonst landen Werte in den falschen Spalten. Die Beschreibung steht in beiden Listen direkt hinter dem Titel.
 
-- [ ] **Step 6: Die Aufrufer in tools.rs anpassen**
+- [x] **Step 6: Die Aufrufer in tools.rs anpassen**
 
 `store::add_todo` in `src-tauri/src/mcp/tools.rs` bekommt vorerst `None` als sechstes Argument, damit der Code kompiliert; Task 10 füllt es:
 
@@ -1760,12 +1760,12 @@ Und im `TodoUpdate`-Literal derselben Datei:
             description: None,
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml`
 Expected: PASS, alle Tests
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src-tauri/src/mcp/store.rs src-tauri/src/mcp/tools.rs
@@ -1780,7 +1780,7 @@ git commit -m "feat: read and write todo descriptions in the mcp store"
 - Modify: `src-tauri/src/mcp/tools.rs` (Grenzen, `check_multiline`, `AddTodo`, `UpdateTodo`, die beiden Tool-Rümpfe)
 - Test: `src-tauri/src/mcp/tools.rs` (Testmodul)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Im Testmodul von `src-tauri/src/mcp/tools.rs` (existiert keines, ein `#[cfg(test)] mod tests { use super::*; … }` am Dateiende anlegen):
 
@@ -1824,12 +1824,12 @@ Im Testmodul von `src-tauri/src/mcp/tools.rs` (existiert keines, ein `#[cfg(test
     }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml multiline`
 Expected: FAIL — `cannot find function 'check_multiline' in this scope`
 
-- [ ] **Step 3: Grenze und Prüfung schreiben**
+- [x] **Step 3: Grenze und Prüfung schreiben**
 
 In `src-tauri/src/mcp/tools.rs`, bei den übrigen Grenzen:
 
@@ -1868,7 +1868,7 @@ fn check_multiline(label: &str, value: &str, max: usize) -> Result<(), String> {
 }
 ```
 
-- [ ] **Step 4: Die Tool-Parameter**
+- [x] **Step 4: Die Tool-Parameter**
 
 In `struct AddTodo`, hinter `title`:
 
@@ -1892,7 +1892,7 @@ In `struct UpdateTodo`, hinter `title`:
     pub description: Option<Option<String>>,
 ```
 
-- [ ] **Step 5: Die Tool-Rümpfe**
+- [x] **Step 5: Die Tool-Rümpfe**
 
 In `add_todo` die Prüfkette erweitern und das `None` aus Task 9 ersetzen:
 
@@ -1959,12 +1959,12 @@ In `update_todo` ebenso:
 
 Und die beiden Tool-Beschreibungen um einen Satz ergänzen — `add_todo`: „Eine Beschreibung ist optional und darf mehrere Zeilen haben."; `update_todo`: „Die Beschreibung darf mehrere Zeilen haben; null leert sie."
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml`
 Expected: PASS, alle Tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src-tauri/src/mcp/tools.rs
@@ -1978,7 +1978,7 @@ git commit -m "feat: take a description through add_todo and update_todo"
 **Files:**
 - Modify: `e2e/todolist.spec.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `e2e/todolist.spec.ts`, im `describe`-Block „Layout and UI" oder in einem eigenen `test.describe("Beschreibung", …)` am Dateiende:
 
@@ -2000,19 +2000,19 @@ In `e2e/todolist.spec.ts`, im `describe`-Block „Layout and UI" oder in einem e
   });
 ```
 
-- [ ] **Step 2: Run test to verify it passes**
+- [x] **Step 2: Run test to verify it passes**
 
 Run: `npx playwright test -g "Beschreibung"`
 Expected: PASS — der Weg ist nach Task 8 fertig; dieser Test sichert ihn im echten Browser gegen den localStorage-Speicher ab.
 
 Schlägt er fehl, liegt es an der Oberfläche, nicht am Test: Task 8 nacharbeiten, nicht den Test abschwächen.
 
-- [ ] **Step 3: Run the whole suite**
+- [x] **Step 3: Run the whole suite**
 
 Run: `npx playwright test`
 Expected: alle Tests grün. Die Suite flakt gelegentlich unter Last — ein Test, der im Wiederholungslauf durchgeht, ist kein Regress; ein reproduzierbarer Fehlschlag schon.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add e2e/todolist.spec.ts
@@ -2028,7 +2028,7 @@ git commit -m "test: cover the description end to end"
 - Modify: `STYLEGUIDE.md` (Baustein-Katalog, Eintrag `Modal`; Abschnitt „Bewusst nicht extrahiert" falls einschlägig)
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: AGENTS.md**
+- [x] **Step 1: AGENTS.md**
 
 Im Abschnitt „MCP-Server" den Satz über die sieben Tools stehen lassen — es bleiben sieben — und hinter dem Absatz über die Kategorien ergänzen:
 
@@ -2041,7 +2041,7 @@ Weglassen lässt sie unverändert — dieselbe Regel wie bei Fälligkeit und
 Kategorie.
 ```
 
-- [ ] **Step 2: STYLEGUIDE.md**
+- [x] **Step 2: STYLEGUIDE.md**
 
 Im Eintrag `Modal` die Zeile zur `variant`-Prop auf die dritte Breite erweitern:
 
@@ -2051,7 +2051,7 @@ Im Eintrag `Modal` die Zeile zur `variant`-Prop auf die dritte Breite erweitern:
 
 Und im Baustein-Katalog beim Icon-Abschnitt `NoteIcon` erwähnen, falls dort einzelne Icons aufgezählt werden.
 
-- [ ] **Step 3: CHANGELOG.md**
+- [x] **Step 3: CHANGELOG.md**
 
 Über dem obersten Eintrag einen neuen Abschnitt anlegen, in der Sprache der bestehenden Einträge — was die Nutzerin davon hat, nicht welche Funktion umgeschrieben wurde:
 
@@ -2067,12 +2067,12 @@ Und im Baustein-Katalog beim Icon-Abschnitt `NoteIcon` erwähnen, falls dort ein
 - Der Titel wird nicht mehr direkt in der Zeile umbenannt, sondern im neuen Fenster. Priorität, Fälligkeit und Kategorie bleiben in der Zeile bedienbar.
 ```
 
-- [ ] **Step 4: Die ganze Suite**
+- [x] **Step 4: Die ganze Suite**
 
 Run: `npm run typecheck && npm test && cargo test --manifest-path src-tauri/Cargo.toml && npx playwright test`
 Expected: alles grün
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add AGENTS.md STYLEGUIDE.md CHANGELOG.md

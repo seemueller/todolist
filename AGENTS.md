@@ -43,6 +43,7 @@ Beschriftung umbenennt, zieht den Test mit.
 - `src/timeCsv.test.ts` — unit tests for the CSV export
 - `src/TimeTrackingView.test.tsx` — time-tracking view (`timeDb` is mocked)
 - `src/App.test.tsx` — React component tests (db layer is mocked)
+- `src/TodoDetailModal.test.tsx` — the detail window, isolated from `App`
 - `src/main.test.tsx` — checks that the migration runs before the first render
 - `src/db.test.ts` / `src/timeDb.test.ts` — which backend each dispatcher picks
 - `src/todoStoreLocal.test.ts` / `src/timeStoreLocal.test.ts` — the localStorage stores
