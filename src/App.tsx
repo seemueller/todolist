@@ -21,18 +21,19 @@ import {
   toggleTodoDone,
   updateCategory,
   updateTodoCategory,
-  updateTodoDueDate,
+  updateTodoFields,
   updateTodoPriority,
   updateTodoStatus,
-  updateTodoTitle,
 } from "./db";
 import { DATA_CHANGED_EVENT } from "./events";
 import { isTauri } from "./sqlClient";
+import type { TodoFieldsPatch } from "./storeTypes";
 import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
 import { TimeTrackingView } from "./TimeTrackingView";
+import { TodoDetailModal } from "./TodoDetailModal";
 
 /** Die drei Ansichten der App. */
 type ViewMode = "list" | "kanban" | "time";
@@ -60,6 +61,7 @@ import {
   LaneTodoIcon,
   ListViewIcon,
   Modal,
+  NoteIcon,
   PencilIcon,
   PlusIcon,
   PrioritySelect,
@@ -140,9 +142,10 @@ function App({ migrationError = null }: AppProps) {
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(migrationError);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingTitle, setEditingTitle] = useState("");
-  const [editingDueDate, setEditingDueDate] = useState("");
+  // Die Aufgabe, deren Detail-Fenster offen ist. Ueber die Id, nicht ueber
+  // das Objekt: nach einem Neuladen (auch durch MCP) zeigt das Fenster so den
+  // frischen Stand und nicht eine Kopie von vorhin.
+  const [detailTodoId, setDetailTodoId] = useState<number | null>(null);
   const [burstId, setBurstId] = useState<number | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [checkUpdate, setCheckUpdate] = useState(false);
@@ -363,32 +366,14 @@ function App({ migrationError = null }: AppProps) {
     }
   }
 
-  function startEdit(todo: Todo) {
-    setEditingId(todo.id);
-    setEditingTitle(todo.title);
-    setEditingDueDate(todo.due_date || "");
-  }
+  const closeDetail = useCallback(() => setDetailTodoId(null), []);
 
-  async function commitEdit(id: number) {
-    const title = editingTitle.trim();
-    if (title) {
-      try {
-        const updated = await updateTodoTitle(id, title);
-        setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-        setError(null);
-      } catch (err) {
-        setError(String(err));
-      }
-    }
-    try {
-      const dueDate = editingDueDate || null;
-      const updated = await updateTodoDueDate(id, dueDate);
-      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      setError(null);
-    } catch (err) {
-      setError(String(err));
-    }
-    setEditingId(null);
+  // Faengt bewusst nichts ab: das Detail-Fenster zeigt den Fehler selbst und
+  // bleibt offen, damit der Entwurf nicht verloren geht.
+  async function handleSaveDetail(id: number, patch: TodoFieldsPatch) {
+    const updated = await updateTodoFields(id, patch);
+    setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    setError(null);
   }
 
   async function handleUpdateTodoCategory(id: number, categoryId: number | null) {
@@ -532,6 +517,8 @@ function App({ migrationError = null }: AppProps) {
     }
     return true;
   });
+
+  const detailTodo = detailTodoId === null ? null : todos.find((t) => t.id === detailTodoId) ?? null;
 
   const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "all" || searchQuery || categoryFilter !== null;
 
@@ -701,43 +688,27 @@ function App({ migrationError = null }: AppProps) {
                   {todo.done && <CheckIcon />}
                 </IconButton>
 
-                {editingId === todo.id ? (
-                  <div className="edit-row">
-                    <InlineEditInput
-                      value={editingTitle}
-                      autoFocus
-                      onValueChange={setEditingTitle}
-                      onCommit={() => commitEdit(todo.id)}
-                      onCancel={() => setEditingId(null)}
-                    />
-                    <input
-                      type="date"
-                      className="edit-date-input"
-                      value={editingDueDate}
-                      onChange={(e) => setEditingDueDate(e.currentTarget.value)}
-                      onBlur={() => commitEdit(todo.id)}
-                    />
-                  </div>
-                ) : (
-                  <span className="title" onDoubleClick={() => startEdit(todo)}>
-                    {todo.title}
-                  </span>
-                )}
+                <span className="title" onDoubleClick={() => setDetailTodoId(todo.id)}>
+                  {todo.title}
+                  {todo.description && (
+                    <span className="todo-note-mark" aria-label="Hat eine Beschreibung">
+                      <NoteIcon />
+                    </span>
+                  )}
+                </span>
 
-                {editingId !== todo.id && todo.due_date && (
+                {todo.due_date && (
                   <DueDateBadge overdue={overdue} today={today && !todo.done}>
                     {formatDate(todo.due_date)}
                   </DueDateBadge>
                 )}
 
-                {editingId !== todo.id && (
-                  <PrioritySelect
-                    variant="inline"
-                    value={todo.priority}
-                    onValueChange={(priority) => handlePriorityChange(todo.id, priority)}
-                    aria-label="Priorität ändern"
-                  />
-                )}
+                <PrioritySelect
+                  variant="inline"
+                  value={todo.priority}
+                  onValueChange={(priority) => handlePriorityChange(todo.id, priority)}
+                  aria-label="Priorität ändern"
+                />
 
                 {todo.category_name && (
                   <CategoryBadge color={todo.category_color}>{todo.category_name}</CategoryBadge>
@@ -753,7 +724,11 @@ function App({ migrationError = null }: AppProps) {
                 />
 
                 <div className="todo-actions">
-                  <IconButton variant="action" onClick={() => startEdit(todo)} aria-label="Bearbeiten">
+                  <IconButton
+                    variant="action"
+                    onClick={() => setDetailTodoId(todo.id)}
+                    aria-label="Bearbeiten"
+                  >
                     <PencilIcon />
                   </IconButton>
                   <IconButton
@@ -830,8 +805,18 @@ function App({ migrationError = null }: AppProps) {
                           }`}
                           draggable
                           onDragStart={(e) => handleDragStart(e, todo.id)}
+                          onDoubleClick={() => setDetailTodoId(todo.id)}
                         >
                           <span className="kanban-card-title">{todo.title}</span>
+
+                          {/* Der Umbruch wird fuer die Vorschau zum Leerzeichen, damit
+                              -webkit-line-clamp zwei Zeilen Text zeigt statt zwei Zeilen
+                              bis zum ersten Umbruch. */}
+                          {todo.description && (
+                            <p className="kanban-card-description">
+                              {todo.description.replace(/\s*\n+\s*/g, " ")}
+                            </p>
+                          )}
 
                           <div className="kanban-card-meta">
                             {todo.due_date && (
@@ -928,6 +913,20 @@ function App({ migrationError = null }: AppProps) {
           </button>
         </footer>
       </main>
+
+      {/* Detail-Fenster einer Aufgabe. Der `key` erzwingt einen frischen Mount je
+          Aufgabe: das Fenster nimmt seinen Entwurf und den Ausgangsstand nur beim
+          ersten Render aus den Props -- ohne `key` zeigte ein Wechsel auf eine
+          andere Aufgabe noch den Entwurf der vorigen. */}
+      {detailTodo && (
+        <TodoDetailModal
+          key={detailTodo.id}
+          todo={detailTodo}
+          categories={categories}
+          onSave={handleSaveDetail}
+          onClose={closeDetail}
+        />
+      )}
 
       {/* MCP-Server: Status, Token und die Zeile fuer den Client */}
       {showMcp && (

@@ -92,7 +92,7 @@ test.describe("TodoList App", () => {
     await addButton.click();
     await expect(page.getByText("Original title")).toBeVisible();
 
-    // Double-click to edit
+    // Double-click opens the detail modal
     const title = page.getByText("Original title");
     await title.dblclick();
 
@@ -101,7 +101,7 @@ test.describe("TodoList App", () => {
     await expect(editInput).toBeVisible();
 
     await editInput.fill("Updated title");
-    await editInput.press("Enter");
+    await page.getByRole("button", { name: "Sichern" }).click();
 
     await expect(page.getByText("Updated title")).toBeVisible();
     await expect(page.getByText("Original title")).not.toBeVisible();

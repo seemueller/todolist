@@ -53,6 +53,7 @@ vi.mock("./db", () => ({
   updateTodoDueDate: vi.fn(),
   updateTodoPriority: vi.fn(),
   updateTodoStatus: vi.fn(),
+  updateTodoFields: vi.fn(),
 }));
 
 vi.mock("./version", () => ({
@@ -411,5 +412,95 @@ describe("App", () => {
       });
       expect(listenMock).not.toHaveBeenCalled();
     });
+  });
+
+  it("opens the detail modal from the pencil button", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /Bearbeiten/i }));
+
+    expect(await screen.findByLabelText(/Beschreibung/i)).toBeInTheDocument();
+  });
+
+  it("opens the detail modal on a double click on the title", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+
+    fireEvent.doubleClick(screen.getByText("Task"));
+
+    expect(await screen.findByLabelText(/Beschreibung/i)).toBeInTheDocument();
+  });
+
+  it("writes the changed fields through updateTodoFields", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.updateTodoFields).mockResolvedValue(
+      makeTodo({ id: 7, title: "Task", description: "Neuer Text" }),
+    );
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /Bearbeiten/i }));
+    fireEvent.change(await screen.findByLabelText(/Beschreibung/i), {
+      target: { value: "Neuer Text" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(db.updateTodoFields).toHaveBeenCalledWith(7, { description: "Neuer Text" });
+    });
+    // Exakt, nicht als Muster: die Notiz-Markierung in der Zeile heisst "Hat eine
+    // Beschreibung" und steht nach dem Sichern da -- ein /Beschreibung/i faende sie.
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Beschreibung")).not.toBeInTheDocument();
+    });
+  });
+
+  it("renames a todo through the detail modal", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.updateTodoFields).mockResolvedValue(makeTodo({ id: 7, title: "Umbenannt" }));
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+
+    fireEvent.doubleClick(screen.getByText("Task"));
+    fireEvent.change(await screen.findByLabelText(/Titel/i), {
+      target: { value: "Umbenannt" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(db.updateTodoFields).toHaveBeenCalledWith(7, { title: "Umbenannt" });
+    });
+    expect(await screen.findByText("Umbenannt")).toBeInTheDocument();
+  });
+
+  it("marks a todo that has a description", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 7, title: "Mit Text", description: "Belege holen" }),
+      makeTodo({ id: 8, title: "Ohne Text" }),
+    ]);
+
+    const { container } = render(<App />);
+    await waitFor(() => expect(screen.getByText("Mit Text")).toBeInTheDocument());
+
+    expect(container.querySelectorAll(".todo-note-mark")).toHaveLength(1);
+  });
+
+  it("previews the description on the kanban card", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 7, title: "Task", description: "Zeile eins\nZeile zwei" }),
+    ]);
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+
+    expect(await screen.findByText("Zeile eins Zeile zwei")).toBeInTheDocument();
   });
 });
