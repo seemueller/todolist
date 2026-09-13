@@ -691,7 +691,7 @@ function App({ migrationError = null }: AppProps) {
                 <span className="title" onDoubleClick={() => setDetailTodoId(todo.id)}>
                   {todo.title}
                   {todo.description && (
-                    <span className="todo-note-mark" aria-label="Hat eine Beschreibung">
+                    <span className="todo-note-mark" role="img" aria-label="Hat eine Beschreibung">
                       <NoteIcon />
                     </span>
                   )}

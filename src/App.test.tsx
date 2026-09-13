@@ -486,10 +486,10 @@ describe("App", () => {
       makeTodo({ id: 8, title: "Ohne Text" }),
     ]);
 
-    const { container } = render(<App />);
+    render(<App />);
     await waitFor(() => expect(screen.getByText("Mit Text")).toBeInTheDocument());
 
-    expect(container.querySelectorAll(".todo-note-mark")).toHaveLength(1);
+    expect(screen.getAllByLabelText("Hat eine Beschreibung")).toHaveLength(1);
   });
 
   it("previews the description on the kanban card", async () => {
