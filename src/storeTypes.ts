@@ -3,6 +3,20 @@ import { DaySlot } from "./timeSlots";
 import { TimeSettings } from "./timeTypes";
 
 /**
+ * Was `updateTodoFields` aendern soll. Ein fehlendes Feld bleibt unveraendert;
+ * `dueDate: null` und `categoryId: null` leeren ausdruecklich. Dieselbe
+ * Unterscheidung, die `update_todo` ueber MCP zwischen "weggelassen" und
+ * "null" trifft.
+ */
+export interface TodoFieldsPatch {
+  title?: string;
+  description?: string;
+  priority?: Priority;
+  dueDate?: string | null;
+  categoryId?: number | null;
+}
+
+/**
  * Everything db.ts needs from a storage backend. Every implementation must keep
  * these contracts, since the views rely on them regardless of which backend is
  * active.
@@ -30,6 +44,18 @@ export interface TodoStore {
   updateTodoPriority(id: number, priority: Priority): Promise<Todo>;
   /** Aktualisiert category_id und denormalisiert category_name/category_color neu; lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoCategory(id: number, categoryId: number | null): Promise<Todo>;
+  /**
+   * Aendert mehrere Felder in einem Schreibvorgang -- der Gegenpart zum
+   * Sichern-Knopf des Detail-Fensters: entweder steht der ganze Stand in der
+   * Datenbank oder nichts davon.
+   *
+   * Ein leerer Patch schreibt nicht und gibt die Aufgabe unveraendert zurueck.
+   * Wird `categoryId` gesetzt, werden category_name/category_color neu
+   * denormalisiert. Lehnt mit `Todo <id> not found` ab, wenn `id` kein
+   * bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner
+   * throw.
+   */
+  updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Todo>;
   /** Haelt `done` konsistent zu `status` ("done" <=> done === true); lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoStatus(id: number, status: TodoStatus): Promise<Todo>;
   /** Haelt `status` konsistent zu `done`; lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */

@@ -2,7 +2,7 @@ import { Priority, Todo, TodoStatus, Category } from "./types";
 import { localTodoStore } from "./todoStoreLocal";
 import { sqlTodoStore } from "./todoStoreSql";
 import { isTauri } from "./sqlClient";
-import { TodoStore } from "./storeTypes";
+import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
 function store(): TodoStore {
   return isTauri() ? sqlTodoStore : localTodoStore;
@@ -36,6 +36,10 @@ export function updateTodoPriority(id: number, priority: Priority): Promise<Todo
 
 export function updateTodoCategory(id: number, categoryId: number | null): Promise<Todo> {
   return store().updateTodoCategory(id, categoryId);
+}
+
+export function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Todo> {
+  return store().updateTodoFields(id, patch);
 }
 
 export function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {

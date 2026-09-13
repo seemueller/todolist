@@ -3,7 +3,7 @@
 // holds implementation detail.
 
 import { Priority, Todo, TodoStatus, Category, compareCategoryNames, categoryNameKey, canonicalCategoryName } from "./types";
-import { TodoStore } from "./storeTypes";
+import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
 // ── localStorage persistence ─────────────────────────────────────────────
 
@@ -152,6 +152,28 @@ async function updateTodoCategory(id: number, categoryId: number | null): Promis
   return Promise.resolve(todos[idx]);
 }
 
+async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id);
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+
+  const next = { ...todos[idx] };
+  if (patch.title !== undefined) next.title = patch.title;
+  if (patch.description !== undefined) next.description = patch.description;
+  if (patch.priority !== undefined) next.priority = patch.priority;
+  if (patch.dueDate !== undefined) next.due_date = patch.dueDate;
+  if (patch.categoryId !== undefined) {
+    const cat = patch.categoryId === null ? null : findCategory(patch.categoryId);
+    next.category_id = patch.categoryId;
+    next.category_name = cat?.name ?? null;
+    next.category_color = cat?.color ?? null;
+  }
+
+  todos[idx] = next;
+  saveTodos(todos);
+  return Promise.resolve(next);
+}
+
 async function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id);
@@ -258,6 +280,7 @@ export const localTodoStore: TodoStore = {
   updateTodoDueDate,
   updateTodoPriority,
   updateTodoCategory,
+  updateTodoFields,
   updateTodoStatus,
   toggleTodoDone,
   deleteTodo,

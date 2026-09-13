@@ -193,4 +193,78 @@ describe("localTodoStore", () => {
 
     expect(todo.description).toBe("");
   });
+
+  describe("updateTodoFields", () => {
+    it("changes a single field and leaves the rest alone", async () => {
+      const todo = await localTodoStore.addTodo("Titel", "medium", "2026-09-20");
+
+      const updated = await localTodoStore.updateTodoFields(todo.id, {
+        description: "Neuer Text",
+      });
+
+      expect(updated.description).toBe("Neuer Text");
+      expect(updated.title).toBe("Titel");
+      expect(updated.priority).toBe("medium");
+      expect(updated.due_date).toBe("2026-09-20");
+    });
+
+    it("changes several fields at once", async () => {
+      const todo = await localTodoStore.addTodo("Alt", "low", null);
+
+      const updated = await localTodoStore.updateTodoFields(todo.id, {
+        title: "Neu",
+        description: "Text",
+        priority: "high",
+        dueDate: "2026-10-01",
+      });
+
+      expect(updated).toMatchObject({
+        title: "Neu",
+        description: "Text",
+        priority: "high",
+        due_date: "2026-10-01",
+      });
+    });
+
+    it("clears the due date and the category with null", async () => {
+      const category = await localTodoStore.addCategory("Arbeit", "#7cc3f7");
+      const todo = await localTodoStore.addTodo("Titel", "medium", "2026-09-20", category.id);
+
+      const updated = await localTodoStore.updateTodoFields(todo.id, {
+        dueDate: null,
+        categoryId: null,
+      });
+
+      expect(updated.due_date).toBeNull();
+      expect(updated.category_id).toBeNull();
+      expect(updated.category_name).toBeNull();
+      expect(updated.category_color).toBeNull();
+    });
+
+    it("denormalises name and colour when the category changes", async () => {
+      const category = await localTodoStore.addCategory("Arbeit", "#7cc3f7");
+      const todo = await localTodoStore.addTodo("Titel", "medium", null);
+
+      const updated = await localTodoStore.updateTodoFields(todo.id, {
+        categoryId: category.id,
+      });
+
+      expect(updated.category_name).toBe("Arbeit");
+      expect(updated.category_color).toBe("#7cc3f7");
+    });
+
+    it("returns the todo unchanged for an empty patch", async () => {
+      const todo = await localTodoStore.addTodo("Titel", "medium", null);
+
+      const updated = await localTodoStore.updateTodoFields(todo.id, {});
+
+      expect(updated).toEqual(todo);
+    });
+
+    it("rejects an unknown id", async () => {
+      await expect(localTodoStore.updateTodoFields(999, { title: "Neu" })).rejects.toThrow(
+        "Todo 999 not found",
+      );
+    });
+  });
 });

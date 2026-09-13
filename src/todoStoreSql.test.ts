@@ -268,4 +268,28 @@ describe("sqlTodoStore", () => {
       null,
     ]);
   });
+
+  describe("updateTodoFields", () => {
+    it("writes exactly the given fields in a single statement", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, { title: "Neu", description: "Text" });
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("title = $1");
+      expect(sql).toContain("description = $2");
+      expect(sql).not.toContain("priority");
+      expect(params).toEqual(["Neu", "Text", 7]);
+    });
+
+    it("writes nothing for an empty patch", async () => {
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, {});
+
+      expect(execute).not.toHaveBeenCalled();
+    });
+  });
 });
