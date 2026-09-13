@@ -49,7 +49,6 @@ vi.mock("./db", () => ({
   addTodo: vi.fn(),
   deleteTodo: vi.fn(),
   toggleTodoDone: vi.fn(),
-  updateTodoTitle: vi.fn(),
   updateTodoDueDate: vi.fn(),
   updateTodoPriority: vi.fn(),
   updateTodoStatus: vi.fn(),

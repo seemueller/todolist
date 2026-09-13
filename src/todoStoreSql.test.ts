@@ -70,13 +70,6 @@ describe("sqlTodoStore", () => {
     expect(updated.done).toBe(true);
   });
 
-  it("rejects rather than throwing synchronously for a missing todo", async () => {
-    execute.mockResolvedValue({ rowsAffected: 0 });
-    select.mockResolvedValue([]);
-
-    await expect(sqlTodoStore.updateTodoTitle(99, "x")).rejects.toThrow("Todo 99 not found");
-  });
-
   it("sorts categories the way German readers expect", async () => {
     // Rows deliberately out of order, and not sorted the way SQLite's NOCASE
     // collation would sort them either (that would put "Ärzte" after "Zebra").

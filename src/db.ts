@@ -22,10 +22,6 @@ export function addTodo(
   return store().addTodo(title, priority, dueDate, categoryId, description);
 }
 
-export function updateTodoTitle(id: number, title: string): Promise<Todo> {
-  return store().updateTodoTitle(id, title);
-}
-
 export function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
   return store().updateTodoDueDate(id, dueDate);
 }

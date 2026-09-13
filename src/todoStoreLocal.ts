@@ -110,15 +110,6 @@ function addTodo(
   return Promise.resolve(todo);
 }
 
-async function updateTodoTitle(id: number, title: string): Promise<Todo> {
-  const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
-  if (idx === -1) throw new Error(`Todo ${id} not found`);
-  todos[idx] = { ...todos[idx], title };
-  saveTodos(todos);
-  return Promise.resolve(todos[idx]);
-}
-
 async function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id);
@@ -276,7 +267,6 @@ function deleteCategory(id: number): Promise<number> {
 export const localTodoStore: TodoStore = {
   listTodos,
   addTodo,
-  updateTodoTitle,
   updateTodoDueDate,
   updateTodoPriority,
   updateTodoCategory,

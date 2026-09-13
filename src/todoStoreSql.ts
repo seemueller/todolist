@@ -70,10 +70,6 @@ async function updateColumn(id: number, sql: string, params: unknown[]): Promise
   return selectTodo(id);
 }
 
-function updateTodoTitle(id: number, title: string): Promise<Todo> {
-  return updateColumn(id, "UPDATE todos SET title = $1 WHERE id = $2", [title]);
-}
-
 function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
   return updateColumn(id, "UPDATE todos SET due_date = $1 WHERE id = $2", [dueDate]);
 }
@@ -202,7 +198,6 @@ async function deleteCategory(id: number): Promise<number> {
 export const sqlTodoStore: TodoStore = {
   listTodos,
   addTodo,
-  updateTodoTitle,
   updateTodoDueDate,
   updateTodoPriority,
   updateTodoCategory,

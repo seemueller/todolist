@@ -42,8 +42,6 @@ export interface TodoStore {
     description?: string
   ): Promise<Todo>;
   /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
-  updateTodoTitle(id: number, title: string): Promise<Todo>;
-  /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo>;
   /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoPriority(id: number, priority: Priority): Promise<Todo>;
