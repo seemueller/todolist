@@ -336,6 +336,7 @@ impl TodoServer {
                 non_empty(&params.priority),
                 non_empty(&params.due_date),
                 non_empty(&params.category),
+                None,
             )
             .await,
         )
@@ -359,6 +360,7 @@ impl TodoServer {
         }
         let update = TodoUpdate {
             title: params.title.as_deref().map(str::trim).map(str::to_string),
+            description: None,
             status: non_empty(&params.status).map(str::to_string),
             priority: non_empty(&params.priority).map(str::to_string),
             due_date: clearable(&params.due_date),
@@ -461,7 +463,8 @@ mod tests {
             due_date TEXT DEFAULT NULL,
             category_id INTEGER DEFAULT NULL REFERENCES categories(id) ON DELETE SET NULL,
             priority TEXT NOT NULL DEFAULT 'medium',
-            status TEXT NOT NULL DEFAULT 'todo'
+            status TEXT NOT NULL DEFAULT 'todo',
+            description TEXT NOT NULL DEFAULT ''
         );",
         "CREATE TABLE time_slots (
             date TEXT NOT NULL,
