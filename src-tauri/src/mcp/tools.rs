@@ -106,6 +106,9 @@ const MAX_NOTE_CHARS: usize = 2000;
 /// nach derselben Regel. `MAX_ECHO_CHARS` liegt bewusst oberhalb dieser Grenze,
 /// damit ein zulaessiger Name vollstaendig in der Absage steht.
 const MAX_CATEGORY_CHARS: usize = 100;
+/// Eine Beschreibung darf ein paar Absaetze lang sein, kein Dokument.
+/// 4000 Zeichen sind etwa anderthalb Seiten Prosa.
+const MAX_DESCRIPTION_CHARS: usize = 4000;
 
 /// Prueft ein Textfeld auf Laenge und Steuerzeichen.
 ///
@@ -128,6 +131,31 @@ fn check_text(label: &str, value: &str, max: usize) -> Result<(), String> {
         return Err(format!(
             "{label} darf keine Steuerzeichen enthalten -- kein Nullbyte, keinen \
              Zeilenumbruch und keinen Tabulator; erlaubt ist eine einzelne Zeile Text."
+        ));
+    }
+    Ok(())
+}
+
+/// Wie `check_text`, laesst aber den Zeilenumbruch durch.
+///
+/// Fuer Felder, die mehrere Absaetze tragen duerfen. Erlaubt ist `\n` und
+/// sonst nichts: `\r` wird mit abgelehnt, obwohl Clients Zeilenumbrueche gern
+/// als `\r\n` schicken. Ein stillschweigend zu `\n` umgeschriebenes `\r\n`
+/// gaebe dem Absender etwas anderes zurueck, als er geschickt hat -- dieselbe
+/// Entscheidung wie bei "09:07" in `slots.rs`. Die Meldung sagt deshalb, wie
+/// der Umbruch auszusehen hat.
+fn check_multiline(label: &str, value: &str, max: usize) -> Result<(), String> {
+    let length = value.chars().count();
+    if length > max {
+        return Err(format!(
+            "{label} ist mit {length} Zeichen zu lang; erlaubt sind hoechstens {max}."
+        ));
+    }
+    if value.chars().any(|c| c.is_control() && c != '\n') {
+        return Err(format!(
+            "{label} darf ausser dem Zeilenumbruch keine Steuerzeichen enthalten -- \
+             kein Nullbyte, keinen Tabulator und kein Wagenruecklaufzeichen; \
+             ein Zeilenumbruch ist als \\n zu schicken."
         ));
     }
     Ok(())
@@ -208,6 +236,10 @@ pub struct AddTodo {
     /// Titel der Aufgabe; darf nicht leer sein. Eine einzelne Zeile bis 500
     /// Zeichen -- Steuerzeichen, auch Zeilenumbrueche, werden abgelehnt.
     pub title: String,
+    /// Frei formulierter Text zur Aufgabe, hoechstens 4000 Zeichen.
+    /// Zeilenumbrueche sind erlaubt und als \n zu schicken; andere
+    /// Steuerzeichen werden abgelehnt. Ohne Angabe bleibt sie leer.
+    pub description: Option<String>,
     /// Prioritaet: "low", "medium" oder "high". Vorgabe ist "medium".
     pub priority: Option<String>,
     /// Faelligkeitstag, ISO-Format YYYY-MM-DD. Ohne Angabe hat die Aufgabe
@@ -227,6 +259,14 @@ pub struct UpdateTodo {
     /// Neuer Titel; darf nicht leer sein. Eine einzelne Zeile bis 500 Zeichen
     /// -- Steuerzeichen, auch Zeilenumbrueche, werden abgelehnt.
     pub title: Option<String>,
+    /// Neue Beschreibung, hoechstens 4000 Zeichen. Zeilenumbrueche sind
+    /// erlaubt und als \n zu schicken; andere Steuerzeichen werden abgelehnt.
+    /// null leert die Beschreibung; das Feld wegzulassen laesst sie
+    /// unveraendert. Das ist ein Unterschied: null loescht, weglassen aendert
+    /// nichts.
+    #[serde(default, deserialize_with = "double_option")]
+    #[schemars(with = "Option<String>")]
+    pub description: Option<Option<String>>,
     /// Neuer Status: "todo", "in_progress" oder "done".
     pub status: Option<String>,
     /// Neue Prioritaet: "low", "medium" oder "high".
@@ -318,13 +358,20 @@ impl TodoServer {
     }
 
     #[tool(
-        description = "Legt eine neue Aufgabe an und gibt sie samt ihrer Id zurueck. Ohne weitere Angaben bekommt sie die Prioritaet \"medium\", den Status \"todo\", keine Faelligkeit und keine Kategorie."
+        description = "Legt eine neue Aufgabe an und gibt sie samt ihrer Id zurueck. Ohne weitere Angaben bekommt sie die Prioritaet \"medium\", den Status \"todo\", keine Faelligkeit und keine Kategorie. Eine Beschreibung ist optional und darf mehrere Zeilen haben."
     )]
     async fn add_todo(
         &self,
         Parameters(params): Parameters<AddTodo>,
     ) -> Result<CallToolResult, McpError> {
         let checked = check_text("Der Titel", params.title.trim(), MAX_TITLE_CHARS)
+            .and_then(|()| {
+                check_multiline(
+                    "Die Beschreibung",
+                    params.description.as_deref().unwrap_or(""),
+                    MAX_DESCRIPTION_CHARS,
+                )
+            })
             .and_then(|()| check_category(non_empty(&params.category)));
         if let Err(message) = checked {
             return Ok(tool_error(message));
@@ -336,14 +383,14 @@ impl TodoServer {
                 non_empty(&params.priority),
                 non_empty(&params.due_date),
                 non_empty(&params.category),
-                None,
+                params.description.as_deref(),
             )
             .await,
         )
     }
 
     #[tool(
-        description = "Aendert eine bestehende Aufgabe und gibt sie danach zurueck. Es aendern sich ausschliesslich die angegebenen Felder; alles Weggelassene bleibt, wie es war. Um eine Aufgabe abzuhaken, ist der Status auf \"done\" zu setzen."
+        description = "Aendert eine bestehende Aufgabe und gibt sie danach zurueck. Es aendern sich ausschliesslich die angegebenen Felder; alles Weggelassene bleibt, wie es war. Um eine Aufgabe abzuhaken, ist der Status auf \"done\" zu setzen. Die Beschreibung darf mehrere Zeilen haben; null leert sie."
     )]
     async fn update_todo(
         &self,
@@ -354,13 +401,25 @@ impl TodoServer {
             params.title.as_deref().map(str::trim),
             MAX_TITLE_CHARS,
         )
+        .and_then(|()| {
+            match params.description.as_ref().and_then(|d| d.as_deref()) {
+                Some(text) => check_multiline("Die Beschreibung", text, MAX_DESCRIPTION_CHARS),
+                None => Ok(()),
+            }
+        })
         .and_then(|()| check_category(clearable(&params.category).flatten().as_deref()));
         if let Err(message) = checked {
             return Ok(tool_error(message));
         }
         let update = TodoUpdate {
             title: params.title.as_deref().map(str::trim).map(str::to_string),
-            description: None,
+            // Nicht ueber `clearable`: das trimmt und faltet "" auf None, und
+            // beides waere hier falsch. Absaetze am Anfang oder Ende gehoeren
+            // dem Text, und "" ist der ausdrueckliche Weg zum Leeren, der
+            // `Some(None)` ergeben muss -- genau wie null.
+            description: params.description.as_ref().map(|inner| {
+                inner.as_deref().filter(|text| !text.is_empty()).map(str::to_string)
+            }),
             status: non_empty(&params.status).map(str::to_string),
             priority: non_empty(&params.priority).map(str::to_string),
             due_date: clearable(&params.due_date),
@@ -629,6 +688,7 @@ mod tests {
         let result = server
             .add_todo(Parameters(super::AddTodo {
                 title: "Rechnung pruefen".into(),
+                description: None,
                 priority: Some("high".into()),
                 due_date: Some("2026-04-01".into()),
                 category: Some("intern".into()),
@@ -650,6 +710,7 @@ mod tests {
         let result = server
             .add_todo(Parameters(super::AddTodo {
                 title: "Rechnung pruefen".into(),
+                description: None,
                 priority: None,
                 due_date: None,
                 category: Some("Urlaub".into()),
@@ -682,6 +743,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id,
                 title: None,
+                description: None,
                 status: Some("done".into()),
                 priority: None,
                 due_date: None,
@@ -712,6 +774,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id,
                 title: None,
+                description: None,
                 status: None,
                 priority: None,
                 due_date: Some(None),
@@ -757,6 +820,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: 404,
                 title: Some("Neu".into()),
+                description: None,
                 status: None,
                 priority: None,
                 due_date: None,
@@ -946,6 +1010,7 @@ mod tests {
         server
             .add_todo(Parameters(super::AddTodo {
                 title: "Rechnung pruefen".into(),
+                description: None,
                 priority: None,
                 due_date: None,
                 category: None,
@@ -958,6 +1023,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: 1,
                 title: Some("Rechnung bezahlen".into()),
+                description: None,
                 status: None,
                 priority: None,
                 due_date: None,
@@ -1026,6 +1092,7 @@ mod tests {
         server
             .add_todo(Parameters(super::AddTodo {
                 title: "Rechnung pruefen".into(),
+                description: None,
                 priority: None,
                 due_date: None,
                 category: Some("Kundenprojekt".into()),
@@ -1038,6 +1105,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: 404,
                 title: Some("egal".into()),
+                description: None,
                 status: None,
                 priority: None,
                 due_date: None,
@@ -1092,6 +1160,7 @@ mod tests {
         let empty_title = server
             .add_todo(Parameters(super::AddTodo {
                 title: "   ".into(),
+                description: None,
                 priority: None,
                 due_date: None,
                 category: None,
@@ -1110,6 +1179,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: i64::MIN,
                 title: Some("x".into()),
+                description: None,
                 status: None,
                 priority: None,
                 due_date: None,
@@ -1257,6 +1327,7 @@ mod tests {
     fn add_todo_params(title: &str) -> super::AddTodo {
         super::AddTodo {
             title: title.to_string(),
+            description: None,
             priority: None,
             due_date: None,
             category: None,
@@ -1336,6 +1407,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: 1,
                 title: Some(long(super::MAX_TITLE_CHARS + 1)),
+                description: None,
                 status: None,
                 priority: None,
                 due_date: None,
@@ -1442,6 +1514,7 @@ mod tests {
         let result = server
             .add_todo(Parameters(super::AddTodo {
                 title: "Angebot".to_string(),
+                description: None,
                 priority: None,
                 due_date: None,
                 category: Some("Kunden\u{0}projekt".to_string()),
@@ -1449,5 +1522,187 @@ mod tests {
             .await
             .expect("no protocol error");
         tool_error(&result, "Steuerzeichen");
+    }
+
+    // --- check_multiline -----------------------------------------------------
+
+    #[test]
+    fn a_line_break_is_allowed_in_a_multiline_field() {
+        assert!(super::check_multiline("Die Beschreibung", "Zeile eins\nZeile zwei", 100).is_ok());
+    }
+
+    #[test]
+    fn other_control_characters_stay_forbidden_in_a_multiline_field() {
+        for (input, name) in [("a\rb", "carriage return"), ("a\tb", "tab"), ("a\0b", "nul")] {
+            let error = super::check_multiline("Die Beschreibung", input, 100)
+                .expect_err(&format!("{name} must be rejected"));
+            assert!(error.contains("Steuerzeichen"), "got: {error}");
+        }
+    }
+
+    #[test]
+    fn the_message_names_the_line_break_that_is_allowed() {
+        let error = super::check_multiline("Die Beschreibung", "a\rb", 100).expect_err("rejected");
+        assert!(error.contains("\\n"), "got: {error}");
+    }
+
+    #[test]
+    fn a_multiline_field_has_a_length_limit() {
+        let error = super::check_multiline("Die Beschreibung", &"z".repeat(101), 100)
+            .expect_err("too long");
+        assert!(error.contains("101"), "got: {error}");
+        assert!(error.contains("100"), "got: {error}");
+    }
+
+    #[test]
+    fn the_description_limit_is_generous_but_finite() {
+        assert!(super::check_multiline(
+            "Die Beschreibung",
+            &"z".repeat(super::MAX_DESCRIPTION_CHARS),
+            super::MAX_DESCRIPTION_CHARS
+        )
+        .is_ok());
+        assert!(super::check_multiline(
+            "Die Beschreibung",
+            &"z".repeat(super::MAX_DESCRIPTION_CHARS + 1),
+            super::MAX_DESCRIPTION_CHARS
+        )
+        .is_err());
+    }
+
+    // --- Die Beschreibung an den Tools ---------------------------------------
+
+    #[tokio::test]
+    async fn add_todo_stores_a_multiline_description() {
+        let (server, _pool) = server().await;
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                title: "Angebot".into(),
+                description: Some("Zeile eins\nZeile zwei".into()),
+                priority: None,
+                due_date: None,
+                category: None,
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(
+            ok_json(&result)["description"],
+            "Zeile eins\nZeile zwei"
+        );
+    }
+
+    #[tokio::test]
+    async fn add_todo_refuses_an_over_long_description() {
+        let (server, pool) = server().await;
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                title: "Angebot".into(),
+                description: Some(long(super::MAX_DESCRIPTION_CHARS + 1)),
+                priority: None,
+                due_date: None,
+                category: None,
+            }))
+            .await
+            .expect("no protocol error");
+        let message = tool_error(&result, "Beschreibung");
+        assert!(
+            message.contains(&super::MAX_DESCRIPTION_CHARS.to_string()),
+            "the message should name the limit, got: {message}"
+        );
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM todos")
+            .fetch_one(&pool)
+            .await
+            .expect("count");
+        assert_eq!(count, 0, "nothing should have been written");
+    }
+
+    #[tokio::test]
+    async fn add_todo_refuses_a_carriage_return_in_the_description() {
+        let (server, _pool) = server().await;
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                title: "Angebot".into(),
+                description: Some("a\rb".into()),
+                priority: None,
+                due_date: None,
+                category: None,
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&result, "Steuerzeichen");
+    }
+
+    #[tokio::test]
+    async fn update_todo_sets_and_clears_the_description() {
+        let (server, pool) = server().await;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at, description)
+             VALUES ('Alt', '2026-01-02T00:00:00.000Z', 'alt') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("insert todo");
+
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id,
+                title: None,
+                description: Some(Some("neu\nmit Umbruch".into())),
+                status: None,
+                priority: None,
+                due_date: None,
+                category: None,
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["description"], "neu\nmit Umbruch");
+
+        let cleared = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id,
+                title: None,
+                description: Some(None),
+                status: None,
+                priority: None,
+                due_date: None,
+                category: None,
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&cleared)["description"], "");
+    }
+
+    #[tokio::test]
+    async fn update_todo_refuses_an_over_long_description() {
+        let (server, pool) = server().await;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at, description)
+             VALUES ('Alt', '2026-01-02T00:00:00.000Z', 'alt') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("insert todo");
+
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id,
+                title: None,
+                description: Some(Some(long(super::MAX_DESCRIPTION_CHARS + 1))),
+                status: None,
+                priority: None,
+                due_date: None,
+                category: None,
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&result, "Beschreibung");
+
+        let description: String = sqlx::query_scalar("SELECT description FROM todos WHERE id = ?")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .expect("description");
+        assert_eq!(description, "alt", "nothing should have been written");
     }
 }
