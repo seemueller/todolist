@@ -10,12 +10,17 @@ import { TimeSettings } from "./timeTypes";
 export interface TodoStore {
   /** Alle Todos, neueste zuerst (nach created_at, bei Gleichstand nach id); optional auf eine Kategorie gefiltert. */
   listTodos(categoryId?: number | null): Promise<Todo[]>;
-  /** Legt ein neues Todo im Status "todo" an; category_name/category_color werden aus der Kategorie denormalisiert. */
+  /**
+   * Legt ein neues Todo im Status "todo" an; category_name/category_color
+   * werden aus der Kategorie denormalisiert. `description` ist frei
+   * formulierter Text; ohne Angabe bleibt sie leer (`""`, nie null).
+   */
   addTodo(
     title: string,
     priority: Priority,
     dueDate: string | null,
-    categoryId?: number | null
+    categoryId?: number | null,
+    description?: string
   ): Promise<Todo>;
   /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoTitle(id: number, title: string): Promise<Todo>;

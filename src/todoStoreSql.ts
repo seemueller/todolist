@@ -19,8 +19,8 @@ import { getDb } from "./sqlClient";
 import { TodoStore } from "./storeTypes";
 
 const TODO_COLUMNS = `
-  t.id, t.title, t.done, t.status, t.priority, t.created_at, t.due_date,
-  t.category_id, c.name AS category_name, c.color AS category_color
+  t.id, t.title, t.description, t.done, t.status, t.priority, t.created_at,
+  t.due_date, t.category_id, c.name AS category_name, c.color AS category_color
 `;
 
 async function selectTodo(id: number): Promise<Todo> {
@@ -52,13 +52,14 @@ async function addTodo(
   title: string,
   priority: Priority,
   dueDate: string | null,
-  categoryId?: number | null
+  categoryId?: number | null,
+  description = ""
 ): Promise<Todo> {
   const db = await getDb();
   const result = await db.execute(
-    `INSERT INTO todos (title, done, status, priority, created_at, due_date, category_id)
-     VALUES ($1, 0, 'todo', $2, $3, $4, $5)`,
-    [title, priority, new Date().toISOString(), dueDate, categoryId ?? null]
+    `INSERT INTO todos (title, description, done, status, priority, created_at, due_date, category_id)
+     VALUES ($1, $2, 0, 'todo', $3, $4, $5, $6)`,
+    [title, description, priority, new Date().toISOString(), dueDate, categoryId ?? null]
   );
   return selectTodo(result.lastInsertId as number);
 }

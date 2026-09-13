@@ -155,4 +155,42 @@ describe("localTodoStore", () => {
       'Es gibt bereits eine Kategorie "Ärzte".'
     );
   });
+
+  it("creates a todo without a description by default", async () => {
+    const todo = await localTodoStore.addTodo("Ohne Text", "medium", null);
+
+    expect(todo.description).toBe("");
+  });
+
+  it("stores a description given at creation time", async () => {
+    const todo = await localTodoStore.addTodo("Mit Text", "medium", null, null, "Zeile eins\nZeile zwei");
+
+    expect(todo.description).toBe("Zeile eins\nZeile zwei");
+    const [listed] = await localTodoStore.listTodos();
+    expect(listed.description).toBe("Zeile eins\nZeile zwei");
+  });
+
+  it("reads a legacy entry without the field as an empty description", async () => {
+    localStorage.setItem(
+      "todolist_todos",
+      JSON.stringify([
+        {
+          id: 1,
+          title: "Alt",
+          done: false,
+          status: "todo",
+          priority: "medium",
+          created_at: "2026-01-01T00:00:00.000Z",
+          due_date: null,
+          category_id: null,
+          category_name: null,
+          category_color: null,
+        },
+      ]),
+    );
+
+    const [todo] = await localTodoStore.listTodos();
+
+    expect(todo.description).toBe("");
+  });
 });

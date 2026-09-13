@@ -16,9 +16,10 @@ export function addTodo(
   title: string,
   priority: Priority,
   dueDate: string | null,
-  categoryId?: number | null
+  categoryId?: number | null,
+  description?: string
 ): Promise<Todo> {
-  return store().addTodo(title, priority, dueDate, categoryId);
+  return store().addTodo(title, priority, dueDate, categoryId, description);
 }
 
 export function updateTodoTitle(id: number, title: string): Promise<Todo> {

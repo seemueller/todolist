@@ -226,4 +226,30 @@ describe("sqlTodoStore", () => {
     ];
     expect(statements.some((sql) => sql.includes("time_slots"))).toBe(false);
   });
+
+  it("selects the description column", async () => {
+    select.mockResolvedValue([ROW]);
+    await sqlTodoStore.listTodos();
+
+    expect(select.mock.calls[0][0]).toContain("t.description");
+  });
+
+  it("writes the description when creating a todo", async () => {
+    execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
+    select.mockResolvedValue([ROW]);
+
+    await sqlTodoStore.addTodo("Mit Text", "medium", null, null, "Zeile eins\nZeile zwei");
+
+    expect(execute.mock.calls[0][0]).toContain("description");
+    expect(execute.mock.calls[0][1]).toContain("Zeile eins\nZeile zwei");
+  });
+
+  it("writes an empty description when none was given", async () => {
+    execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
+    select.mockResolvedValue([ROW]);
+
+    await sqlTodoStore.addTodo("Ohne Text", "medium", null);
+
+    expect(execute.mock.calls[0][1]).toContain("");
+  });
 });

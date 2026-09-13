@@ -28,11 +28,15 @@ function loadTodos(): Todo[] {
   }
 }
 
+// Holt Eintraege aus aelteren Staenden auf den heutigen Stand: `status` kam
+// mit dem Brett dazu, `description` mit dem Detail-Fenster. Beides fehlt in
+// Daten, die davor geschrieben wurden.
 function migrateTodos(todos: any[]): Todo[] {
   return todos.map((todo) => {
-    if (todo.status) return todo;
+    const description = todo.description ?? "";
+    if (todo.status) return { ...todo, description };
     const status: TodoStatus = todo.done ? "done" : "todo";
-    return { ...todo, status, done: status === "done" };
+    return { ...todo, description, status, done: status === "done" };
   });
 }
 
@@ -84,12 +88,14 @@ function addTodo(
   title: string,
   priority: Priority,
   dueDate: string | null,
-  categoryId?: number | null
+  categoryId?: number | null,
+  description = ""
 ): Promise<Todo> {
   const todos = loadTodos();
   const todo: Todo = {
     id: generateId(),
     title,
+    description,
     done: false,
     status: "todo",
     priority,
