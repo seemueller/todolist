@@ -435,7 +435,7 @@ test.describe("Layout and UI", () => {
     const todoItem = page.locator(".todo-list li").first();
     await todoItem.hover();
 
-    const editBtn = page.getByRole("button", { name: "Bearbeiten" }).first();
+    const editBtn = page.getByRole("button", { name: "Aufgabe bearbeiten" }).first();
     await expect(editBtn).toBeVisible();
 
     const deleteBtn = page.getByRole("button", { name: "Löschen" }).first();

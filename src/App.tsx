@@ -727,7 +727,7 @@ function App({ migrationError = null }: AppProps) {
                   <IconButton
                     variant="action"
                     onClick={() => setDetailTodoId(todo.id)}
-                    aria-label="Bearbeiten"
+                    aria-label="Aufgabe bearbeiten"
                   >
                     <PencilIcon />
                   </IconButton>
@@ -1049,7 +1049,7 @@ function App({ migrationError = null }: AppProps) {
                       <IconButton
                         variant="icon"
                         onClick={() => startEditCategory(cat)}
-                        aria-label="Bearbeiten"
+                        aria-label="Kategorie bearbeiten"
                       >
                         <PencilIcon />
                       </IconButton>

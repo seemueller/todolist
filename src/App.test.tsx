@@ -420,7 +420,7 @@ describe("App", () => {
     render(<App />);
     await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: /Bearbeiten/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
 
     expect(await screen.findByLabelText(/Beschreibung/i)).toBeInTheDocument();
   });
@@ -445,7 +445,7 @@ describe("App", () => {
     render(<App />);
     await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: /Bearbeiten/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
     fireEvent.change(await screen.findByLabelText(/Beschreibung/i), {
       target: { value: "Neuer Text" },
     });
