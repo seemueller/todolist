@@ -146,11 +146,22 @@ export async function migrateLocalStorage(): Promise<void> {
     const createdAt = typeof todo.created_at === "string" ? todo.created_at : new Date().toISOString();
     const dueDate = typeof todo.due_date === "string" ? todo.due_date : null;
     const categoryId = todo.category_id == null ? null : resolveCategory(todo.category_id);
+    const description = typeof todo.description === "string" ? todo.description : "";
 
     await db.execute(
-      `INSERT OR IGNORE INTO todos (id, title, done, status, priority, created_at, due_date, category_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [todo.id, todo.title, status === "done" ? 1 : 0, status, priority, createdAt, dueDate, categoryId]
+      `INSERT OR IGNORE INTO todos (id, title, description, done, status, priority, created_at, due_date, category_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        todo.id,
+        todo.title,
+        description,
+        status === "done" ? 1 : 0,
+        status,
+        priority,
+        createdAt,
+        dueDate,
+        categoryId,
+      ]
     );
   }
 
