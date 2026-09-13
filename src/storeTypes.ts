@@ -8,6 +8,11 @@ import { TimeSettings } from "./timeTypes";
  * Unterscheidung, die `update_todo` ueber MCP zwischen "weggelassen" und
  * "null" trifft.
  */
+/**
+ * `description` kennt hier keine Längen- oder Zeichenbeschränkung — die
+ * 4000-Zeichen-Grenze samt Verbot von `\r`, Tabulator und Nullbyte gilt nur an
+ * der MCP-Werkzeuggrenze (`src-tauri/src/mcp/tools.rs`), nicht am Store.
+ */
 export interface TodoFieldsPatch {
   title?: string;
   description?: string;

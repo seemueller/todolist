@@ -261,9 +261,9 @@ pub struct UpdateTodo {
     pub title: Option<String>,
     /// Neue Beschreibung, hoechstens 4000 Zeichen. Zeilenumbrueche sind
     /// erlaubt und als \n zu schicken; andere Steuerzeichen werden abgelehnt.
-    /// null leert die Beschreibung; das Feld wegzulassen laesst sie
-    /// unveraendert. Das ist ein Unterschied: null loescht, weglassen aendert
-    /// nichts.
+    /// null oder "" leeren die Beschreibung; das Feld wegzulassen laesst sie
+    /// unveraendert. Das ist ein Unterschied: null/"" loeschen, weglassen
+    /// aendert nichts.
     #[serde(default, deserialize_with = "double_option")]
     #[schemars(with = "Option<String>")]
     pub description: Option<Option<String>>,

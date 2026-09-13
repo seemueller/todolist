@@ -102,11 +102,14 @@ ein Fehler — über MCP lassen sich bewusst keine Kategorien anlegen, umbenenne
 oder löschen.
 
 Eine Aufgabe trägt neben dem Titel eine optionale **Beschreibung**: frei
-formulierter Text, höchstens 4000 Zeichen, mehrzeilig. Zeilenumbrüche sind als
-`\n` zu schicken; `\r`, Tabulator und Nullbyte werden abgelehnt, statt still
-umgeschrieben zu werden. Bei `update_todo` leert `null` die Beschreibung,
-Weglassen lässt sie unverändert — dieselbe Regel wie bei Fälligkeit und
-Kategorie.
+formulierter Text, mehrzeilig. Die Grenze von 4000 Zeichen und das Verbot von
+`\r`, Tabulator und Nullbyte sind eine Regel dieser Tool-Grenze, keine Regel der
+Spalte oder der Oberfläche — die App schreibt ungeprüft, eine dort verfasste
+Beschreibung darf also länger sein oder diese Zeichen enthalten. `list_todos`
+liefert einen solchen Wert unverändert zurück; `add_todo`/`update_todo` nehmen
+ihn dann nicht mehr an. Zeilenumbrüche sind als `\n` zu schicken. Bei
+`update_todo` leeren sowohl `null` als auch `""` die Beschreibung, Weglassen
+lässt sie unverändert — dieselbe Regel wie bei Fälligkeit und Kategorie.
 
 **Der Token steht in der Datenbank**, in `app_settings` unter dem Schlüssel
 `mcp_token`, und entsteht beim ersten Start (32 Zufallsbytes, base64url). Die
