@@ -181,6 +181,26 @@ describe("TodoDetailModal", () => {
     });
   });
 
+  it("does not close when a drag started in the textarea ends on the overlay", () => {
+    const { onClose } = renderModal();
+
+    const description = screen.getByLabelText(/Beschreibung/i);
+    fireEvent.mouseDown(description);
+    fireEvent.click(document.querySelector(".modal-overlay")!);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("closes when mouseDown and click both land on the overlay", () => {
+    const { onClose } = renderModal();
+
+    const overlay = document.querySelector(".modal-overlay")!;
+    fireEvent.mouseDown(overlay);
+    fireEvent.click(overlay);
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("disables Sichern while the save is in flight", async () => {
     let resolveSave: () => void = () => {};
     const onSave = vi.fn(

@@ -4,8 +4,8 @@
 // Die Komponente nur mounten, wenn das Modal offen sein soll -
 // der Escape-Listener haengt an der Lebensdauer der Komponente.
 
-import { useEffect } from "react";
-import type { HTMLAttributes, ReactNode, Ref } from "react";
+import { useEffect, useRef } from "react";
+import type { HTMLAttributes, MouseEvent, ReactNode, Ref } from "react";
 import { IconButton } from "./IconButton";
 import { CloseIcon } from "./icons";
 
@@ -48,10 +48,26 @@ export function Modal({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // Schliessen nur, wenn die Interaktion auch auf dem Overlay *begonnen* hat.
+  // Ein click ist nicht dasselbe wie ein Klick: er feuert auf dem gemeinsamen
+  // Vorfahren von mousedown- und mouseup-Ziel. Wer im Panel Text markiert und
+  // die Maus ueber den Rand hinaus loslaesst, erzeugt so einen click auf dem
+  // Overlay, ohne dass "ausserhalb klicken" gemeint war.
+  const mouseDownOnOverlay = useRef(false);
+
+  function handleOverlayMouseDown(e: MouseEvent<HTMLDivElement>) {
+    mouseDownOnOverlay.current = e.target === e.currentTarget;
+  }
+
+  function handleOverlayClick(e: MouseEvent<HTMLDivElement>) {
+    if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose();
+    mouseDownOnOverlay.current = false;
+  }
+
   const panelClasses = [VARIANT_CLASS[variant], className ?? ""].filter(Boolean).join(" ");
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
       <div
         ref={panelRef}
         className={panelClasses}
