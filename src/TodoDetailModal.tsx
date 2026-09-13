@@ -23,6 +23,15 @@ export interface TodoDetailModalProps {
 }
 
 export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetailModalProps) {
+  // Der Stand beim Oeffnen, ein einziges Mal eingefroren. Waehrend das Fenster
+  // offen ist, kann `todo` von aussen neue Werte bekommen -- etwa weil der
+  // MCP-Server dieselbe Aufgabe aendert und die App ihre Liste neu laedt.
+  // `buildPatch` vergleicht gegen diesen eingefrorenen Stand, nicht gegen die
+  // lebende Prop: gegen die Prop zu vergleichen sieht nach Aktualitaet aus,
+  // wuerde aber jedes Feld, das der Nutzer nie angefasst hat, als "geaendert"
+  // ansehen, sobald es sich von aussen bewegt -- und die fremde Aenderung mit
+  // dem alten Entwurfswert stillschweigend ueberschreiben.
+  const [original] = useState(todo);
   const [title, setTitle] = useState(todo.title);
   const [description, setDescription] = useState(todo.description);
   const [priority, setPriority] = useState<Priority>(todo.priority);
@@ -31,15 +40,15 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  /** Nur die Felder, die sich gegenueber dem Ausgangsstand unterscheiden. */
+  /** Nur die Felder, die sich gegenueber dem Ausgangsstand beim Oeffnen unterscheiden. */
   function buildPatch(trimmedTitle: string): TodoFieldsPatch {
     const patch: TodoFieldsPatch = {};
-    if (trimmedTitle !== todo.title) patch.title = trimmedTitle;
-    if (description !== todo.description) patch.description = description;
-    if (priority !== todo.priority) patch.priority = priority;
+    if (trimmedTitle !== original.title) patch.title = trimmedTitle;
+    if (description !== original.description) patch.description = description;
+    if (priority !== original.priority) patch.priority = priority;
     const nextDueDate = dueDate || null;
-    if (nextDueDate !== todo.due_date) patch.dueDate = nextDueDate;
-    if (categoryId !== todo.category_id) patch.categoryId = categoryId;
+    if (nextDueDate !== original.due_date) patch.dueDate = nextDueDate;
+    if (categoryId !== original.category_id) patch.categoryId = categoryId;
     return patch;
   }
 

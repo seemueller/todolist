@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { TodoDetailModal } from "./TodoDetailModal";
 import { Category, Todo } from "./types";
 
@@ -117,5 +117,90 @@ describe("TodoDetailModal", () => {
 
     expect(await screen.findByText(/Datenbank weg/i)).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("diffs against the todo as it was opened, not against a later prop update", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    const original = makeTodo();
+    const { rerender } = render(
+      <TodoDetailModal todo={original} categories={categories} onSave={onSave} onClose={onClose} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "Belege holen" } });
+
+    // Waehrend das Fenster offen ist, aendert sich die Aufgabe von aussen --
+    // z. B. weil der MCP-Server die Prioritaet setzt und die App neu laedt.
+    // Der Entwurf im Fenster hat die Prioritaet nie angefasst.
+    rerender(
+      <TodoDetailModal
+        todo={{ ...original, priority: "high" }}
+        categories={categories}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(7, { description: "Belege holen" });
+    });
+  });
+
+  it("puts the changed priority alone in the patch", async () => {
+    const { onSave } = renderModal();
+
+    fireEvent.change(screen.getByLabelText(/Priorität/i), { target: { value: "high" } });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(7, { priority: "high" });
+    });
+  });
+
+  it("sets dueDate to null in the patch when a due date is cleared", async () => {
+    const { onSave } = renderModal({ due_date: "2026-09-20" });
+
+    fireEvent.change(screen.getByLabelText(/Fällig/i), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(7, { dueDate: null });
+    });
+  });
+
+  it("sets categoryId to null in the patch when the category is reset to none", async () => {
+    const { onSave } = renderModal({ category_id: 1, category_name: "Arbeit", category_color: "#7cc3f7" });
+
+    fireEvent.change(screen.getByLabelText(/Kategorie/i), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(7, { categoryId: null });
+    });
+  });
+
+  it("disables Sichern while the save is in flight", async () => {
+    let resolveSave: () => void = () => {};
+    const onSave = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const onClose = vi.fn();
+    render(
+      <TodoDetailModal todo={makeTodo()} categories={categories} onSave={onSave} onClose={onClose} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "Text" } });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Sichern/i })).toBeDisabled());
+
+    await act(async () => {
+      resolveSave();
+    });
   });
 });
