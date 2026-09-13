@@ -643,8 +643,8 @@ mod tests {
         let (server, pool) = server().await;
         let id = category(&pool, "Kundenprojekt").await;
         sqlx::query(
-            "INSERT INTO todos (title, created_at, category_id, due_date)
-             VALUES ('Angebot schreiben', '2026-01-02T00:00:00.000Z', ?, '2026-03-01')",
+            "INSERT INTO todos (title, description, created_at, category_id, due_date)
+             VALUES ('Angebot schreiben', 'Zeile eins\nZeile zwei', '2026-01-02T00:00:00.000Z', ?, '2026-03-01')",
         )
         .bind(id)
         .execute(&pool)
@@ -662,6 +662,7 @@ mod tests {
         let json = ok_json(&result);
         assert_eq!(json["count"], 1);
         assert_eq!(json["todos"][0]["title"], "Angebot schreiben");
+        assert_eq!(json["todos"][0]["description"], "Zeile eins\nZeile zwei");
         assert_eq!(json["todos"][0]["category_name"], "Kundenprojekt");
     }
 
