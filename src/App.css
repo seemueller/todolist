@@ -979,7 +979,7 @@ a:hover {
 .todo-modal-description {
   min-height: 160px;
   padding: 10px 12px;
-  border: 2px solid var(--ink);
+  border: var(--border-thin);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--ink);
@@ -1011,11 +1011,19 @@ a:hover {
 .todo-modal-cancel,
 .todo-modal-save {
   padding: 8px 16px;
-  border: 2px solid var(--ink);
+  border: var(--border);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.todo-modal-cancel:active,
+.todo-modal-save:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 var(--ink);
 }
 
 .todo-modal-cancel {
