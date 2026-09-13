@@ -921,7 +921,8 @@ a:hover {
 }
 
 .changelog-modal,
-.category-modal {
+.category-modal,
+.todo-modal {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -940,6 +941,113 @@ a:hover {
 
 .category-modal {
   max-width: 460px;
+}
+
+.todo-modal {
+  max-width: 560px;
+}
+
+.todo-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.todo-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.todo-modal-field > label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.todo-modal-row {
+  display: flex;
+  gap: 12px;
+}
+
+.todo-modal-row > .todo-modal-field {
+  flex: 1;
+}
+
+.todo-modal-description {
+  min-height: 160px;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.todo-modal-description::placeholder {
+  color: var(--ink-faint);
+}
+
+.todo-modal-error {
+  margin: 0;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.todo-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+/* Die beiden Knoepfe des Fensters. Eigene Klassen, weil es im Projekt bisher
+   keinen benannten Sichern-/Abbrechen-Knopf gibt: das Kategorie-Fenster kommt
+   mit einem nackten <button type="submit"> aus. */
+.todo-modal-cancel,
+.todo-modal-save {
+  padding: 8px 16px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.todo-modal-cancel {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.todo-modal-save {
+  background: var(--accent);
+  color: var(--canvas);
+}
+
+.todo-modal-save:disabled {
+  background: var(--ink-ghost);
+  cursor: default;
+}
+
+/* Hinweis in der Liste, dass eine Aufgabe eine Beschreibung hat. */
+.todo-note-mark {
+  display: inline-flex;
+  color: var(--ink-ghost);
+}
+
+/* Zwei Zeilen Vorschau auf der Kanban-Karte. */
+.kanban-card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .changelog-header {

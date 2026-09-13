@@ -23,6 +23,7 @@ export {
   LaneTodoIcon,
   ListViewIcon,
   MinusIcon,
+  NoteIcon,
   PencilIcon,
   PlusIcon,
   SlidersIcon,

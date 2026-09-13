@@ -105,6 +105,16 @@ export function MinusIcon(props: IconProps) {
   );
 }
 
+/** Notizblock - Aufgabe hat eine Beschreibung. */
+export function NoteIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" {...props}>
+      <path d="M3 2.2h8v9.6H3z" />
+      <path d="M5 5h4M5 7h4M5 9h2.5" />
+    </BaseIcon>
+  );
+}
+
 /** Schieberegler - Einstellungen der Zeiterfassung. Bei 14px lesbarer als ein Zahnrad. */
 export function SlidersIcon(props: IconProps) {
   return (
