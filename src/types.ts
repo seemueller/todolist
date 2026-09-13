@@ -4,6 +4,8 @@ export type TodoStatus = "todo" | "in_progress" | "done";
 export interface Todo {
   id: number;
   title: string;
+  /** Frei formulierter Text zur Aufgabe; leerer String heisst "keine Beschreibung". */
+  description: string;
   done: boolean;
   status: TodoStatus;
   priority: Priority;
@@ -17,6 +19,9 @@ export interface Todo {
 export interface TodoRow {
   id: number;
   title: string;
+  /** Optional, weil der localStorage-Speicher Eintraege aus der Zeit vor
+   *  dieser Spalte liefert; `fromRow` setzt dann den leeren String. */
+  description?: string;
   done: number;
   priority: Priority;
   created_at: string;
@@ -32,6 +37,7 @@ export function fromRow(row: TodoRow): Todo {
   return {
     id: row.id,
     title: row.title,
+    description: row.description ?? "",
     done: status === "done",
     status,
     priority: row.priority,
