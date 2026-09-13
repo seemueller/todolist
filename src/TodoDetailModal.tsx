@@ -91,8 +91,14 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
   }
 
   return (
-    <Modal variant="todo" title="Aufgabe bearbeiten" onClose={onClose} closeLabel="Schließen">
-      <div className="todo-modal-body" onKeyDown={handleKeyDown}>
+    <Modal
+      variant="todo"
+      title="Aufgabe bearbeiten"
+      onClose={onClose}
+      closeLabel="Schließen"
+      onKeyDown={handleKeyDown}
+    >
+      <div className="todo-modal-body">
         <div className="todo-modal-field">
           <label htmlFor="todo-detail-title">Titel</label>
           <input

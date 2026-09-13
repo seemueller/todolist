@@ -124,6 +124,18 @@ describe("TodoDetailModal", () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(7, { description: "Text" }));
   });
 
+  it("saves on Ctrl+Enter from the Abbrechen button, outside the body", async () => {
+    const { onSave } = renderModal();
+
+    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "Text" } });
+    fireEvent.keyDown(screen.getByRole("button", { name: /Abbrechen/i }), {
+      key: "Enter",
+      ctrlKey: true,
+    });
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(7, { description: "Text" }));
+  });
+
   it("stays open and shows the error when saving fails", async () => {
     const onSave = vi.fn().mockRejectedValue(new Error("Datenbank weg"));
     const onClose = vi.fn();
