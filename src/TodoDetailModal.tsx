@@ -44,7 +44,11 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
   function buildPatch(trimmedTitle: string): TodoFieldsPatch {
     const patch: TodoFieldsPatch = {};
     if (trimmedTitle !== original.title) patch.title = trimmedTitle;
-    if (description !== original.description) patch.description = description;
+    // Leer heisst leer -- der leere String. Nur Weissraum bringt die Ambiguitaet
+    // sonst durch die Hintertuer zurueck; echter Text behaelt seinen Weissraum,
+    // auch fuehrende/abschliessende Umbrueche gehoeren zum Text.
+    const nextDescription = description.trim() === "" ? "" : description;
+    if (nextDescription !== original.description) patch.description = nextDescription;
     if (priority !== original.priority) patch.priority = priority;
     const nextDueDate = dueDate || null;
     if (nextDueDate !== original.due_date) patch.dueDate = nextDueDate;

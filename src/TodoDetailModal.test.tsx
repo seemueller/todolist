@@ -80,6 +80,30 @@ describe("TodoDetailModal", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("treats a whitespace-only description as empty", async () => {
+    const { onSave } = renderModal({ description: "Belege holen" });
+
+    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(7, { description: "" });
+    });
+  });
+
+  it("keeps leading and trailing newlines around real text", async () => {
+    const { onSave } = renderModal();
+
+    fireEvent.change(screen.getByLabelText(/Beschreibung/i), {
+      target: { value: "\n\nText\n\n" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(7, { description: "\n\nText\n\n" });
+    });
+  });
+
   it("refuses an empty title and stays open", async () => {
     const { onSave } = renderModal();
 
