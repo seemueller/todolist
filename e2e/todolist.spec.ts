@@ -587,3 +587,28 @@ test.describe("Layout and UI", () => {
     await expect(page.locator(".active-filters")).not.toBeVisible();
   });
 });
+
+test.describe("Beschreibung", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "TodoList" })).toBeVisible();
+  });
+
+  test("kann eine Beschreibung setzen und im Brett sehen", async ({ page }) => {
+    const input = page.getByPlaceholder(/Was steht an/i);
+    await input.fill("Mit Beschreibung");
+    await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
+    await expect(page.getByText("Mit Beschreibung")).toBeVisible();
+
+    await page.getByRole("button", { name: "Aufgabe bearbeiten" }).first().click();
+    // Exakt, nicht als Muster: die Notiz-Markierung in der Zeile heisst
+    // "Hat eine Beschreibung" und wuerde ein /Beschreibung/i sonst mittreffen.
+    await page.getByLabel("Beschreibung", { exact: true }).fill("Belege aus dem Ordner");
+    await page.getByRole("button", { name: /Sichern/i }).click();
+
+    await expect(page.getByLabel("Beschreibung", { exact: true })).not.toBeVisible();
+
+    await page.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }).click();
+    await expect(page.getByText("Belege aus dem Ordner")).toBeVisible();
+  });
+});
