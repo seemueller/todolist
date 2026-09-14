@@ -2,7 +2,7 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [Unreleased]
+## [0.9.0] - 2026-09-14
 
 ### Hinzugefügt
 - Eine Aufgabe kann jetzt eine Beschreibung tragen: Ein Klick auf den Stift in der Zeile — oder ein Doppelklick auf den Titel — öffnet ein Fenster, in dem Titel, Beschreibung, Priorität, Fälligkeit und Kategorie zusammen stehen. Die Beschreibung darf mehrere Absätze haben. Gesichert wird alles auf einmal; Abbrechen verwirft.

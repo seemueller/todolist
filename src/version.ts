@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.8.1";
+export const APP_VERSION = "0.9.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.9.0",
+    date: "2026-09-14",
+    changes: [
+      "Eine Aufgabe kann eine Beschreibung tragen: Der Stift in der Zeile — oder ein Doppelklick auf den Titel — öffnet ein Fenster mit Titel, Beschreibung, Priorität, Fälligkeit und Kategorie",
+      "Aufgaben mit Beschreibung sind in der Liste an einem Notiz-Symbol zu erkennen, im Brett zeigt die Karte die ersten zwei Zeilen",
+      "Ein KI-Assistent kann die Beschreibung über MCP mitlesen, setzen und wieder leeren",
+      "Wird die geöffnete Aufgabe zwischenzeitlich anderswo gelöscht, schließt sich das Bearbeitungsfenster von selbst und sagt Bescheid",
+      "Ein KI-Assistent löscht Fälligkeit, Kategorie oder Beschreibung nur noch auf ausdrückliche Anweisung — bisher konnte das bloße Abhaken einer Aufgabe Kategorie und Fälligkeit kosten",
+    ],
+  },
   {
     version: "0.8.1",
     date: "2026-09-05",
