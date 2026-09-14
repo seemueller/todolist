@@ -434,6 +434,21 @@ const NOT_DELETED: &str = "t.deleted_at IS NULL";
 
 /// Ohne Tabellen-Alias: ein UPDATE kennt keinen. Spiegelt `NOT_DELETED_HERE`
 /// in src/todoStoreSql.ts.
+///
+/// **Nicht die Stelle, die heute vor einem Schreibzugriff auf eine
+/// weggeworfene Aufgabe schuetzt.** Das tut `select_todo` am Anfang von
+/// `update_todo` und `delete_todo`: es bricht vorher ab, die folgende
+/// UPDATE-Zeile mit dieser Bedingung sieht eine geloeschte Id also nie.
+/// Anders als in src/todoStoreSql.ts, wo `updateColumn` erst schreibt und
+/// danach liest -- dort ist die Bedingung tatsaechlich das, was den Zugriff
+/// verhindert.
+///
+/// Diese Bedingung ist die zweite Verteidigungslinie: sie haelt dieselbe
+/// Regel am Ort des Schreibens fest, damit eine spaetere Umstellung der
+/// Reihenfolge (oder ein neuer Schreibpfad ohne vorheriges `select_todo`)
+/// die Sperre nicht stillschweigend verliert. Kein Test schlaegt fehl, wenn
+/// sie entfernt wird -- das macht sie nicht ueberfluessig, sondern beweist
+/// nur, dass `select_todo` heute zuerst greift.
 const NOT_DELETED_HERE: &str = "deleted_at IS NULL";
 
 async fn select_todo(pool: &Pool<Sqlite>, id: i64) -> Result<Todo, StoreError> {
@@ -656,9 +671,10 @@ pub async fn update_todo(
 /// src/todoStoreSql.ts.
 pub async fn delete_todo(pool: &Pool<Sqlite>, id: i64) -> Result<Todo, StoreError> {
     let todo = select_todo(pool, id).await?;
-    sqlx::query(
-        "UPDATE todos SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-    )
+    sqlx::query(&format!(
+        "UPDATE todos SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         WHERE id = ? AND {NOT_DELETED_HERE}"
+    ))
     .bind(id)
     .execute(pool)
     .await?;
