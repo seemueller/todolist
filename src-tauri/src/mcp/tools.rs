@@ -796,6 +796,41 @@ mod tests {
         assert_eq!(json["description"], "Notiz", "null must not clear");
     }
 
+    /// Ein leerer Text ist kein Wert, und er ist erst recht kein Loeschbefehl:
+    /// `""` heisst genau wie `null` "dieses Feld nicht anfassen".
+    #[tokio::test]
+    async fn update_todo_keeps_everything_that_arrives_as_an_empty_string() {
+        let (server, pool) = server().await;
+        let category_id = category(&pool, "iteratec").await;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at, description, due_date, category_id)
+             VALUES ('Angebot', '2026-01-02T00:00:00.000Z', 'Notiz', '2026-09-03', ?)
+             RETURNING id",
+        )
+        .bind(category_id)
+        .fetch_one(&pool)
+        .await
+        .expect("insert todo");
+
+        let params: super::UpdateTodo = serde_json::from_str(&format!(
+            r#"{{"id":{id},"status":"done","description":"","due_date":"","category":""}}"#
+        ))
+        .expect("params parse");
+
+        let result = server
+            .update_todo(Parameters(params))
+            .await
+            .expect("no protocol error");
+        let json = ok_json(&result);
+        assert_eq!(json["status"], "done");
+        assert_eq!(json["due_date"], "2026-09-03", "an empty text must not clear");
+        assert_eq!(
+            json["category_name"], "iteratec",
+            "an empty text must not clear"
+        );
+        assert_eq!(json["description"], "Notiz", "an empty text must not clear");
+    }
+
     #[tokio::test]
     async fn update_todo_clears_a_due_date_when_the_clear_flag_is_set() {
         let (server, pool) = server().await;
@@ -852,6 +887,43 @@ mod tests {
                 .expect("select todo");
         assert_eq!(title, "Alt", "a rejected call must not write anything");
         assert_eq!(due.as_deref(), Some("2026-05-05"));
+    }
+
+    /// Jedes der drei Felder muss sich im Fehlertext selbst wiedererkennen --
+    /// sonst sucht der Aufrufer den Widerspruch am falschen Feld.
+    #[tokio::test]
+    async fn update_todo_names_the_field_it_refuses_to_set_and_clear() {
+        let (server, pool) = server().await;
+        category(&pool, "Kundenprojekt").await;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at) VALUES ('Alt', '2026-01-02T00:00:00.000Z')
+             RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("insert todo");
+
+        let description = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id,
+                description: Some("Notiz".into()),
+                clear_description: Some(true),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&description, "clear_description");
+
+        let category = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id,
+                category: Some("Kundenprojekt".into()),
+                clear_category: Some(true),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&category, "clear_category");
     }
 
     #[tokio::test]
