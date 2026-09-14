@@ -663,3 +663,51 @@ describe("die Rückgängig-Leiste", () => {
     expect(screen.queryByRole("button", { name: "Rückgängig" })).not.toBeInTheDocument();
   });
 });
+
+describe("der Papierkorb-Knopf", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    insideTauri = true;
+  });
+
+  it("öffnet das Papierkorb-Fenster", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    vi.mocked(db.listDeletedTodos).mockResolvedValue([]);
+
+    render(<App />);
+    await waitFor(() => expect(db.listTodos).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Papierkorb"));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Papierkorb" })).toBeInTheDocument()
+    );
+  });
+
+  it("zieht die Rückgängig-Leiste zurück, wenn im Papierkorb endgültig gelöscht wird", async () => {
+    const todo = makeTodo({ id: 1, title: "Versehentlich" });
+    vi.mocked(db.listTodos).mockResolvedValue([todo]);
+    vi.mocked(db.deleteTodo).mockResolvedValue(1);
+    vi.mocked(db.listDeletedTodos).mockResolvedValue([todo]);
+    vi.mocked(db.purgeTodo).mockResolvedValue(1);
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Versehentlich")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Löschen"));
+    await waitFor(() => expect(screen.getByText(/Versehentlich.*gelöscht/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Papierkorb"));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Papierkorb" })).toBeInTheDocument()
+    );
+
+    fireEvent.click(screen.getByLabelText("Endgültig löschen"));
+
+    await waitFor(() => expect(db.purgeTodo).toHaveBeenCalledWith(1));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Rückgängig" })).not.toBeInTheDocument()
+    );
+  });
+});

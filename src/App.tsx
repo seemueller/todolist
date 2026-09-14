@@ -34,6 +34,7 @@ import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
 import { TimeTrackingView } from "./TimeTrackingView";
 import { TodoDetailModal } from "./TodoDetailModal";
+import { TrashModal } from "./TrashModal";
 
 /** Die drei Ansichten der App. */
 type ViewMode = "list" | "kanban" | "time";
@@ -173,6 +174,7 @@ function App({ migrationError = null }: AppProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState(CATEGORY_COLORS[0]);
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
@@ -662,6 +664,9 @@ function App({ migrationError = null }: AppProps) {
               <TagIcon />
               Kategorien
             </IconButton>
+            <IconButton variant="icon" onClick={() => setShowTrash(true)} aria-label="Papierkorb">
+              <TrashIcon />
+            </IconButton>
           </div>
         </div>
 
@@ -1121,6 +1126,16 @@ function App({ migrationError = null }: AppProps) {
               ))}
             </ul>
         </Modal>
+      )}
+
+      {showTrash && (
+        <TrashModal
+          onClose={() => setShowTrash(false)}
+          onChanged={() => {
+            void refresh();
+            setJustDeleted(null);
+          }}
+        />
       )}
 
       {DebugLogPanel && showDebug && (
