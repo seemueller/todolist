@@ -386,5 +386,21 @@ describe("localTodoStore", () => {
       expect(removed).toBe(0);
       expect(await localTodoStore.listTodos()).toEqual([todo]);
     });
+
+    it("lässt eine lebende Aufgabe unberührt, statt sie zu entfernen", async () => {
+      const todo = await localTodoStore.addTodo("Lebt noch", "medium", null);
+
+      await localTodoStore.purgeTodo(todo.id);
+
+      expect(await localTodoStore.listTodos()).toEqual([todo]);
+    });
+
+    it("bleibt bei einer unbekannten Id folgenlos", async () => {
+      const todo = await localTodoStore.addTodo("Unberührt", "medium", null);
+
+      await localTodoStore.purgeTodo(999999);
+
+      expect(await localTodoStore.listTodos()).toEqual([todo]);
+    });
   });
 });

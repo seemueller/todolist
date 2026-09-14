@@ -428,7 +428,16 @@ describe("sqlTodoStore", () => {
 
       const [sql, params] = execute.mock.calls[0];
       expect(sql).toContain("DELETE FROM todos");
+      expect(sql).toContain("deleted_at IS NOT NULL");
       expect(params).toEqual([7]);
+    });
+
+    it("bleibt bei einer lebenden oder unbekannten Id folgenlos", async () => {
+      execute.mockResolvedValue({ rowsAffected: 0 });
+
+      const result = await sqlTodoStore.purgeTodo(999);
+
+      expect(result).toBe(999);
     });
 
     it("räumt nur den Papierkorb vor dem Stichtag", async () => {

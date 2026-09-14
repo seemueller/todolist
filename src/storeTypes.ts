@@ -74,12 +74,25 @@ export interface TodoStore {
   listDeletedTodos(): Promise<Todo[]>;
   /** Holt eine Aufgabe aus dem Papierkorb zurueck; lehnt mit `Todo <id> not found` ab, wenn `id` nicht im Papierkorb liegt — als Promise-Rejection, nie als synchroner throw. */
   restoreTodo(id: number): Promise<Todo>;
-  /** Entfernt eine Aufgabe unwiederbringlich; gibt die Id zurueck. */
+  /**
+   * Entfernt eine Aufgabe unwiederbringlich, aber nur, wenn sie im Papierkorb
+   * liegt; gibt die Id zurueck. Eine lebende oder unbekannte Id bleibt wie bei
+   * `deleteTodo` folgenlos -- anders als `restoreTodo` lehnt das hier nicht ab,
+   * weil das Fehlen eines zu entfernenden Datensatzes harmlos ist, waehrend ein
+   * Wiederherstellen-Aufruf ins Leere auf eine verwirrte Aufruferin hindeutet.
+   */
   purgeTodo(id: number): Promise<number>;
   /**
    * Entfernt unwiederbringlich alles, was vor `cutoff` (ISO-Zeitstempel) in den
    * Papierkorb gelegt wurde, und gibt die Anzahl zurueck. Der Stichtag kommt
    * vom Aufrufer -- der Store kennt keine Uhr, damit seine Tests keine brauchen.
+   *
+   * Der Vergleich ist ein reiner Textvergleich (`deleted_at < cutoff`); er
+   * traegt nur, weil jedes Backend `deleted_at` in derselben ISO-Form
+   * schreibt (`YYYY-MM-DDTHH:MM:SS.sssZ`) -- der localStorage-Store ueber
+   * `toISOString()`, die SQL-Stores ueber `strftime('%Y-%m-%dT%H:%M:%fZ','now')`.
+   * Weicht ein Backend davon ab, rechnet die Frist falsch, ohne dass ein
+   * Compiler oder Test das meldet.
    */
   purgeDeletedBefore(cutoff: string): Promise<number>;
   /**

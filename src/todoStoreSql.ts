@@ -174,12 +174,16 @@ async function restoreTodo(id: number): Promise<Todo> {
 
 async function purgeTodo(id: number): Promise<number> {
   const db = await getDb();
-  await db.execute("DELETE FROM todos WHERE id = $1", [id]);
+  // Nur Zeilen im Papierkorb -- eine lebende oder unbekannte Id bleibt
+  // folgenlos, siehe Vertrag in storeTypes.ts.
+  await db.execute("DELETE FROM todos WHERE id = $1 AND deleted_at IS NOT NULL", [id]);
   return id;
 }
 
 async function purgeDeletedBefore(cutoff: string): Promise<number> {
   const db = await getDb();
+  // Textvergleich -- gilt nur, weil alle Backends dasselbe ISO-Format
+  // schreiben, siehe storeTypes.ts.
   const result = await db.execute(
     "DELETE FROM todos WHERE deleted_at IS NOT NULL AND deleted_at < $1",
     [cutoff]

@@ -260,14 +260,21 @@ function restoreTodo(id: number): Promise<Todo> {
 }
 
 function purgeTodo(id: number): Promise<number> {
-  saveTodos(loadTodos().filter((t) => t.id !== id));
+  // Nur Zeilen im Papierkorb -- eine lebende oder unbekannte Id bleibt
+  // folgenlos, siehe Vertrag in storeTypes.ts.
+  saveTodos(loadTodos().filter((t) => !(t.id === id && isInTrash(t))));
   return Promise.resolve(id);
 }
 
 function purgeDeletedBefore(cutoff: string): Promise<number> {
   const todos = loadTodos();
+  // Textvergleich -- gilt nur, weil alle Backends dasselbe ISO-Format
+  // schreiben, siehe storeTypes.ts.
   const kept = todos.filter((t) => !(isInTrash(t) && t.deleted_at < cutoff));
-  saveTodos(kept);
+  // Kein Schreiben, wenn nichts entfernt wurde: task 8 ruft das bei jedem
+  // Programmstart auf, ein unveraendertes setItem loest sonst in jedem
+  // offenen Tab unnoetig ein storage-Event aus.
+  if (kept.length !== todos.length) saveTodos(kept);
   return Promise.resolve(todos.length - kept.length);
 }
 
