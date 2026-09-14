@@ -27,7 +27,7 @@ use rmcp::{
     model::{CallToolResult, ContentBlock},
     schemars, tool, tool_router,
 };
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use super::TodoServer;
@@ -185,32 +185,37 @@ fn non_empty(value: &Option<String>) -> Option<&str> {
         .filter(|text| !text.is_empty())
 }
 
-/// Haelt `null` von "gar nicht angegeben" auseinander.
+/// Ein Feld zugleich zu setzen und zu leeren ist ein Widerspruch.
 ///
-/// Serde faltet beides sonst auf `None` zusammen, und damit waere ueber
-/// `update_todo` nicht mehr auszudruecken, dass eine Faelligkeit weg soll.
-/// Mit `#[serde(default)]` bleibt ein fehlendes Feld `None`, waehrend `null`
-/// hier durchlaeuft und `Some(None)` ergibt.
-fn double_option<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Option::deserialize(deserializer).map(Some)
+/// Ihn nach einer Regel still aufzuloesen macht ihn unsichtbar, und genau das
+/// Unsichtbare war der Schaden in Issue #35. Also ein Fehler, bevor irgendetwas
+/// geschrieben ist.
+fn check_not_both(
+    value: Option<&str>,
+    clear: Option<bool>,
+    label: &str,
+    field: &str,
+    flag: &str,
+) -> Result<(), String> {
+    if value.is_some() && clear == Some(true) {
+        return Err(format!(
+            "{label} kann nicht zugleich gesetzt und geleert werden: \
+             entweder \"{field}\" angeben oder \"{flag}\" setzen."
+        ));
+    }
+    Ok(())
 }
 
-/// `Some(None)` heisst "leeren", `Some(Some(_))` "setzen", `None` "unveraendert".
+/// `Some(None)` heisst leeren, `Some(Some(_))` setzen, `None` unveraendert.
 ///
-/// `null` ist der dokumentierte Weg zu leeren; ein leerer String kommt hier
-/// genauso an. Das ist Nachsicht mit Absicht: `""` ist weder ein Datum noch ein
-/// Kategoriename, und ein Modell, das es statt `null` schickt, meint dasselbe.
-fn clearable(value: &Option<Option<String>>) -> Option<Option<String>> {
-    value.as_ref().map(|inner| {
-        inner
-            .as_deref()
-            .map(str::trim)
-            .filter(|text| !text.is_empty())
-            .map(str::to_string)
-    })
+/// Geleert wird ausschliesslich ueber das Flag. Ein fehlendes Feld, `null` und
+/// ein leerer Text sind alle drei "unveraendert" -- ein Modell, das sein
+/// Parameterobjekt vollstaendig ausfuellt, soll nichts loeschen koennen.
+fn set_or_clear(value: Option<&str>, clear: Option<bool>) -> Option<Option<String>> {
+    if clear == Some(true) {
+        return Some(None);
+    }
+    value.map(|text| Some(text.to_string()))
 }
 
 // --- Parameter --------------------------------------------------------------
@@ -252,7 +257,7 @@ pub struct AddTodo {
 }
 
 /// Eine Aenderung an einer Aufgabe. Nur die angegebenen Felder aendern sich.
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
 pub struct UpdateTodo {
     /// Id der Aufgabe, wie "list_todos" sie liefert.
     pub id: i64,
@@ -261,30 +266,32 @@ pub struct UpdateTodo {
     pub title: Option<String>,
     /// Neue Beschreibung, hoechstens 4000 Zeichen. Zeilenumbrueche sind
     /// erlaubt und als \n zu schicken; andere Steuerzeichen werden abgelehnt.
-    /// null oder "" leeren die Beschreibung; das Feld wegzulassen laesst sie
-    /// unveraendert. Das ist ein Unterschied: null/"" loeschen, weglassen
-    /// aendert nichts.
-    #[serde(default, deserialize_with = "double_option")]
-    #[schemars(with = "Option<String>")]
-    pub description: Option<Option<String>>,
+    /// Weglassen, null und "" lassen die bestehende Beschreibung unveraendert;
+    /// geleert wird sie ausschliesslich ueber "clear_description".
+    pub description: Option<String>,
     /// Neuer Status: "todo", "in_progress" oder "done".
     pub status: Option<String>,
     /// Neue Prioritaet: "low", "medium" oder "high".
     pub priority: Option<String>,
-    /// Neuer Faelligkeitstag, ISO-Format YYYY-MM-DD. null entfernt die
-    /// Faelligkeit; das Feld wegzulassen laesst sie unveraendert. Das ist ein
-    /// Unterschied: null loescht, weglassen aendert nichts.
-    #[serde(default, deserialize_with = "double_option")]
-    #[schemars(with = "Option<String>")]
-    pub due_date: Option<Option<String>>,
+    /// Neuer Faelligkeitstag, ISO-Format YYYY-MM-DD. Weglassen, null und ""
+    /// lassen die bestehende Faelligkeit unveraendert; entfernt wird sie
+    /// ausschliesslich ueber "clear_due_date".
+    pub due_date: Option<String>,
     /// Name einer bereits bestehenden Kategorie (Gross-/Kleinschreibung egal).
-    /// null nimmt die Aufgabe aus ihrer Kategorie heraus; das Feld wegzulassen
-    /// laesst sie unveraendert. Das ist ein Unterschied: null loescht,
-    /// weglassen aendert nichts. Ein unbekannter Name ist ein Fehler; ueber
-    /// dieses Tool entsteht keine neue Kategorie.
-    #[serde(default, deserialize_with = "double_option")]
-    #[schemars(with = "Option<String>")]
-    pub category: Option<Option<String>>,
+    /// Ein unbekannter Name ist ein Fehler; ueber dieses Tool entsteht keine
+    /// neue Kategorie. Weglassen, null und "" lassen die bestehende Kategorie
+    /// unveraendert; herausgenommen wird die Aufgabe ausschliesslich ueber
+    /// "clear_category".
+    pub category: Option<String>,
+    /// true leert die Beschreibung. Nicht zusammen mit "description" zu
+    /// verwenden -- beides zugleich ist ein Fehler.
+    pub clear_description: Option<bool>,
+    /// true entfernt die Faelligkeit. Nicht zusammen mit "due_date" zu
+    /// verwenden -- beides zugleich ist ein Fehler.
+    pub clear_due_date: Option<bool>,
+    /// true nimmt die Aufgabe aus ihrer Kategorie heraus. Nicht zusammen mit
+    /// "category" zu verwenden -- beides zugleich ist ein Fehler.
+    pub clear_category: Option<bool>,
 }
 
 /// Die zu loeschende Aufgabe.
@@ -390,40 +397,68 @@ impl TodoServer {
     }
 
     #[tool(
-        description = "Aendert eine bestehende Aufgabe und gibt sie danach zurueck. Es aendern sich ausschliesslich die angegebenen Felder; alles Weggelassene bleibt, wie es war. Um eine Aufgabe abzuhaken, ist der Status auf \"done\" zu setzen. Die Beschreibung darf mehrere Zeilen haben; null leert sie."
+        description = "Aendert eine bestehende Aufgabe und gibt sie danach zurueck. Es aendern sich ausschliesslich die angegebenen Felder; alles Weggelassene bleibt, wie es war -- auch ein Feld, das als null oder als leerer Text ankommt. Um eine Aufgabe abzuhaken, ist der Status auf \"done\" zu setzen. Geleert wird ausschliesslich ueber \"clear_description\", \"clear_due_date\" und \"clear_category\"."
     )]
     async fn update_todo(
         &self,
         Parameters(params): Parameters<UpdateTodo>,
     ) -> Result<CallToolResult, McpError> {
+        // Die Beschreibung wird nicht getrimmt -- Absaetze am Anfang und Ende
+        // gehoeren dem Text. Leer heisst trotzdem "nicht angegeben".
+        let description = params
+            .description
+            .as_deref()
+            .filter(|text| !text.is_empty());
+        let due_date = non_empty(&params.due_date);
+        let category = non_empty(&params.category);
+
         let checked = check_optional(
             "Der Titel",
             params.title.as_deref().map(str::trim),
             MAX_TITLE_CHARS,
         )
-        .and_then(|()| {
-            match params.description.as_ref().and_then(|d| d.as_deref()) {
-                Some(text) => check_multiline("Die Beschreibung", text, MAX_DESCRIPTION_CHARS),
-                None => Ok(()),
-            }
+        .and_then(|()| match description {
+            Some(text) => check_multiline("Die Beschreibung", text, MAX_DESCRIPTION_CHARS),
+            None => Ok(()),
         })
-        .and_then(|()| check_category(clearable(&params.category).flatten().as_deref()));
+        .and_then(|()| check_category(category))
+        .and_then(|()| {
+            check_not_both(
+                description,
+                params.clear_description,
+                "Die Beschreibung",
+                "description",
+                "clear_description",
+            )
+        })
+        .and_then(|()| {
+            check_not_both(
+                due_date,
+                params.clear_due_date,
+                "Die Faelligkeit",
+                "due_date",
+                "clear_due_date",
+            )
+        })
+        .and_then(|()| {
+            check_not_both(
+                category,
+                params.clear_category,
+                "Die Kategorie",
+                "category",
+                "clear_category",
+            )
+        });
         if let Err(message) = checked {
             return Ok(tool_error(message));
         }
         let update = TodoUpdate {
             title: params.title.as_deref().map(str::trim).map(str::to_string),
-            // Nicht ueber `clearable`: das trimmt und faltet "" auf None, und
-            // beides waere hier falsch. Absaetze am Anfang oder Ende gehoeren
-            // dem Text, und "" ist der ausdrueckliche Weg zum Leeren, der
-            // `Some(None)` ergeben muss -- genau wie null.
-            description: params.description.as_ref().map(|inner| {
-                inner.as_deref().filter(|text| !text.is_empty()).map(str::to_string)
-            }),
+            description: set_or_clear(description, params.clear_description),
             status: non_empty(&params.status).map(str::to_string),
             priority: non_empty(&params.priority).map(str::to_string),
-            due_date: clearable(&params.due_date),
-            category: clearable(&params.category),
+            due_date: set_or_clear(due_date, params.clear_due_date),
+            category: set_or_clear(category, params.clear_category),
         };
         self.respond_write(store::update_todo(&self.pool, params.id, update).await)
     }
@@ -710,12 +745,8 @@ mod tests {
         let result = server
             .update_todo(Parameters(super::UpdateTodo {
                 id,
-                title: None,
-                description: None,
                 status: Some("done".into()),
-                priority: None,
-                due_date: None,
-                category: None,
+                ..Default::default()
             }))
             .await
             .expect("no protocol error");
@@ -762,7 +793,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn update_todo_clears_a_due_date_when_given_null() {
+    async fn update_todo_clears_a_due_date_when_the_clear_flag_is_set() {
         let (server, pool) = server().await;
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO todos (title, created_at, due_date)
@@ -775,12 +806,8 @@ mod tests {
         let result = server
             .update_todo(Parameters(super::UpdateTodo {
                 id,
-                title: None,
-                description: None,
-                status: None,
-                priority: None,
-                due_date: Some(None),
-                category: None,
+                clear_due_date: Some(true),
+                ..Default::default()
             }))
             .await
             .expect("no protocol error");
@@ -788,31 +815,28 @@ mod tests {
         assert!(json["due_date"].is_null(), "due date should be cleared");
     }
 
-    /// Die ganze Unterscheidung haengt daran, dass `null` und ein fehlendes
-    /// Feld verschieden ankommen -- serde faltet beides von sich aus auf `None`
-    /// zusammen, und dann waere "Faelligkeit entfernen" nicht ausdrueckbar.
+    /// Die alte API unterschied `null` von einem fehlenden Feld. Sie tut es
+    /// nicht mehr: beides heisst "unveraendert", und nur das Flag leert.
     #[test]
-    fn null_and_a_missing_field_mean_different_things_on_the_wire() {
-        let cleared: super::UpdateTodo =
+    fn null_and_a_missing_field_both_mean_leave_it_alone() {
+        let with_nulls: super::UpdateTodo =
             serde_json::from_str(r#"{"id":1,"due_date":null,"category":null}"#)
                 .expect("null parses");
-        assert_eq!(cleared.due_date, Some(None), "null must mean: clear it");
-        assert_eq!(cleared.category, Some(None), "null must mean: clear it");
+        assert_eq!(with_nulls.due_date, None, "null must not mean: clear it");
+        assert_eq!(with_nulls.category, None, "null must not mean: clear it");
 
-        let untouched: super::UpdateTodo =
+        let missing: super::UpdateTodo =
             serde_json::from_str(r#"{"id":1,"status":"done"}"#).expect("missing fields parse");
-        assert_eq!(
-            untouched.due_date, None,
-            "a missing field must mean: leave it alone"
-        );
-        assert_eq!(
-            untouched.category, None,
-            "a missing field must mean: leave it alone"
-        );
+        assert_eq!(missing.due_date, None);
+        assert_eq!(missing.category, None);
+
+        let cleared: super::UpdateTodo =
+            serde_json::from_str(r#"{"id":1,"clear_due_date":true}"#).expect("the flag parses");
+        assert_eq!(cleared.clear_due_date, Some(true));
 
         let set: super::UpdateTodo =
             serde_json::from_str(r#"{"id":1,"due_date":"2026-12-24"}"#).expect("a value parses");
-        assert_eq!(set.due_date, Some(Some("2026-12-24".into())));
+        assert_eq!(set.due_date.as_deref(), Some("2026-12-24"));
     }
 
     #[tokio::test]
@@ -822,11 +846,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: 404,
                 title: Some("Neu".into()),
-                description: None,
-                status: None,
-                priority: None,
-                due_date: None,
-                category: None,
+                ..Default::default()
             }))
             .await
             .expect("an unknown id is not a protocol error");
@@ -1025,11 +1045,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: 1,
                 title: Some("Rechnung bezahlen".into()),
-                description: None,
-                status: None,
-                priority: None,
-                due_date: None,
-                category: None,
+                ..Default::default()
             }))
             .await
             .expect("no protocol error");
@@ -1107,11 +1123,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: 404,
                 title: Some("egal".into()),
-                description: None,
-                status: None,
-                priority: None,
-                due_date: None,
-                category: None,
+                ..Default::default()
             }))
             .await
             .expect("an unknown id is not a protocol error");
@@ -1181,11 +1193,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: i64::MIN,
                 title: Some("x".into()),
-                description: None,
-                status: None,
-                priority: None,
-                due_date: None,
-                category: None,
+                ..Default::default()
             }))
             .await
             .expect("no protocol error");
@@ -1409,11 +1417,7 @@ mod tests {
             .update_todo(Parameters(super::UpdateTodo {
                 id: 1,
                 title: Some(long(super::MAX_TITLE_CHARS + 1)),
-                description: None,
-                status: None,
-                priority: None,
-                due_date: None,
-                category: None,
+                ..Default::default()
             }))
             .await
             .expect("no protocol error");
@@ -1649,12 +1653,8 @@ mod tests {
         let result = server
             .update_todo(Parameters(super::UpdateTodo {
                 id,
-                title: None,
-                description: Some(Some("neu\nmit Umbruch".into())),
-                status: None,
-                priority: None,
-                due_date: None,
-                category: None,
+                description: Some("neu\nmit Umbruch".into()),
+                ..Default::default()
             }))
             .await
             .expect("no protocol error");
@@ -1663,12 +1663,8 @@ mod tests {
         let cleared = server
             .update_todo(Parameters(super::UpdateTodo {
                 id,
-                title: None,
-                description: Some(None),
-                status: None,
-                priority: None,
-                due_date: None,
-                category: None,
+                clear_description: Some(true),
+                ..Default::default()
             }))
             .await
             .expect("no protocol error");
@@ -1689,12 +1685,8 @@ mod tests {
         let result = server
             .update_todo(Parameters(super::UpdateTodo {
                 id,
-                title: None,
-                description: Some(Some(long(super::MAX_DESCRIPTION_CHARS + 1))),
-                status: None,
-                priority: None,
-                due_date: None,
-                category: None,
+                description: Some(long(super::MAX_DESCRIPTION_CHARS + 1)),
+                ..Default::default()
             }))
             .await
             .expect("no protocol error");

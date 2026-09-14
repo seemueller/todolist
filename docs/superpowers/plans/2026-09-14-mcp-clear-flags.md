@@ -93,11 +93,11 @@ Ein roter Test wird hier ausnahmsweise committet: Er ist der Beleg für den Fehl
 - Modify: `src-tauri/src/mcp/tools.rs:392-429` (Tool-Rumpf `update_todo`)
 - Modify: `src-tauri/src/mcp/tools.rs` — alle zehn `super::UpdateTodo { … }` im Testmodul
 
-- [ ] **Step 1: `double_option` und `clearable` löschen**
+- [x] **Step 1: `double_option` und `clearable` löschen**
 
 Beide Funktionen samt ihrer Doc-Kommentare ersatzlos entfernen. `double_option` steht ab „Haelt `null` von "gar nicht angegeben" auseinander." bis zum Ende der Funktion, `clearable` direkt darunter ab „`Some(None)` heisst "leeren" …". `non_empty` darüber bleibt, `Deserializer` im `use`-Kopf der Datei wird damit unbenutzt und fliegt ebenfalls raus (der Compiler nennt die Zeile).
 
-- [ ] **Step 2: Die beiden neuen Helfer schreiben**
+- [x] **Step 2: Die beiden neuen Helfer schreiben**
 
 An die Stelle der gelöschten Funktionen, also unter `non_empty`:
 
@@ -136,7 +136,7 @@ fn set_or_clear(value: Option<&str>, clear: Option<bool>) -> Option<Option<Strin
 }
 ```
 
-- [ ] **Step 3: `UpdateTodo` umbauen**
+- [x] **Step 3: `UpdateTodo` umbauen**
 
 Die Struktur vollständig ersetzen. `Default` kommt dazu, damit die Tests nur noch die Felder nennen, um die es ihnen geht:
 
@@ -182,7 +182,7 @@ pub struct UpdateTodo {
 
 `Option`-Felder sind für serde von sich aus optional; `#[serde(default)]` und `#[schemars(with = …)]` braucht hier keins mehr.
 
-- [ ] **Step 4: Den Tool-Rumpf ersetzen**
+- [x] **Step 4: Den Tool-Rumpf ersetzen**
 
 Attribut und Funktion `update_todo` vollständig durch dieses Stück ersetzen:
 
@@ -255,7 +255,7 @@ Attribut und Funktion `update_todo` vollständig durch dieses Stück ersetzen:
     }
 ```
 
-- [ ] **Step 5: Die Testliterale auf `..Default::default()` umstellen**
+- [x] **Step 5: Die Testliterale auf `..Default::default()` umstellen**
 
 Zehn Stellen im Testmodul bauen `super::UpdateTodo { … }` mit allen Feldern aus. Jede wird auf die Felder eingedampft, die der jeweilige Test wirklich setzt, plus Rest aus `Default`. `id` steht in jedem Literal. Beispiel für `update_todo_changes_only_the_given_fields`:
 
@@ -310,7 +310,7 @@ Drei dieser Stellen tragen Werte in umgebauten Feldern und werden dabei inhaltli
 
 - `update_todo_refuses_an_over_long_description`: `description: Some(Some(long(…)))` wird zu `description: Some(long(super::MAX_DESCRIPTION_CHARS + 1))`.
 
-- [ ] **Step 6: Den serde-Test umschreiben**
+- [x] **Step 6: Den serde-Test umschreiben**
 
 `null_and_a_missing_field_mean_different_things_on_the_wire` hielt fest, was jetzt falsch ist. Er wird ersetzt durch den Test, der die neue Regel festhält:
 
@@ -340,12 +340,12 @@ Drei dieser Stellen tragen Werte in umgebauten Feldern und werden dabei inhaltli
     }
 ```
 
-- [ ] **Step 7: Alle Tests laufen lassen**
+- [x] **Step 7: Alle Tests laufen lassen**
 
 Run: `cargo test --lib`
 Expected: PASS, 110 Tests (109 wie bisher plus der Regressionstest aus Task 1). Insbesondere grün: `update_todo_keeps_everything_that_arrives_as_null`, `update_todo_changes_only_the_given_fields`, `update_todo_clears_a_due_date_when_the_clear_flag_is_set`, `update_todo_sets_and_clears_the_description` und `the_router_lists_all_seven_tools_with_documented_parameters` — letzterer verlangt für jedes Schema-Feld eine Beschreibung und deckt damit die drei neuen Flags ohne eigene Änderung ab.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src-tauri/src/mcp/tools.rs
