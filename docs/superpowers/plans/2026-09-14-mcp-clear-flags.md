@@ -497,7 +497,7 @@ git commit -m "test: cover clearing a category and a false clear flag"
 - Modify: `AGENTS.md` (Absatz zur Beschreibung, ~Zeile 112)
 - Modify: `CHANGELOG.md` (Abschnitt `## [Unreleased]`)
 
-- [ ] **Step 1: `AGENTS.md` anpassen**
+- [x] **Step 1: `AGENTS.md` anpassen**
 
 Der Satz
 
@@ -507,7 +507,7 @@ wird ersetzt durch:
 
 > Bei `update_todo` leert ausschließlich `clear_description: true` die Beschreibung; Weglassen, `null` und `""` lassen sie unverändert — dieselbe Regel wie bei Fälligkeit (`clear_due_date`) und Kategorie (`clear_category`). Ein Feld zugleich zu setzen und zu leeren ist ein Tool-Fehler. Der Grund ist Issue #35: `null` als Löschbefehl hat Aufgaben die Kategorie und die Fälligkeit gekostet, weil ein Modell sein Parameterobjekt vollständig ausfüllt.
 
-- [ ] **Step 2: `CHANGELOG.md` ergänzen**
+- [x] **Step 2: `CHANGELOG.md` ergänzen**
 
 Unter `## [Unreleased]` in den bestehenden Abschnitt `### Geändert` als weiteren Punkt:
 
@@ -515,12 +515,12 @@ Unter `## [Unreleased]` in den bestehenden Abschnitt `### Geändert` als weitere
 - Ein KI-Assistent löscht Fälligkeit, Kategorie oder Beschreibung einer Aufgabe nur noch, wenn er es ausdrücklich verlangt (`clear_due_date`, `clear_category`, `clear_description`). Bisher genügte dafür ein mitgeschicktes `null`, und das hat beim bloßen Abhaken Kategorie und Fälligkeit gekostet.
 ```
 
-- [ ] **Step 3: Die Tests ein letztes Mal laufen lassen**
+- [x] **Step 3: Die Tests ein letztes Mal laufen lassen**
 
 Run: `cargo test --lib`
 Expected: PASS, 113 Tests.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add AGENTS.md CHANGELOG.md
@@ -531,5 +531,5 @@ git commit -m "docs: write down that only a clear flag empties a field"
 
 ## Abschluss
 
-- [ ] `cargo clippy --all-targets` läuft ohne neue Warnungen (insbesondere kein toter `Deserializer`-Import).
+- [x] `cargo clippy --all-targets` läuft ohne neue Warnungen (insbesondere kein toter `Deserializer`-Import).
 - [ ] `gh issue close 35 --comment "…"` erst nach dem Merge, mit einem Satz zur neuen Regel.
