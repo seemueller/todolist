@@ -25,8 +25,10 @@ const TODO_COLUMNS = `
 
 // Die eine Stelle, an der steht, was "nicht im Papierkorb" heisst. Jede
 // Leseabfrage haengt sie an -- eine vergessene wuerde weggeworfene Aufgaben
-// wieder auftauchen lassen.
-const NOT_DELETED = "t.deleted_at IS NULL";
+// wieder auftauchen lassen. Ohne Tabellen-Alias fuer UPDATE-Statements, die
+// keinen kennen.
+const NOT_DELETED_HERE = "deleted_at IS NULL";
+const NOT_DELETED = `t.${NOT_DELETED_HERE}`;
 
 async function selectTodo(id: number): Promise<Todo> {
   const db = await getDb();
@@ -71,7 +73,10 @@ async function addTodo(
 
 async function updateColumn(id: number, sql: string, params: unknown[]): Promise<Todo> {
   const db = await getDb();
-  await db.execute(sql, [...params, id]);
+  // Der Guard haengt hier, nicht in jedem Aufrufer: eine Aufgabe im Papierkorb
+  // darf sich nicht still veraendern, waehrend der Aufrufer den
+  // "not found"-Fehler von selectTodo bekommt.
+  await db.execute(`${sql} AND ${NOT_DELETED_HERE}`, [...params, id]);
   return selectTodo(id);
 }
 
@@ -110,10 +115,11 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
   if (assignments.length === 0) return selectTodo(id);
 
   const db = await getDb();
-  await db.execute(`UPDATE todos SET ${assignments.join(", ")} WHERE id = $${params.length + 1}`, [
-    ...params,
-    id,
-  ]);
+  // Selber Guard wie in updateColumn -- dieser Pfad geht nicht ueber sie.
+  await db.execute(
+    `UPDATE todos SET ${assignments.join(", ")} WHERE id = $${params.length + 1} AND ${NOT_DELETED_HERE}`,
+    [...params, id]
+  );
   return selectTodo(id);
 }
 
@@ -132,8 +138,14 @@ async function deleteTodo(id: number): Promise<number> {
   const db = await getDb();
   // Wirft nicht, wenn die Id unbekannt ist -- wie bisher. Der Aufrufer sieht
   // an der zurueckgegebenen Id nur, worauf er gezielt hat.
+  //
+  // Das Format ist ausgeschrieben, nicht datetime('now'): die 30-Tage-Frist
+  // wird in JavaScript aus toISOString() berechnet ("...T...Z"), waehrend
+  // datetime('now') "... ..." (Leerzeichen statt "T", kein "Z") liefert. Ein
+  // Vergleich als Text wuerde dann am zehnten Zeichen entscheiden -- Leerzeichen
+  // vor "T" -- und nicht an der Uhrzeit, das Loeschfenster waere also falsch.
   await db.execute(
-    "UPDATE todos SET deleted_at = datetime('now') WHERE id = $1 AND deleted_at IS NULL",
+    `UPDATE todos SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = $1 AND ${NOT_DELETED_HERE}`,
     [id]
   );
   return id;

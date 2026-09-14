@@ -44,7 +44,7 @@ describe("sqlTodoStore", () => {
     select.mockResolvedValue([ROW]);
     await sqlTodoStore.listTodos(2);
 
-    expect(select.mock.calls[0][0]).toContain("AND t.category_id = $1");
+    expect(select.mock.calls[0][0]).toContain("t.deleted_at IS NULL AND t.category_id = $1");
     expect(select.mock.calls[0][1]).toEqual([2]);
   });
 
@@ -83,6 +83,16 @@ describe("sqlTodoStore", () => {
       expect(params).toEqual([7]);
     });
 
+    it("schreibt den Zeitstempel im gleichen Format wie toISOString", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+
+      await sqlTodoStore.deleteTodo(7);
+
+      const [sql] = execute.mock.calls[0];
+      expect(sql).toContain("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+      expect(sql).not.toContain("datetime('now')");
+    });
+
     it("blendet den Papierkorb aus jeder Leseabfrage aus", async () => {
       select.mockResolvedValue([]);
 
@@ -92,6 +102,18 @@ describe("sqlTodoStore", () => {
       for (const [sql] of select.mock.calls) {
         expect(sql).toContain("t.deleted_at IS NULL");
       }
+    });
+
+    it("schreibt nichts, wenn die Aufgabe im Papierkorb liegt", async () => {
+      execute.mockResolvedValue({ rowsAffected: 0 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoPriority(7, "low");
+      expect(execute.mock.calls[0][0]).toContain("AND deleted_at IS NULL");
+
+      execute.mockClear();
+      await sqlTodoStore.updateTodoFields(7, { title: "Neuer Titel" });
+      expect(execute.mock.calls[0][0]).toContain("AND deleted_at IS NULL");
     });
   });
 
