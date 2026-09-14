@@ -1844,6 +1844,19 @@ git commit -m "test: cover the trash end to end"
 
 ---
 
+## Reihenfolge beim Zusammenführen
+
+Task 7 stellt die MCP-Werkzeugbeschreibung auf den Papierkorb um: sie sagt einem
+Modell zu, die Nutzerin könne eine gelöschte Aufgabe in der App wiederherstellen
+und die App räume nach 30 Tagen selbst auf. Beides entsteht erst in Task 8
+(Frist) und Task 10 (Papierkorb-Fenster).
+
+**Dieser Branch darf darum nicht vor Task 8 und Task 10 nach `main`.** Käme er
+früher, verspräche das Werkzeug einen Rückweg, den es im laufenden Programm
+nicht gibt — ein Modell würde der Nutzerin sagen, sie finde die Aufgabe im
+Papierkorb, und dort wäre nichts. Innerhalb des Branches ist die Reihenfolge
+unkritisch, weil bis zum Zusammenführen alles vorhanden ist.
+
 ## Was nicht dazugehört
 
 Aus der Spec übernommen, damit es unterwegs nicht hineinrutscht:
