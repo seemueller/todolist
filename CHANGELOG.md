@@ -2,6 +2,17 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unreleased]
+
+### Hinzugefügt
+- Eine Aufgabe kann jetzt eine Beschreibung tragen: Ein Klick auf den Stift in der Zeile — oder ein Doppelklick auf den Titel — öffnet ein Fenster, in dem Titel, Beschreibung, Priorität, Fälligkeit und Kategorie zusammen stehen. Die Beschreibung darf mehrere Absätze haben. Gesichert wird alles auf einmal; Abbrechen verwirft.
+- Aufgaben mit Beschreibung sind in der Liste an einem kleinen Notiz-Symbol zu erkennen, im Brett zeigt die Karte die ersten zwei Zeilen.
+- Ein KI-Assistent kann die Beschreibung über MCP mitlesen, setzen und wieder leeren.
+- Wird die gerade geöffnete Aufgabe zwischenzeitlich anderswo gelöscht — etwa von einem anderen MCP-Client —, schließt sich das Bearbeitungsfenster von selbst, und eine Meldung sagt: „Die Aufgabe wurde zwischenzeitlich gelöscht. Nicht gespeicherte Änderungen sind verloren.“
+
+### Geändert
+- Der Titel wird nicht mehr direkt in der Zeile umbenannt, sondern im neuen Fenster. Priorität, Fälligkeit und Kategorie bleiben in der Zeile bedienbar.
+
 ## [0.8.1] - 2026-09-05
 
 ### Behoben

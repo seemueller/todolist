@@ -13,6 +13,7 @@ import { sqlTodoStore } from "./todoStoreSql";
 const ROW = {
   id: 7,
   title: "Schreiben",
+  description: "Vorbereitung fuer den Kunden",
   done: 0,
   status: "todo",
   priority: "high",
@@ -67,13 +68,6 @@ describe("sqlTodoStore", () => {
     expect(execute.mock.calls[0][0]).toContain("SET status = $1, done = $2");
     expect(execute.mock.calls[0][1]).toEqual(["done", 1, 7]);
     expect(updated.done).toBe(true);
-  });
-
-  it("rejects rather than throwing synchronously for a missing todo", async () => {
-    execute.mockResolvedValue({ rowsAffected: 0 });
-    select.mockResolvedValue([]);
-
-    await expect(sqlTodoStore.updateTodoTitle(99, "x")).rejects.toThrow("Todo 99 not found");
   });
 
   it("sorts categories the way German readers expect", async () => {
@@ -225,5 +219,113 @@ describe("sqlTodoStore", () => {
       ...select.mock.calls.map((call) => call[0] as string),
     ];
     expect(statements.some((sql) => sql.includes("time_slots"))).toBe(false);
+  });
+
+  it("selects the description column", async () => {
+    select.mockResolvedValue([ROW]);
+    const [todo] = await sqlTodoStore.listTodos();
+
+    expect(select.mock.calls[0][0]).toContain("t.description");
+    expect(todo.description).toBe("Vorbereitung fuer den Kunden");
+  });
+
+  it("writes the description when creating a todo", async () => {
+    execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
+    select.mockResolvedValue([ROW]);
+
+    await sqlTodoStore.addTodo("Mit Text", "medium", null, null, "Zeile eins\nZeile zwei");
+
+    expect(execute.mock.calls[0][0]).toContain("description");
+    expect(execute.mock.calls[0][1]).toEqual([
+      "Mit Text",
+      "Zeile eins\nZeile zwei",
+      "medium",
+      expect.any(String),
+      null,
+      null,
+    ]);
+  });
+
+  it("writes an empty description when none was given", async () => {
+    execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
+    select.mockResolvedValue([ROW]);
+
+    await sqlTodoStore.addTodo("Ohne Text", "medium", null);
+
+    expect(execute.mock.calls[0][1]).toEqual([
+      "Ohne Text",
+      "",
+      "medium",
+      expect.any(String),
+      null,
+      null,
+    ]);
+  });
+
+  describe("updateTodoFields", () => {
+    it("writes exactly the given fields in a single statement", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, { title: "Neu", description: "Text" });
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("title = $1");
+      expect(sql).toContain("description = $2");
+      expect(sql).not.toContain("priority");
+      expect(params).toEqual(["Neu", "Text", 7]);
+    });
+
+    it("clears a description with the empty string rather than skipping the field", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, { description: "" });
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("description = $1");
+      expect(params).toEqual(["", 7]);
+    });
+
+    it("writes nothing for an empty patch", async () => {
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, {});
+
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it("sets category_id when a category is given", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, { categoryId: 3 });
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("category_id = $1");
+      expect(params).toEqual([3, 7]);
+    });
+
+    it("clears category_id when the patch sets it to null", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoFields(7, { categoryId: null });
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("category_id = $1");
+      expect(params).toEqual([null, 7]);
+    });
+
+    it("rejects rather than throwing synchronously for an unknown id", async () => {
+      execute.mockResolvedValue({ rowsAffected: 0 });
+      select.mockResolvedValue([]);
+
+      const result = sqlTodoStore.updateTodoFields(999, { title: "Neu" });
+
+      await expect(result).rejects.toThrow("Todo 999 not found");
+    });
   });
 });

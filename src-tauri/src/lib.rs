@@ -353,6 +353,16 @@ pub fn run() {
             ALTER TABLE time_slots_new RENAME TO time_slots;",
             kind: MigrationKind::Up,
         },
+        // Eine Aufgabe traegt zusaetzlich zum Titel einen frei formulierten
+        // Text. `NOT NULL DEFAULT ''` statt NULL: "keine Beschreibung" soll
+        // nur eine Schreibweise haben, und Altbestand bekommt den leeren
+        // String von der Datenbank.
+        Migration {
+            version: 10,
+            description: "add_description_column",
+            sql: "ALTER TABLE todos ADD COLUMN description TEXT NOT NULL DEFAULT '';",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

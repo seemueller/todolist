@@ -118,11 +118,11 @@ describe("migrateLocalStorage", () => {
 
     const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
     expect(todoCall).toBeDefined();
-    // params: id, title, done, status, priority, created_at, due_date, category_id
+    // params: id, title, description, done, status, priority, created_at, due_date, category_id
     const params = todoCall![1] as unknown[];
-    expect(params[2]).toBe(1); // done -> 1
-    expect(params[3]).toBe("done"); // status derived
-    expect(params[4]).toBe("medium"); // priority default
+    expect(params[3]).toBe(1); // done -> 1
+    expect(params[4]).toBe("done"); // status derived
+    expect(params[5]).toBe("medium"); // priority default
   });
 
   it("maps two categories differing only in case onto one id, and rewrites a slot referencing the second", async () => {
@@ -180,8 +180,8 @@ describe("migrateLocalStorage", () => {
     const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
     expect(todoCall).toBeDefined();
     const todoParams = todoCall![1] as unknown[];
-    // id, title, done, status, priority, created_at, due_date, category_id
-    expect(todoParams[7]).toBe(1); // rewritten to the database's id, not 555
+    // id, title, description, done, status, priority, created_at, due_date, category_id
+    expect(todoParams[8]).toBe(1); // rewritten to the database's id, not 555
 
     const slotCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO time_slots"));
     expect(slotCall).toBeDefined();
@@ -363,8 +363,62 @@ describe("migrateLocalStorage", () => {
     const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
     expect(todoCall).toBeDefined();
     const params = todoCall![1] as unknown[];
-    // id, title, done, status, priority, created_at, due_date, category_id
+    // id, title, description, done, status, priority, created_at, due_date, category_id
     expect(params[0]).toBe(10);
-    expect(params[7]).toBeNull();
+    expect(params[8]).toBeNull();
+  });
+
+  it("migrates a todo that has no description yet", async () => {
+    set(TODOS_KEY, [
+      {
+        id: 1,
+        title: "Alt",
+        done: false,
+        status: "todo",
+        priority: "medium",
+        created_at: "2026-01-01T00:00:00.000Z",
+        due_date: null,
+        category_id: null,
+      },
+    ]);
+
+    await migrateLocalStorage();
+
+    const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
+    expect(todoCall).toBeDefined();
+    // id, title, description, done, status, priority, created_at, due_date, category_id
+    expect(todoCall![1]).toEqual([1, "Alt", "", 0, "todo", "medium", "2026-01-01T00:00:00.000Z", null, null]);
+  });
+
+  it("carries an existing description over", async () => {
+    set(TODOS_KEY, [
+      {
+        id: 1,
+        title: "Alt",
+        description: "Zeile eins\nZeile zwei",
+        done: false,
+        status: "todo",
+        priority: "medium",
+        created_at: "2026-01-01T00:00:00.000Z",
+        due_date: null,
+        category_id: null,
+      },
+    ]);
+
+    await migrateLocalStorage();
+
+    const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
+    expect(todoCall).toBeDefined();
+    expect(todoCall![1]).toEqual([
+      1,
+      "Alt",
+      "Zeile eins\nZeile zwei",
+      0,
+      "todo",
+      "medium",
+      "2026-01-01T00:00:00.000Z",
+      null,
+      null,
+    ]);
   });
 });

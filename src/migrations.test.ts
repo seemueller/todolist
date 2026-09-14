@@ -27,4 +27,8 @@ describe("sql migrations", () => {
   it("gives todos a status column", () => {
     expect(source).toContain("ALTER TABLE todos ADD COLUMN status");
   });
+
+  it("gives todos a description column", () => {
+    expect(source).toContain("ALTER TABLE todos ADD COLUMN description TEXT NOT NULL DEFAULT ''");
+  });
 });

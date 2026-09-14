@@ -118,7 +118,10 @@ herunter, laufender Text nicht.
 
 **Jedes Bedienelement braucht einen zugänglichen Namen.** Icon-Knöpfe tragen
 `aria-label`, das Icon selbst `aria-hidden`. Die Testsuite hängt an genau diesen
-Beschriftungen.
+Beschriftungen. Ein Icon ohne Klickfunktion, das trotzdem eine Information
+trägt — etwa die Notiz-Markierung, die anzeigt, dass eine Aufgabe eine
+Beschreibung hat —, bekommt `role="img"` und `aria-label` statt `aria-hidden`,
+damit Screenreader sie vorlesen.
 
 ---
 
@@ -218,7 +221,7 @@ Modal offen sein soll** — der Listener hängt an der Lebensdauer der Komponent
 
 | Prop | Typ | Bedeutung |
 |---|---|---|
-| `variant` | `"changelog" \| "category"` | Wählt die Panelbreite. |
+| `variant` | `"changelog" \| "category" \| "todo"` | Wählt die Panelbreite (520 / 460 / 560 px). |
 | `title` | `string` | Text der `<h2>` in der Kopfzeile. |
 | `onClose` | `() => void` | Overlay-Klick, Schließen-Knopf, Escape. |
 | `closeLabel` | `string` | `aria-label` des Schließen-Knopfs. |
@@ -260,7 +263,8 @@ Tastaturvertrag: Enter und Verlassen übernehmen, Escape bricht ab.
 
 `CheckIcon`, `CloseIcon`, `PencilIcon`, `TrashIcon`, `TagIcon`, `PlusIcon`,
 `ChevronLeftIcon`, `LaneTodoIcon`, `LaneProgressIcon`, `LaneDoneIcon`,
-`ListViewIcon`, `BoardViewIcon`. Alle nehmen `size` und die üblichen SVG-Props.
+`ListViewIcon`, `BoardViewIcon`, `NoteIcon`. Alle nehmen `size` und die üblichen
+SVG-Props.
 Ein neues Icon entsteht hier und nirgends sonst: strichbasiert, `currentColor`,
 Raster 14/16/18 px, Strichstärke 1,6–2 px.
 

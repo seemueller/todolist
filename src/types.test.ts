@@ -32,6 +32,7 @@ describe("fromRow", () => {
     expect(result).toEqual({
       id: 1,
       title: "Test task",
+      description: "",
       done: true,
       status: "done",
       priority: "medium",
@@ -99,6 +100,39 @@ describe("fromRow", () => {
     const result = fromRow(row);
 
     expect(result.done).toBe(false);
+  });
+
+  it("defaults a missing description to the empty string", () => {
+    const todo = fromRow({
+      id: 1,
+      title: "Ohne Beschreibung",
+      done: 0,
+      priority: "medium",
+      created_at: "2026-09-13T10:00:00.000Z",
+      due_date: null,
+      category_id: null,
+      category_name: null,
+      category_color: null,
+    });
+
+    expect(todo.description).toBe("");
+  });
+
+  it("passes a stored description through unchanged", () => {
+    const todo = fromRow({
+      id: 2,
+      title: "Mit Beschreibung",
+      done: 0,
+      priority: "medium",
+      created_at: "2026-09-13T10:00:00.000Z",
+      due_date: null,
+      category_id: null,
+      category_name: null,
+      category_color: null,
+      description: "Zeile eins\nZeile zwei",
+    });
+
+    expect(todo.description).toBe("Zeile eins\nZeile zwei");
   });
 });
 

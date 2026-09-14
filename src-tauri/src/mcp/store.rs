@@ -72,6 +72,7 @@ fn bad_request<T>(message: impl Into<String>) -> Result<T, StoreError> {
 pub struct Todo {
     pub id: i64,
     pub title: String,
+    pub description: String,
     pub done: bool,
     pub status: String,
     pub priority: String,
@@ -86,6 +87,7 @@ pub struct Todo {
 struct TodoRow {
     id: i64,
     title: String,
+    description: String,
     done: i64,
     status: String,
     priority: String,
@@ -105,6 +107,7 @@ impl From<TodoRow> for Todo {
             done: row.status == STATUS_DONE || (row.status.is_empty() && row.done == 1),
             id: row.id,
             title: row.title,
+            description: row.description,
             status: row.status,
             priority: row.priority,
             created_at: row.created_at,
@@ -133,6 +136,7 @@ pub struct Category {
 #[derive(Debug, Default, Clone)]
 pub struct TodoUpdate {
     pub title: Option<String>,
+    pub description: Option<Option<String>>,
     pub status: Option<String>,
     pub priority: Option<String>,
     pub due_date: Option<Option<String>>,
@@ -142,6 +146,7 @@ pub struct TodoUpdate {
 impl TodoUpdate {
     fn is_empty(&self) -> bool {
         self.title.is_none()
+            && self.description.is_none()
             && self.status.is_none()
             && self.priority.is_none()
             && self.due_date.is_none()
@@ -420,8 +425,8 @@ pub async fn resolve_category(pool: &Pool<Sqlite>, name: &str) -> Result<Categor
 
 // --- Aufgaben ---------------------------------------------------------------
 
-const TODO_COLUMNS: &str = "t.id, t.title, t.done, t.status, t.priority, t.created_at,
-     t.due_date, t.category_id, c.name AS category_name, c.color AS category_color";
+const TODO_COLUMNS: &str = "t.id, t.title, t.description, t.done, t.status, t.priority,
+     t.created_at, t.due_date, t.category_id, c.name AS category_name, c.color AS category_color";
 
 async fn select_todo(pool: &Pool<Sqlite>, id: i64) -> Result<Todo, StoreError> {
     let row: Option<TodoRow> = sqlx::query_as(&format!(
@@ -506,6 +511,7 @@ pub async fn add_todo(
     priority: Option<&str>,
     due_date: Option<&str>,
     category: Option<&str>,
+    description: Option<&str>,
 ) -> Result<Todo, StoreError> {
     let title = title.trim();
     if title.is_empty() {
@@ -518,16 +524,18 @@ pub async fn add_todo(
         Some(name) => Some(resolve_category(pool, name).await?.id),
         None => None,
     };
+    let description = description.unwrap_or("");
 
     // `strftime` statt einer Zeit-Crate: dasselbe ISO-Format mit Millisekunden
     // und Z, das `new Date().toISOString()` im Frontend schreibt, und ohne neue
     // Abhaengigkeit.
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO todos (title, done, status, priority, created_at, due_date, category_id)
-         VALUES (?, 0, 'todo', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?)
+        "INSERT INTO todos (title, description, done, status, priority, created_at, due_date, category_id)
+         VALUES (?, ?, 0, 'todo', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?)
          RETURNING id",
     )
     .bind(title)
+    .bind(description)
     .bind(priority)
     .bind(due_date)
     .bind(category_id)
@@ -551,6 +559,14 @@ pub async fn update_todo(
             return bad_request("Der Titel darf nicht leer sein.");
         }
         Some(title) => Some(title.trim().to_string()),
+        None => None,
+    };
+    // `Some(None)` heisst leeren; in der Spalte steht dann der leere String,
+    // nicht NULL -- die Spalte ist NOT NULL, und "keine Beschreibung" soll
+    // nur eine Schreibweise haben.
+    let description = match &update.description {
+        Some(Some(text)) => Some(text.to_string()),
+        Some(None) => Some(String::new()),
         None => None,
     };
     if let Some(status) = &update.status {
@@ -577,6 +593,9 @@ pub async fn update_todo(
     if title.is_some() {
         assignments.push("title = ?");
     }
+    if description.is_some() {
+        assignments.push("description = ?");
+    }
     if update.status.is_some() {
         // `done` wird mitgefuehrt, genau wie `updateTodoStatus` in
         // src/todoStoreSql.ts es tut; sonst laufen Spalte und Status
@@ -598,6 +617,9 @@ pub async fn update_todo(
     let mut query = sqlx::query(&sql);
     if let Some(title) = title {
         query = query.bind(title);
+    }
+    if let Some(description) = description {
+        query = query.bind(description);
     }
     if let Some(status) = &update.status {
         let done = i64::from(status == STATUS_DONE);
@@ -782,50 +804,57 @@ pub async fn book_time(
     })
 }
 
+/// Muss dem echten Schema nach Migration 10 entsprechen -- insbesondere
+/// `categories.name` mit `UNIQUE COLLATE NOCASE` und `time_slots` OHNE
+/// Fremdschluessel auf die Kategorie. Ein Testschema, das vom echten
+/// abweicht, ist der Grund, warum das ON DELETE CASCADE aus Migration 7
+/// drei Reviews lang unbemerkt blieb.
+///
+/// Die einzige Kopie im Repository: sowohl dieses Testmodul als auch das
+/// von `tools.rs` haengen hier dran, statt je ihr eigenes `CREATE TABLE`
+/// mitzuschreiben -- zwei handgepflegte Kopien sind genau die Stelle, an der
+/// eine Abweichung zwischen ihnen unbemerkt bleiben kann.
+#[cfg(test)]
+pub(crate) const SCHEMA: &[&str] = &[
+    "CREATE TABLE categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        color TEXT NOT NULL DEFAULT '#a78bfa',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );",
+    "CREATE TABLE todos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        done INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        due_date TEXT DEFAULT NULL,
+        category_id INTEGER DEFAULT NULL REFERENCES categories(id) ON DELETE SET NULL,
+        priority TEXT NOT NULL DEFAULT 'medium',
+        status TEXT NOT NULL DEFAULT 'todo',
+        description TEXT NOT NULL DEFAULT ''
+    );",
+    "CREATE TABLE time_slots (
+        date TEXT NOT NULL,
+        slot INTEGER NOT NULL,
+        category_id INTEGER NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (date, slot)
+    );",
+    "CREATE TABLE time_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        target_slots_per_day INTEGER NOT NULL DEFAULT 32,
+        show_weekend INTEGER NOT NULL DEFAULT 0
+    );",
+    "CREATE TABLE app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );",
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use sqlx::SqlitePool;
-
-    /// Muss dem echten Schema nach Migration 9 entsprechen -- insbesondere
-    /// `categories.name` mit `UNIQUE COLLATE NOCASE` und `time_slots` OHNE
-    /// Fremdschluessel auf die Kategorie. Ein Testschema, das vom echten
-    /// abweicht, ist der Grund, warum das ON DELETE CASCADE aus Migration 7
-    /// drei Reviews lang unbemerkt blieb.
-    const SCHEMA: &[&str] = &[
-        "CREATE TABLE categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
-            color TEXT NOT NULL DEFAULT '#a78bfa',
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );",
-        "CREATE TABLE todos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            done INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            due_date TEXT DEFAULT NULL,
-            category_id INTEGER DEFAULT NULL REFERENCES categories(id) ON DELETE SET NULL,
-            priority TEXT NOT NULL DEFAULT 'medium',
-            status TEXT NOT NULL DEFAULT 'todo'
-        );",
-        "CREATE TABLE time_slots (
-            date TEXT NOT NULL,
-            slot INTEGER NOT NULL,
-            category_id INTEGER NOT NULL,
-            note TEXT NOT NULL DEFAULT '',
-            PRIMARY KEY (date, slot)
-        );",
-        "CREATE TABLE time_settings (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            target_slots_per_day INTEGER NOT NULL DEFAULT 32,
-            show_weekend INTEGER NOT NULL DEFAULT 0
-        );",
-        "CREATE TABLE app_settings (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        );",
-    ];
 
     async fn setup() -> Pool<Sqlite> {
         let pool = SqlitePool::connect("sqlite::memory:")
@@ -874,7 +903,7 @@ mod tests {
     async fn list_todos_without_a_filter_returns_everything_newest_first() {
         let pool = setup().await;
         for title in ["erste", "zweite", "dritte"] {
-            add_todo(&pool, title, None, None, None)
+            add_todo(&pool, title, None, None, None, None)
                 .await
                 .expect("add todo");
         }
@@ -893,10 +922,10 @@ mod tests {
     #[tokio::test]
     async fn list_todos_filters_by_status() {
         let pool = setup().await;
-        let offen = add_todo(&pool, "offen", None, None, None)
+        let offen = add_todo(&pool, "offen", None, None, None, None)
             .await
             .expect("add");
-        let fertig = add_todo(&pool, "fertig", None, None, None)
+        let fertig = add_todo(&pool, "fertig", None, None, None, None)
             .await
             .expect("add");
         update_todo(
@@ -927,10 +956,10 @@ mod tests {
     async fn list_todos_filters_by_category_name_case_insensitively() {
         let pool = setup().await;
         category(&pool, "Kundenprojekt").await;
-        add_todo(&pool, "mit", None, None, Some("Kundenprojekt"))
+        add_todo(&pool, "mit", None, None, Some("Kundenprojekt"), None)
             .await
             .expect("add");
-        add_todo(&pool, "ohne", None, None, None)
+        add_todo(&pool, "ohne", None, None, None, None)
             .await
             .expect("add");
 
@@ -945,16 +974,16 @@ mod tests {
     #[tokio::test]
     async fn list_todos_filters_by_a_due_date_cutoff() {
         let pool = setup().await;
-        add_todo(&pool, "frueh", None, Some("2026-09-01"), None)
+        add_todo(&pool, "frueh", None, Some("2026-09-01"), None, None)
             .await
             .expect("add");
-        add_todo(&pool, "genau", None, Some("2026-09-10"), None)
+        add_todo(&pool, "genau", None, Some("2026-09-10"), None, None)
             .await
             .expect("add");
-        add_todo(&pool, "spaet", None, Some("2026-09-20"), None)
+        add_todo(&pool, "spaet", None, Some("2026-09-20"), None, None)
             .await
             .expect("add");
-        add_todo(&pool, "ohne", None, None, None)
+        add_todo(&pool, "ohne", None, None, None, None)
             .await
             .expect("add");
 
@@ -1000,7 +1029,7 @@ mod tests {
     async fn add_todo_inserts_and_returns_the_row_with_defaults() {
         let pool = setup().await;
 
-        let todo = add_todo(&pool, "  Einkaufen  ", None, None, None)
+        let todo = add_todo(&pool, "  Einkaufen  ", None, None, None, None)
             .await
             .expect("add");
 
@@ -1032,6 +1061,7 @@ mod tests {
             Some("high"),
             Some("2026-09-30"),
             Some("kundenprojekt"),
+            None,
         )
         .await
         .expect("add");
@@ -1046,7 +1076,7 @@ mod tests {
     async fn add_todo_with_an_unknown_category_errors_and_inserts_nothing() {
         let pool = setup().await;
 
-        let error = add_todo(&pool, "Angebot", None, None, Some("Gibtsnicht"))
+        let error = add_todo(&pool, "Angebot", None, None, Some("Gibtsnicht"), None)
             .await
             .expect_err("unknown category");
         expect_request_error(error, "Gibtsnicht");
@@ -1066,19 +1096,19 @@ mod tests {
         let pool = setup().await;
 
         expect_request_error(
-            add_todo(&pool, "   ", None, None, None)
+            add_todo(&pool, "   ", None, None, None, None)
                 .await
                 .expect_err("empty title"),
             "Titel",
         );
         expect_request_error(
-            add_todo(&pool, "Angebot", Some("dringend"), None, None)
+            add_todo(&pool, "Angebot", Some("dringend"), None, None, None)
                 .await
                 .expect_err("bad priority"),
             "dringend",
         );
         expect_request_error(
-            add_todo(&pool, "Angebot", None, Some("morgen"), None)
+            add_todo(&pool, "Angebot", None, Some("morgen"), None, None)
                 .await
                 .expect_err("bad due date"),
             "morgen",
@@ -1089,6 +1119,112 @@ mod tests {
                 .expect("list")
                 .is_empty()
         );
+    }
+
+    // --- Beschreibung ---------------------------------------------------------
+
+    #[tokio::test]
+    async fn a_new_todo_has_an_empty_description_by_default() {
+        let pool = setup().await;
+
+        let todo = add_todo(&pool, "Ohne Text", None, None, None, None)
+            .await
+            .expect("add");
+
+        assert_eq!(todo.description, "");
+    }
+
+    #[tokio::test]
+    async fn a_description_survives_creation_and_listing() {
+        let pool = setup().await;
+
+        add_todo(&pool, "Mit Text", None, None, None, Some("Zeile eins\nZeile zwei"))
+            .await
+            .expect("add");
+
+        let todos = list_todos(&pool, None, None, None).await.expect("list");
+        assert_eq!(todos[0].description, "Zeile eins\nZeile zwei");
+    }
+
+    #[tokio::test]
+    async fn update_sets_and_clears_the_description() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Titel", None, None, None, Some("alt"))
+            .await
+            .expect("add");
+
+        let updated = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                description: Some(Some("neu".to_string())),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update");
+        assert_eq!(updated.description, "neu");
+
+        let cleared = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                description: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update");
+        assert_eq!(cleared.description, "");
+    }
+
+    #[tokio::test]
+    async fn an_omitted_description_stays_untouched() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Titel", None, None, None, Some("bleibt"))
+            .await
+            .expect("add");
+
+        let updated = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                title: Some("Neuer Titel".to_string()),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update");
+
+        assert_eq!(updated.description, "bleibt");
+        assert_eq!(updated.title, "Neuer Titel");
+    }
+
+    /// Deckt genau die Falle ab, vor der der Auftrag warnt: Titel und
+    /// Beschreibung stehen in `assignments` und den `bind`-Aufrufen an
+    /// benachbarten Stellen, und ein vertauschtes Paar wuerde hier auffallen,
+    /// wo ein Test je Feld es nicht taete.
+    #[tokio::test]
+    async fn updating_title_and_description_together_lands_in_the_right_columns() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Alter Titel", None, None, None, Some("alte Beschreibung"))
+            .await
+            .expect("add");
+
+        let updated = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                title: Some("Neuer Titel".to_string()),
+                description: Some(Some("neue Beschreibung".to_string())),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update");
+
+        assert_eq!(updated.title, "Neuer Titel");
+        assert_eq!(updated.description, "neue Beschreibung");
     }
 
     // --- update_todo --------------------------------------------------------
@@ -1103,6 +1239,7 @@ mod tests {
             Some("high"),
             Some("2026-09-30"),
             Some("Kundenprojekt"),
+            None,
         )
         .await
         .expect("add");
@@ -1128,7 +1265,7 @@ mod tests {
     #[tokio::test]
     async fn update_todo_keeps_done_in_step_with_status() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Angebot", None, None, None)
+        let todo = add_todo(&pool, "Angebot", None, None, None, None)
             .await
             .expect("add");
 
@@ -1167,6 +1304,7 @@ mod tests {
             None,
             Some("2026-09-30"),
             Some("Kundenprojekt"),
+            None,
         )
         .await
         .expect("add");
@@ -1191,7 +1329,7 @@ mod tests {
     #[tokio::test]
     async fn update_todo_without_any_field_is_an_error() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Angebot", None, None, None)
+        let todo = add_todo(&pool, "Angebot", None, None, None, None)
             .await
             .expect("add");
 
@@ -1238,7 +1376,7 @@ mod tests {
     #[tokio::test]
     async fn update_todo_with_an_unknown_category_errors_and_changes_nothing() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Angebot", None, None, None)
+        let todo = add_todo(&pool, "Angebot", None, None, None, None)
             .await
             .expect("add");
 
@@ -1266,7 +1404,7 @@ mod tests {
     #[tokio::test]
     async fn delete_todo_removes_the_row() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Angebot", None, None, None)
+        let todo = add_todo(&pool, "Angebot", None, None, None, None)
             .await
             .expect("add");
 

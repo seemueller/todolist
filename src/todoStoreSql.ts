@@ -16,11 +16,11 @@ import {
   canonicalCategoryName,
 } from "./types";
 import { getDb } from "./sqlClient";
-import { TodoStore } from "./storeTypes";
+import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
 const TODO_COLUMNS = `
-  t.id, t.title, t.done, t.status, t.priority, t.created_at, t.due_date,
-  t.category_id, c.name AS category_name, c.color AS category_color
+  t.id, t.title, t.description, t.done, t.status, t.priority, t.created_at,
+  t.due_date, t.category_id, c.name AS category_name, c.color AS category_color
 `;
 
 async function selectTodo(id: number): Promise<Todo> {
@@ -52,13 +52,14 @@ async function addTodo(
   title: string,
   priority: Priority,
   dueDate: string | null,
-  categoryId?: number | null
+  categoryId?: number | null,
+  description = ""
 ): Promise<Todo> {
   const db = await getDb();
   const result = await db.execute(
-    `INSERT INTO todos (title, done, status, priority, created_at, due_date, category_id)
-     VALUES ($1, 0, 'todo', $2, $3, $4, $5)`,
-    [title, priority, new Date().toISOString(), dueDate, categoryId ?? null]
+    `INSERT INTO todos (title, description, done, status, priority, created_at, due_date, category_id)
+     VALUES ($1, $2, 0, 'todo', $3, $4, $5, $6)`,
+    [title, description, priority, new Date().toISOString(), dueDate, categoryId ?? null]
   );
   return selectTodo(result.lastInsertId as number);
 }
@@ -67,10 +68,6 @@ async function updateColumn(id: number, sql: string, params: unknown[]): Promise
   const db = await getDb();
   await db.execute(sql, [...params, id]);
   return selectTodo(id);
-}
-
-function updateTodoTitle(id: number, title: string): Promise<Todo> {
-  return updateColumn(id, "UPDATE todos SET title = $1 WHERE id = $2", [title]);
 }
 
 function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
@@ -83,6 +80,36 @@ function updateTodoPriority(id: number, priority: Priority): Promise<Todo> {
 
 function updateTodoCategory(id: number, categoryId: number | null): Promise<Todo> {
   return updateColumn(id, "UPDATE todos SET category_id = $1 WHERE id = $2", [categoryId]);
+}
+
+// Ein einziges UPDATE, keine Folge von Einzelanweisungen: der Pool kann
+// zwischen zwei Aufrufen die Verbindung wechseln, BEGIN und COMMIT waeren
+// also keine Transaktion (siehe AGENTS.md). Ein UPDATE ist fuer sich atomar.
+async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Todo> {
+  const assignments: string[] = [];
+  const params: unknown[] = [];
+
+  function set(column: string, value: unknown): void {
+    params.push(value);
+    assignments.push(`${column} = $${params.length}`);
+  }
+
+  if (patch.title !== undefined) set("title", patch.title);
+  if (patch.description !== undefined) set("description", patch.description);
+  if (patch.priority !== undefined) set("priority", patch.priority);
+  if (patch.dueDate !== undefined) set("due_date", patch.dueDate);
+  if (patch.categoryId !== undefined) set("category_id", patch.categoryId);
+
+  // Ein leerer Patch bekommt kein UPDATE ohne SET-Liste, das waere ein
+  // Syntaxfehler. selectTodo prueft trotzdem, ob es die Aufgabe gibt.
+  if (assignments.length === 0) return selectTodo(id);
+
+  const db = await getDb();
+  await db.execute(`UPDATE todos SET ${assignments.join(", ")} WHERE id = $${params.length + 1}`, [
+    ...params,
+    id,
+  ]);
+  return selectTodo(id);
 }
 
 function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
@@ -171,10 +198,10 @@ async function deleteCategory(id: number): Promise<number> {
 export const sqlTodoStore: TodoStore = {
   listTodos,
   addTodo,
-  updateTodoTitle,
   updateTodoDueDate,
   updateTodoPriority,
   updateTodoCategory,
+  updateTodoFields,
   updateTodoStatus,
   toggleTodoDone,
   deleteTodo,
