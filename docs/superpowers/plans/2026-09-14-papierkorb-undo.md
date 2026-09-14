@@ -857,12 +857,18 @@ pub async fn delete_todo(pool: &Pool<Sqlite>, id: i64) -> Result<Todo, StoreErro
 }
 ```
 
-**Der Papierkorb muss auch die Schreibpfade schuetzen.** `select_todo` davor
-reicht nicht: `update_todo` setzt seine SET-Liste dynamisch zusammen und
-schreibt mit `WHERE id = ?`. Ohne Bedingung liefe der Schreibvorgang gegen eine
-weggeworfene Aufgabe durch, und erst das `select_todo` danach meldete den
-Fehler — die Zeile waere trotzdem veraendert. Haenge darum, analog zu
-`NOT_DELETED_HERE` in `src/todoStoreSql.ts`, an jedes UPDATE auf `todos`:
+**Die Schreibpfade bekommen eine zweite Verteidigungslinie.** Anders als in
+`src/todoStoreSql.ts` liegt hier kein Fehler: `update_todo` und `delete_todo`
+rufen `select_todo` an ihrem Anfang auf und brechen dort ab, bevor ein UPDATE
+laeuft — die Reihenfolge ist umgekehrt zur TypeScript-Fassung, wo erst
+geschrieben und dann gelesen wurde (das war der Fehler aus Task 2).
+
+Die Bedingung gehoert trotzdem an jedes `UPDATE todos`: sie haelt beide
+Implementierungen textgleich und sorgt dafuer, dass ein spaeteres Umsortieren
+der Funktion oder ein neuer Schreibpfad das Loch nicht still aufreisst. Sie
+traegt heute aber nichts — kein Test schlaegt fehl, wenn man sie entfernt. Das
+muss am Code stehen, sonst raeumt sie der Naechste als toten Ballast weg und
+hat nach Aktenlage recht.
 
 ```rust
 /// Ohne Tabellen-Alias: ein UPDATE kennt keinen. Spiegelt `NOT_DELETED_HERE`
