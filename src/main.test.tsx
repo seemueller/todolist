@@ -98,12 +98,21 @@ describe("main", () => {
     }
   });
 
-  it("purges the trash on startup", async () => {
+  it("purges the trash on startup, before the first render", async () => {
+    const order: string[] = [];
     migrate.mockResolvedValue(undefined);
+    purgeDeletedBefore.mockImplementation((_cutoff: string) => {
+      order.push("purge");
+      return Promise.resolve(0);
+    });
+    render.mockImplementation(() => {
+      order.push("render");
+    });
 
     await import("./main");
     await vi.waitFor(() => expect(render).toHaveBeenCalled());
 
+    expect(order).toEqual(["purge", "render"]);
     expect(purgeDeletedBefore).toHaveBeenCalledTimes(1);
     expect(typeof purgeDeletedBefore.mock.calls[0][0]).toBe("string");
   });

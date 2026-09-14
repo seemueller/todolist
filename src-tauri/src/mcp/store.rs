@@ -1955,6 +1955,71 @@ mod tests {
         );
     }
 
+    /// Der 30-Tage-Papierkorb (`purgeDeletedBefore` in `src/db.ts`, Stichtag
+    /// aus `src/trashRetention.ts`) vergleicht `deleted_at < cutoff` als
+    /// reinen Textvergleich -- er traegt nur, weil `strftime('%Y-%m-%dT%H:%M:%fZ','now')`
+    /// hier dieselbe Form schreibt wie `toISOString()` in JavaScript. Das ist
+    /// schon einmal falsch gewesen: `datetime('now')` schrieb ein Leerzeichen
+    /// statt `T`, was jeden Zeitstempel vom selben Tag als "aelter" sortierte.
+    /// Dieser Test deckt beide SQL-Backends ab (die frontend-seitige
+    /// SQLite-Anbindung in `src/todoStoreSql.ts` benutzt denselben Ausdruck),
+    /// nicht nur den MCP-Store -- ihre eigenen Tests mocken den Tauri-SQL-Client
+    /// und fuehren nie echtes SQL aus, koennen die Form also nicht pruefen.
+    #[tokio::test]
+    async fn the_deleted_at_stamp_compares_against_a_javascript_cutoff() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+            .await
+            .expect("add");
+        delete_todo(&pool, todo.id).await.expect("delete");
+
+        let stamp: (String,) = sqlx::query_as("SELECT deleted_at FROM todos WHERE id = ?")
+            .bind(todo.id)
+            .fetch_one(&pool)
+            .await
+            .expect("select");
+        let deleted_at = stamp.0;
+
+        // Form von `toISOString()`: "YYYY-MM-DDTHH:MM:SS.sssZ", 24 Zeichen.
+        assert_eq!(deleted_at.len(), 24, "got: {deleted_at}");
+        assert_eq!(deleted_at.as_bytes()[10], b'T', "got: {deleted_at}");
+        assert_eq!(deleted_at.as_bytes()[23], b'Z', "got: {deleted_at}");
+        assert_eq!(deleted_at.as_bytes()[19], b'.', "got: {deleted_at}");
+
+        // Und der Textvergleich muss auch tatsaechlich die richtige Richtung
+        // treffen -- gegen einen Stichtag, der wortwoertlich in der Form
+        // steht, die `toISOString()` in src/trashRetention.ts erzeugt, nicht
+        // gegen einen von SQLite selbst berechneten. Wuerde `delete_todo`
+        // wieder `datetime('now')` schreiben (Leerzeichen statt `T`), zoege
+        // ein aus SQLite abgeleiteter Stichtag denselben Fehler mit -- der
+        // Test bliebe gruen, obwohl der echte 30-Tage-Abgleich brechen wuerde.
+        // Deshalb ein eigener, von Hand gesetzter Stempel und zwei feste
+        // Literale als Stichtage.
+        sqlx::query("UPDATE todos SET deleted_at = '2026-03-15T12:00:00.000Z' WHERE id = ?")
+            .bind(todo.id)
+            .execute(&pool)
+            .await
+            .expect("set literal stamp");
+
+        let before: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM todos WHERE deleted_at IS NOT NULL AND deleted_at < ?",
+        )
+        .bind("2026-03-15T11:00:00.000Z")
+        .fetch_one(&pool)
+        .await
+        .expect("count");
+        assert_eq!(before.0, 0, "a cutoff an hour before the stamp must keep the row");
+
+        let after: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM todos WHERE deleted_at IS NOT NULL AND deleted_at < ?",
+        )
+        .bind("2026-03-15T13:00:00.000Z")
+        .fetch_one(&pool)
+        .await
+        .expect("count");
+        assert_eq!(after.0, 1, "a cutoff an hour after the stamp must catch the row");
+    }
+
     #[tokio::test]
     async fn list_todos_hides_the_trash() {
         let pool = setup().await;

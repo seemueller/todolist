@@ -378,6 +378,33 @@ describe("localTodoStore", () => {
       expect((await localTodoStore.listDeletedTodos()).map((t) => t.title)).toEqual(["Neu"]);
     });
 
+    it("schreibt deleted_at in der Form von toISOString() und vergleicht darüber richtig gegen den Stichtag", async () => {
+      // Ein echtes deleteTodo statt eines von Hand gesetzten Zeitstempels:
+      // dieser Test soll pruefen, was `now()` in todoStoreLocal.ts tatsaechlich
+      // schreibt, nicht nur, dass purgeDeletedBefore mit irgendeiner Form
+      // umgehen kann.
+      const todo = await localTodoStore.addTodo("Weg damit", "medium", null);
+      await localTodoStore.deleteTodo(todo.id);
+
+      const raw = JSON.parse(localStorage.getItem("todolist_todos") ?? "[]");
+      const deletedAt: string = raw[0].deleted_at;
+
+      // Form von toISOString(): "YYYY-MM-DDTHH:MM:SS.sssZ", 24 Zeichen.
+      expect(deletedAt).toHaveLength(24);
+      expect(deletedAt[10]).toBe("T");
+      expect(deletedAt[19]).toBe(".");
+      expect(deletedAt.at(-1)).toBe("Z");
+
+      const anHourLater = new Date(Date.parse(deletedAt) + 60 * 60 * 1000).toISOString();
+      const anHourEarlier = new Date(Date.parse(deletedAt) - 60 * 60 * 1000).toISOString();
+
+      expect(await localTodoStore.purgeDeletedBefore(anHourEarlier)).toBe(0);
+      expect(await localTodoStore.listDeletedTodos()).toHaveLength(1);
+
+      expect(await localTodoStore.purgeDeletedBefore(anHourLater)).toBe(1);
+      expect(await localTodoStore.listDeletedTodos()).toEqual([]);
+    });
+
     it("lässt eine nicht gelöschte Aufgabe vom Stichtag unberührt", async () => {
       const todo = await localTodoStore.addTodo("Lebt", "medium", null);
 
