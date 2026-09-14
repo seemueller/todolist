@@ -14,11 +14,19 @@ vi.mock("react-dom/client", () => ({
 
 vi.mock("./App", () => ({ default: () => null }));
 
+const purgeDeletedBefore = vi.fn((_cutoff: string) => Promise.resolve(0) as Promise<number>);
+
+vi.mock("./db", () => ({
+  purgeDeletedBefore: (cutoff: string) => purgeDeletedBefore(cutoff),
+}));
+
 describe("main", () => {
   beforeEach(() => {
     vi.resetModules();
     migrate.mockReset();
     render.mockReset();
+    purgeDeletedBefore.mockReset();
+    purgeDeletedBefore.mockResolvedValue(0);
     document.body.innerHTML = '<div id="root"></div>';
   });
 
@@ -88,5 +96,30 @@ describe("main", () => {
     } finally {
       process.off("unhandledRejection", onUnhandledRejection);
     }
+  });
+
+  it("purges the trash on startup", async () => {
+    migrate.mockResolvedValue(undefined);
+
+    await import("./main");
+    await vi.waitFor(() => expect(render).toHaveBeenCalled());
+
+    expect(purgeDeletedBefore).toHaveBeenCalledTimes(1);
+    expect(typeof purgeDeletedBefore.mock.calls[0][0]).toBe("string");
+  });
+
+  it("still renders when the purge fails, without turning it into a migration error", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    migrate.mockResolvedValue(undefined);
+    purgeDeletedBefore.mockRejectedValue(new Error("db locked"));
+
+    await import("./main");
+    await vi.waitFor(() => expect(render).toHaveBeenCalled());
+
+    expect(consoleError).toHaveBeenCalledWith("purging the trash failed", expect.any(Error));
+
+    const appElement = render.mock.calls[0][0].props.children;
+    expect(appElement.props.migrationError).toBeNull();
+    consoleError.mockRestore();
   });
 });

@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { installDebugInterceptor } from "./debug";
 import { migrateLocalStorage } from "./migrateLocalStorage";
+import { purgeDeletedBefore } from "./db";
+import { cutoffFor } from "./trashRetention";
 
 // Vor allem anderen: das Debug-Panel soll auch die Ausgaben zeigen, die noch
 // vor dem ersten Render anfallen -- die Migration und der asynchrone Aufbau der
@@ -47,5 +49,15 @@ migrateLocalStorage()
   .catch((error) => {
     console.error("localStorage migration failed", error);
     return MIGRATION_ERROR_MESSAGE;
+  })
+  .then(async (migrationError) => {
+    // Misslungenes Aufraeumen kostet keine Daten und bekommt darum kein
+    // Banner: die Meldung landet in der Konsole, der Start laeuft weiter.
+    try {
+      await purgeDeletedBefore(cutoffFor(new Date()));
+    } catch (error) {
+      console.error("purging the trash failed", error);
+    }
+    return migrationError;
   })
   .then(start);
