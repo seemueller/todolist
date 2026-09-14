@@ -48,6 +48,10 @@ vi.mock("./db", () => ({
   listCategories: vi.fn(() => Promise.resolve([])),
   addTodo: vi.fn(),
   deleteTodo: vi.fn(),
+  restoreTodo: vi.fn(),
+  listDeletedTodos: vi.fn(() => Promise.resolve([])),
+  purgeTodo: vi.fn(),
+  purgeDeletedBefore: vi.fn(() => Promise.resolve(0)),
   toggleTodoDone: vi.fn(),
   updateTodoDueDate: vi.fn(),
   updateTodoPriority: vi.fn(),
@@ -558,5 +562,47 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
 
     expect(await screen.findByText("Zeile eins Zeile zwei")).toBeInTheDocument();
+  });
+});
+
+describe("die Rückgängig-Leiste", () => {
+  it("bietet nach dem Löschen an, die Aufgabe zurückzuholen", async () => {
+    const todo = makeTodo({ id: 1, title: "Versehentlich" });
+    vi.mocked(db.listTodos).mockResolvedValue([todo]);
+    vi.mocked(db.deleteTodo).mockResolvedValue(1);
+    vi.mocked(db.restoreTodo).mockResolvedValue(todo);
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Versehentlich")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Löschen"));
+
+    await waitFor(() => expect(screen.getByText(/Versehentlich.*gelöscht/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Rückgängig" }));
+
+    await waitFor(() => expect(db.restoreTodo).toHaveBeenCalledWith(1));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Rückgängig" })).not.toBeInTheDocument()
+    );
+  });
+
+  it("zeigt nur die zuletzt gelöschte Aufgabe an", async () => {
+    const erste = makeTodo({ id: 1, title: "Erste" });
+    const zweite = makeTodo({ id: 2, title: "Zweite" });
+    vi.mocked(db.listTodos).mockResolvedValue([erste, zweite]);
+    vi.mocked(db.deleteTodo).mockImplementation((id: number) => Promise.resolve(id));
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Erste")).toBeInTheDocument());
+
+    const [ersterKnopf, zweiterKnopf] = screen.getAllByLabelText("Löschen");
+    fireEvent.click(ersterKnopf);
+    await waitFor(() => expect(screen.getByText(/Erste.*gelöscht/i)).toBeInTheDocument());
+    fireEvent.click(zweiterKnopf);
+
+    await waitFor(() => expect(screen.getByText(/Zweite.*gelöscht/i)).toBeInTheDocument());
+    expect(screen.queryByText(/Erste.*gelöscht/i)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Rückgängig" })).toHaveLength(1);
   });
 });

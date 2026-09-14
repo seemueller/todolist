@@ -15,6 +15,7 @@ import {
   addCategory,
   deleteCategory,
   deleteTodo,
+  restoreTodo,
   listCategories,
   listTodos,
   toggleTodoDone,
@@ -50,6 +51,7 @@ import {
   CheckIcon,
   ChevronLeftIcon,
   ClockViewIcon,
+  CloseIcon,
   ColorPicker,
   DueDateBadge,
   FilterChip,
@@ -141,6 +143,10 @@ function App({ migrationError = null }: AppProps) {
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(migrationError);
+  // Die zuletzt geloeschte Aufgabe, solange das Rueckgaengig angeboten wird.
+  // Nur eine: das naechste Loeschen ersetzt den Eintrag, statt Hinweise zu
+  // stapeln. Kein Timer -- nichts verschwindet, waehrend jemand hinsieht.
+  const [justDeleted, setJustDeleted] = useState<{ id: number; title: string } | null>(null);
   // Die Aufgabe, deren Detail-Fenster offen ist. Ueber die Id, nicht ueber das
   // Objekt: die Liste bleibt so die einzige Quelle dafuer, ob die Aufgabe noch
   // existiert -- darauf baut die Loesch-Erkennung weiter unten. Das Fenster
@@ -351,9 +357,28 @@ function App({ migrationError = null }: AppProps) {
   }
 
   async function handleDelete(id: number) {
+    const doomed = todos.find((t) => t.id === id);
     try {
       await deleteTodo(id);
       setTodos((prev) => prev.filter((t) => t.id !== id));
+      setJustDeleted(doomed ? { id, title: doomed.title } : null);
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  async function handleUndoDelete() {
+    if (!justDeleted) return;
+    try {
+      const restored = await restoreTodo(justDeleted.id);
+      setTodos((prev) =>
+        [...prev, restored].sort((a, b) => {
+          const dateCmp = b.created_at.localeCompare(a.created_at);
+          return dateCmp !== 0 ? dateCmp : b.id - a.id;
+        })
+      );
+      setJustDeleted(null);
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -669,6 +694,21 @@ function App({ migrationError = null }: AppProps) {
             >
               Zurücksetzen
             </button>
+          </div>
+        )}
+        {justDeleted && (
+          <div className="undo-bar">
+            <span>„{justDeleted.title}" gelöscht.</span>
+            <button type="button" className="undo-bar-action" onClick={handleUndoDelete}>
+              Rückgängig
+            </button>
+            <IconButton
+              variant="icon"
+              onClick={() => setJustDeleted(null)}
+              aria-label="Hinweis schließen"
+            >
+              <CloseIcon />
+            </IconButton>
           </div>
         )}
         {error && <p className="error">Fehler: {error}</p>}
