@@ -1132,8 +1132,14 @@ function App({ migrationError = null }: AppProps) {
         <TrashModal
           onClose={() => setShowTrash(false)}
           onChanged={() => {
-            void refresh();
+            // Das Zuruecknehmen der Leiste ist kein Aufraeumen, sondern noetig:
+            // der Papierkorb kann genau die Aufgabe treffen, auf die sie zeigt.
+            // Nach dem Wiederherstellen ist sie schon zurueck, nach dem
+            // endgueltigen Loeschen gibt es sie nicht mehr -- "Rueckgaengig"
+            // liefe dann in ein `Todo <id> not found`, und die Leiste bliebe
+            // fuer einen Versuch stehen, der nie gelingen kann.
             setJustDeleted(null);
+            void refresh();
           }}
         />
       )}
