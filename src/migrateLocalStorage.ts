@@ -79,7 +79,7 @@ export async function migrateLocalStorage(): Promise<void> {
   // damit ein zweiter Insert nicht abbricht -- weder bei einem Duplikat aus
   // localStorage noch bei einer Kategorie, die schon vor dem Umzug ganz normal
   // ueber die App angelegt wurde.
-  const seenByNameKey = new Map<string, any>();
+  const seenByNameKey = new Map<string, Record<string, unknown>>();
   for (const category of categories) {
     if (typeof category?.id !== "number" || typeof category?.name !== "string") continue;
     const key = categoryNameKey(category.name);

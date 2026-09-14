@@ -3,7 +3,6 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   DragEvent,
   FormEvent,
-  KeyboardEvent,
   ReactNode,
   Suspense,
   lazy,
@@ -252,14 +251,16 @@ function App({ migrationError = null }: AppProps) {
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    function handleKey(e: KeyboardEvent) {
+    // Der globale Typ, nicht Reacts synthetischer: das Ereignis kommt hier
+    // direkt vom document, nicht aus einem JSX-Handler.
+    function handleKey(e: globalThis.KeyboardEvent) {
       if (e.ctrlKey && e.shiftKey && e.key === "L") {
         e.preventDefault();
         setShowDebug((d) => !d);
       }
     }
-    document.addEventListener("keydown", handleKey as any);
-    return () => document.removeEventListener("keydown", handleKey as any);
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
   }, []);
 
   const closeChangelog = useCallback(() => setShowChangelog(false), []);

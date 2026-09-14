@@ -31,10 +31,15 @@ function loadTodos(): Todo[] {
 // Holt Eintraege aus aelteren Staenden auf den heutigen Stand: `status` kam
 // mit dem Brett dazu, `description` mit dem Detail-Fenster. Beides fehlt in
 // Daten, die davor geschrieben wurden.
-function migrateTodos(todos: any[]): Todo[] {
+/** Ein Eintrag so, wie ihn ein aelterer Stand geschrieben haben kann: `status`
+ *  und `description` koennen fehlen. */
+type StoredTodo = Omit<Todo, "status" | "description"> &
+  Partial<Pick<Todo, "status" | "description">>;
+
+function migrateTodos(todos: StoredTodo[]): Todo[] {
   return todos.map((todo) => {
     const description = todo.description ?? "";
-    if (todo.status) return { ...todo, description };
+    if (todo.status) return { ...todo, description, status: todo.status };
     const status: TodoStatus = todo.done ? "done" : "todo";
     return { ...todo, description, status, done: status === "done" };
   });

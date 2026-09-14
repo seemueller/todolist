@@ -13,7 +13,7 @@ ein Muster zum zweiten Mal auftaucht.
 Always run the test suite locally before pushing or merging changes to `main`:
 
 ```bash
-npm run typecheck && npm test
+npm run typecheck && npm run lint && npm test
 ```
 
 Both the TypeScript type check and all tests must pass. If either fails, fix the issues before proceeding.
@@ -40,6 +40,7 @@ Beschriftung umbenennt, zieht den Test mit.
 | `npm run typecheck` | TypeScript type checking |
 | `npm test` | Run all tests (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
+| `npm run lint` | ESLint (Warnungen sind sichtbar, brechen aber nicht) |
 | `npm run test:e2e` | End-to-End-Tests (Chromium) |
 | `npm run test:rust` | Rust-Tests (`src-tauri`) |
 | `npm run lint:rust` | Clippy, Warnungen als Fehler |

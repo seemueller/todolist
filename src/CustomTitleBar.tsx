@@ -42,8 +42,13 @@ function CloseIcon() {
   );
 }
 
+/** Das einzige Stueck Tauri-Innenleben, das diese Datei anfasst. */
+interface TauriWindow {
+  __TAURI_INTERNALS__?: { invoke?: unknown };
+}
+
 function isTauri(): boolean {
-  const w = window as any;
+  const w = window as Window & TauriWindow;
   if (typeof w === "undefined") return false;
   if (w.__TAURI_INTERNALS__?.invoke) return true;
   return /Tauri/i.test(navigator.userAgent);
