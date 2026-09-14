@@ -23,12 +23,17 @@ const TODO_COLUMNS = `
   t.due_date, t.category_id, c.name AS category_name, c.color AS category_color
 `;
 
+// Die eine Stelle, an der steht, was "nicht im Papierkorb" heisst. Jede
+// Leseabfrage haengt sie an -- eine vergessene wuerde weggeworfene Aufgaben
+// wieder auftauchen lassen.
+const NOT_DELETED = "t.deleted_at IS NULL";
+
 async function selectTodo(id: number): Promise<Todo> {
   const db = await getDb();
   const rows = await db.select<TodoRow[]>(
     `SELECT ${TODO_COLUMNS}
      FROM todos t LEFT JOIN categories c ON c.id = t.category_id
-     WHERE t.id = $1`,
+     WHERE t.id = $1 AND ${NOT_DELETED}`,
     [id]
   );
   if (rows.length === 0) throw new Error(`Todo ${id} not found`);
@@ -41,7 +46,7 @@ async function listTodos(categoryId?: number | null): Promise<Todo[]> {
   const rows = await db.select<TodoRow[]>(
     `SELECT ${TODO_COLUMNS}
      FROM todos t LEFT JOIN categories c ON c.id = t.category_id
-     ${filter ? "WHERE t.category_id = $1" : ""}
+     WHERE ${NOT_DELETED}${filter ? " AND t.category_id = $1" : ""}
      ORDER BY t.created_at DESC, t.id DESC`,
     filter ? [categoryId] : []
   );
@@ -125,7 +130,12 @@ function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
 
 async function deleteTodo(id: number): Promise<number> {
   const db = await getDb();
-  await db.execute("DELETE FROM todos WHERE id = $1", [id]);
+  // Wirft nicht, wenn die Id unbekannt ist -- wie bisher. Der Aufrufer sieht
+  // an der zurueckgegebenen Id nur, worauf er gezielt hat.
+  await db.execute(
+    "UPDATE todos SET deleted_at = datetime('now') WHERE id = $1 AND deleted_at IS NULL",
+    [id]
+  );
   return id;
 }
 

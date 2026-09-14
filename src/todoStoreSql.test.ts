@@ -44,7 +44,7 @@ describe("sqlTodoStore", () => {
     select.mockResolvedValue([ROW]);
     await sqlTodoStore.listTodos(2);
 
-    expect(select.mock.calls[0][0]).toContain("WHERE t.category_id = $1");
+    expect(select.mock.calls[0][0]).toContain("AND t.category_id = $1");
     expect(select.mock.calls[0][1]).toEqual([2]);
   });
 
@@ -68,6 +68,31 @@ describe("sqlTodoStore", () => {
     expect(execute.mock.calls[0][0]).toContain("SET status = $1, done = $2");
     expect(execute.mock.calls[0][1]).toEqual(["done", 1, 7]);
     expect(updated.done).toBe(true);
+  });
+
+  describe("der Papierkorb im SQLite-Store", () => {
+    it("loescht weich statt die Zeile zu entfernen", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+
+      await sqlTodoStore.deleteTodo(7);
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("UPDATE todos");
+      expect(sql).toContain("deleted_at");
+      expect(sql).not.toContain("DELETE FROM todos");
+      expect(params).toEqual([7]);
+    });
+
+    it("blendet den Papierkorb aus jeder Leseabfrage aus", async () => {
+      select.mockResolvedValue([]);
+
+      await sqlTodoStore.listTodos();
+      await sqlTodoStore.listTodos(3);
+
+      for (const [sql] of select.mock.calls) {
+        expect(sql).toContain("t.deleted_at IS NULL");
+      }
+    });
   });
 
   it("sorts categories the way German readers expect", async () => {
