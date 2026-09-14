@@ -361,7 +361,7 @@ Die Prüfung steht seit Task 2 im Code; dieser Task belegt sie und sichert, dass
 **Files:**
 - Modify: `src-tauri/src/mcp/tools.rs` — Testmodul, hinter `update_todo_clears_a_due_date_when_the_clear_flag_is_set`
 
-- [ ] **Step 1: Den Test schreiben**
+- [x] **Step 1: Den Test schreiben**
 
 ```rust
     /// Ein Widerspruch ist ein Fehler des Aufrufers, und er darf die Aufgabe
@@ -400,12 +400,12 @@ Die Prüfung steht seit Task 2 im Code; dieser Task belegt sie und sichert, dass
     }
 ```
 
-- [ ] **Step 2: Den Test laufen lassen**
+- [x] **Step 2: Den Test laufen lassen**
 
 Run: `cargo test --lib update_todo_refuses_to_set_and_clear_the_same_field`
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src-tauri/src/mcp/tools.rs

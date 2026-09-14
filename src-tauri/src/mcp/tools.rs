@@ -819,6 +819,41 @@ mod tests {
         assert!(json["due_date"].is_null(), "due date should be cleared");
     }
 
+    /// Ein Widerspruch ist ein Fehler des Aufrufers, und er darf die Aufgabe
+    /// nicht halb angefasst zuruecklassen.
+    #[tokio::test]
+    async fn update_todo_refuses_to_set_and_clear_the_same_field() {
+        let (server, pool) = server().await;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at, due_date)
+             VALUES ('Alt', '2026-01-02T00:00:00.000Z', '2026-05-05') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("insert todo");
+
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id,
+                title: Some("Neu".into()),
+                due_date: Some("2026-12-24".into()),
+                clear_due_date: Some(true),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&result, "clear_due_date");
+
+        let (title, due): (String, Option<String>) =
+            sqlx::query_as("SELECT title, due_date FROM todos WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .expect("select todo");
+        assert_eq!(title, "Alt", "a rejected call must not write anything");
+        assert_eq!(due.as_deref(), Some("2026-05-05"));
+    }
+
     /// Die alte API unterschied `null` von einem fehlenden Feld. Sie tut es
     /// nicht mehr: beides heisst "unveraendert", und nur das Flag leert.
     #[test]
