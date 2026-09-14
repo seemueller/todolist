@@ -29,7 +29,7 @@ Alle Befehle laufen aus `src-tauri/`.
 **Files:**
 - Modify: `src-tauri/src/mcp/tools.rs` — Testmodul, direkt nach `update_todo_changes_only_the_given_fields` (endet bei ~Zeile 724)
 
-- [ ] **Step 1: Den fehlschlagenden Test schreiben**
+- [x] **Step 1: Den fehlschlagenden Test schreiben**
 
 Der Test geht bewusst über `serde_json::from_str` statt über ein Struct-Literal: Genau das Stück Weg — `null` auf dem Draht — ist das, was kaputt ist.
 
@@ -69,12 +69,12 @@ Der Test geht bewusst über `serde_json::from_str` statt über ein Struct-Litera
     }
 ```
 
-- [ ] **Step 2: Den Test laufen lassen und den Fehlschlag sehen**
+- [x] **Step 2: Den Test laufen lassen und den Fehlschlag sehen**
 
 Run: `cargo test --lib update_todo_keeps_everything_that_arrives_as_null`
 Expected: FAIL — `assertion \`left == right\` failed: null must not clear`, links `Null`, rechts `"2026-09-03"`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src-tauri/src/mcp/tools.rs
@@ -93,11 +93,11 @@ Ein roter Test wird hier ausnahmsweise committet: Er ist der Beleg für den Fehl
 - Modify: `src-tauri/src/mcp/tools.rs:392-429` (Tool-Rumpf `update_todo`)
 - Modify: `src-tauri/src/mcp/tools.rs` — alle zehn `super::UpdateTodo { … }` im Testmodul
 
-- [ ] **Step 1: `double_option` und `clearable` löschen**
+- [x] **Step 1: `double_option` und `clearable` löschen**
 
 Beide Funktionen samt ihrer Doc-Kommentare ersatzlos entfernen. `double_option` steht ab „Haelt `null` von "gar nicht angegeben" auseinander." bis zum Ende der Funktion, `clearable` direkt darunter ab „`Some(None)` heisst "leeren" …". `non_empty` darüber bleibt, `Deserializer` im `use`-Kopf der Datei wird damit unbenutzt und fliegt ebenfalls raus (der Compiler nennt die Zeile).
 
-- [ ] **Step 2: Die beiden neuen Helfer schreiben**
+- [x] **Step 2: Die beiden neuen Helfer schreiben**
 
 An die Stelle der gelöschten Funktionen, also unter `non_empty`:
 
@@ -136,7 +136,7 @@ fn set_or_clear(value: Option<&str>, clear: Option<bool>) -> Option<Option<Strin
 }
 ```
 
-- [ ] **Step 3: `UpdateTodo` umbauen**
+- [x] **Step 3: `UpdateTodo` umbauen**
 
 Die Struktur vollständig ersetzen. `Default` kommt dazu, damit die Tests nur noch die Felder nennen, um die es ihnen geht:
 
@@ -182,7 +182,7 @@ pub struct UpdateTodo {
 
 `Option`-Felder sind für serde von sich aus optional; `#[serde(default)]` und `#[schemars(with = …)]` braucht hier keins mehr.
 
-- [ ] **Step 4: Den Tool-Rumpf ersetzen**
+- [x] **Step 4: Den Tool-Rumpf ersetzen**
 
 Attribut und Funktion `update_todo` vollständig durch dieses Stück ersetzen:
 
@@ -255,7 +255,7 @@ Attribut und Funktion `update_todo` vollständig durch dieses Stück ersetzen:
     }
 ```
 
-- [ ] **Step 5: Die Testliterale auf `..Default::default()` umstellen**
+- [x] **Step 5: Die Testliterale auf `..Default::default()` umstellen**
 
 Zehn Stellen im Testmodul bauen `super::UpdateTodo { … }` mit allen Feldern aus. Jede wird auf die Felder eingedampft, die der jeweilige Test wirklich setzt, plus Rest aus `Default`. `id` steht in jedem Literal. Beispiel für `update_todo_changes_only_the_given_fields`:
 
@@ -310,7 +310,7 @@ Drei dieser Stellen tragen Werte in umgebauten Feldern und werden dabei inhaltli
 
 - `update_todo_refuses_an_over_long_description`: `description: Some(Some(long(…)))` wird zu `description: Some(long(super::MAX_DESCRIPTION_CHARS + 1))`.
 
-- [ ] **Step 6: Den serde-Test umschreiben**
+- [x] **Step 6: Den serde-Test umschreiben**
 
 `null_and_a_missing_field_mean_different_things_on_the_wire` hielt fest, was jetzt falsch ist. Er wird ersetzt durch den Test, der die neue Regel festhält:
 
@@ -340,12 +340,12 @@ Drei dieser Stellen tragen Werte in umgebauten Feldern und werden dabei inhaltli
     }
 ```
 
-- [ ] **Step 7: Alle Tests laufen lassen**
+- [x] **Step 7: Alle Tests laufen lassen**
 
 Run: `cargo test --lib`
 Expected: PASS, 110 Tests (109 wie bisher plus der Regressionstest aus Task 1). Insbesondere grün: `update_todo_keeps_everything_that_arrives_as_null`, `update_todo_changes_only_the_given_fields`, `update_todo_clears_a_due_date_when_the_clear_flag_is_set`, `update_todo_sets_and_clears_the_description` und `the_router_lists_all_seven_tools_with_documented_parameters` — letzterer verlangt für jedes Schema-Feld eine Beschreibung und deckt damit die drei neuen Flags ohne eigene Änderung ab.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src-tauri/src/mcp/tools.rs
@@ -361,7 +361,7 @@ Die Prüfung steht seit Task 2 im Code; dieser Task belegt sie und sichert, dass
 **Files:**
 - Modify: `src-tauri/src/mcp/tools.rs` — Testmodul, hinter `update_todo_clears_a_due_date_when_the_clear_flag_is_set`
 
-- [ ] **Step 1: Den Test schreiben**
+- [x] **Step 1: Den Test schreiben**
 
 ```rust
     /// Ein Widerspruch ist ein Fehler des Aufrufers, und er darf die Aufgabe
@@ -400,12 +400,12 @@ Die Prüfung steht seit Task 2 im Code; dieser Task belegt sie und sichert, dass
     }
 ```
 
-- [ ] **Step 2: Den Test laufen lassen**
+- [x] **Step 2: Den Test laufen lassen**
 
 Run: `cargo test --lib update_todo_refuses_to_set_and_clear_the_same_field`
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src-tauri/src/mcp/tools.rs
@@ -419,7 +419,7 @@ git commit -m "test: setting and clearing one field at once is an error"
 **Files:**
 - Modify: `src-tauri/src/mcp/tools.rs` — Testmodul, hinter dem Test aus Task 3
 
-- [ ] **Step 1: Beide Tests schreiben**
+- [x] **Step 1: Beide Tests schreiben**
 
 ```rust
     #[tokio::test]
@@ -477,12 +477,12 @@ git commit -m "test: setting and clearing one field at once is an error"
     }
 ```
 
-- [ ] **Step 2: Die Tests laufen lassen**
+- [x] **Step 2: Die Tests laufen lassen**
 
 Run: `cargo test --lib update_todo`
 Expected: PASS für alle `update_todo`-Tests, darunter die beiden neuen.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src-tauri/src/mcp/tools.rs
@@ -497,7 +497,7 @@ git commit -m "test: cover clearing a category and a false clear flag"
 - Modify: `AGENTS.md` (Absatz zur Beschreibung, ~Zeile 112)
 - Modify: `CHANGELOG.md` (Abschnitt `## [Unreleased]`)
 
-- [ ] **Step 1: `AGENTS.md` anpassen**
+- [x] **Step 1: `AGENTS.md` anpassen**
 
 Der Satz
 
@@ -507,7 +507,7 @@ wird ersetzt durch:
 
 > Bei `update_todo` leert ausschließlich `clear_description: true` die Beschreibung; Weglassen, `null` und `""` lassen sie unverändert — dieselbe Regel wie bei Fälligkeit (`clear_due_date`) und Kategorie (`clear_category`). Ein Feld zugleich zu setzen und zu leeren ist ein Tool-Fehler. Der Grund ist Issue #35: `null` als Löschbefehl hat Aufgaben die Kategorie und die Fälligkeit gekostet, weil ein Modell sein Parameterobjekt vollständig ausfüllt.
 
-- [ ] **Step 2: `CHANGELOG.md` ergänzen**
+- [x] **Step 2: `CHANGELOG.md` ergänzen**
 
 Unter `## [Unreleased]` in den bestehenden Abschnitt `### Geändert` als weiteren Punkt:
 
@@ -515,12 +515,12 @@ Unter `## [Unreleased]` in den bestehenden Abschnitt `### Geändert` als weitere
 - Ein KI-Assistent löscht Fälligkeit, Kategorie oder Beschreibung einer Aufgabe nur noch, wenn er es ausdrücklich verlangt (`clear_due_date`, `clear_category`, `clear_description`). Bisher genügte dafür ein mitgeschicktes `null`, und das hat beim bloßen Abhaken Kategorie und Fälligkeit gekostet.
 ```
 
-- [ ] **Step 3: Die Tests ein letztes Mal laufen lassen**
+- [x] **Step 3: Die Tests ein letztes Mal laufen lassen**
 
 Run: `cargo test --lib`
 Expected: PASS, 113 Tests.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add AGENTS.md CHANGELOG.md
@@ -531,5 +531,5 @@ git commit -m "docs: write down that only a clear flag empties a field"
 
 ## Abschluss
 
-- [ ] `cargo clippy --all-targets` läuft ohne neue Warnungen (insbesondere kein toter `Deserializer`-Import).
+- [x] `cargo clippy --all-targets` läuft ohne neue Warnungen (insbesondere kein toter `Deserializer`-Import).
 - [ ] `gh issue close 35 --comment "…"` erst nach dem Merge, mit einem Satz zur neuen Regel.

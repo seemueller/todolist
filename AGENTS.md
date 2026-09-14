@@ -109,8 +109,12 @@ Spalte oder der Oberfläche — die App schreibt ungeprüft, eine dort verfasste
 Beschreibung darf also länger sein oder diese Zeichen enthalten. `list_todos`
 liefert einen solchen Wert unverändert zurück; `add_todo`/`update_todo` nehmen
 ihn dann nicht mehr an. Zeilenumbrüche sind als `\n` zu schicken. Bei
-`update_todo` leeren sowohl `null` als auch `""` die Beschreibung, Weglassen
-lässt sie unverändert — dieselbe Regel wie bei Fälligkeit und Kategorie.
+`update_todo` leert ausschließlich `clear_description: true` die Beschreibung;
+Weglassen, `null` und `""` lassen sie unverändert — dieselbe Regel wie bei
+Fälligkeit (`clear_due_date`) und Kategorie (`clear_category`). Ein Feld zugleich
+zu setzen und zu leeren ist ein Tool-Fehler. Der Grund ist Issue #35: `null` als
+Löschbefehl hat Aufgaben die Kategorie und die Fälligkeit gekostet, weil ein
+Modell sein Parameterobjekt vollständig ausfüllt.
 
 **Der Token steht in der Datenbank**, in `app_settings` unter dem Schlüssel
 `mcp_token`, und entsteht beim ersten Start (32 Zufallsbytes, base64url). Die

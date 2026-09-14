@@ -4,9 +4,11 @@ import { TimeSettings } from "./timeTypes";
 
 /**
  * Was `updateTodoFields` aendern soll. Ein fehlendes Feld bleibt unveraendert;
- * `dueDate: null` und `categoryId: null` leeren ausdruecklich. Dieselbe
- * Unterscheidung, die `update_todo` ueber MCP zwischen "weggelassen" und
- * "null" trifft.
+ * `dueDate: null` und `categoryId: null` leeren ausdruecklich. Die MCP-Grenze
+ * macht das seit Issue #35 anders: dort leert `null` nichts mehr, dafuer gibt
+ * es die Flags `clear_due_date`, `clear_category` und `clear_description`.
+ * Diese Patch-API bleibt, wie sie ist -- sie ist intern, kein Modell fuellt
+ * sie aus.
  */
 /**
  * `description` kennt hier keine Längen- oder Zeichenbeschränkung — die
