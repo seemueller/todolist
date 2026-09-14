@@ -203,6 +203,33 @@ auch trifft, was gerade nicht auf dem Schirm ist.
 - Aufgabe löschen → Papierkorb öffnen → wiederherstellen → Aufgabe steht wieder
   in der Liste, Papierkorb ist leer.
 
+## Bekannte Abweichung: Reihenfolge bei gleicher Millisekunde
+
+Der Papierkorb zeigt „zuletzt gelöscht zuerst". Werden zwei Aufgaben innerhalb
+derselben Millisekunde gelöscht — von Hand praktisch unmöglich, über MCP
+durchaus erreichbar —, tragen beide denselben Zeitstempel, und die beiden
+Speicher entscheiden den Gleichstand unterschiedlich:
+
+- Der **localStorage-Speicher** vergibt über `nextDeletedAt()` streng
+  aufsteigende Zeitstempel (`max(jetzt, höchster Wert + 1 ms)`). Er ordnet
+  darum immer nach echter Löschreihenfolge. Nötig wurde das, weil `generateId()`
+  dort `Date.now() + Zufall` ist und als Gleichstandsregel nichts taugt.
+- Der **SQLite-Speicher** fällt auf `ORDER BY ... t.id DESC` zurück. `id` ist
+  `AUTOINCREMENT`, also die *Erstellungs*reihenfolge. Wer A vor B anlegt, dann
+  B und danach A in derselben Millisekunde löscht, sieht dort B über A.
+
+Das ist bewusst so gelassen. Betroffen ist allein die Anzeigereihenfolge zweier
+Einträge im Papierkorb; nichts geht verloren, nichts wird falsch
+wiederhergestellt, und die Frist rechnet unverändert richtig. Der SQL-Seite
+dieselbe Garantie zu geben hieße, den Zeitstempel im UPDATE aus einer
+Unterabfrage über `MAX(deleted_at)` zu berechnen — ein schwer lesbarer Ausdruck
+an einer Stelle, an der zweimal täglich jemand vorbeikommt, für einen Fehler,
+den niemand bemerkt.
+
+Wer die Reihenfolge später doch verbindlich braucht, hat zwei Wege: eine
+laufende Nummer beim Löschen, oder den Zeitstempel in der aufrufenden Schicht
+berechnen statt in der Datenbank.
+
 ## Was nicht dazugehört
 
 - Kategorien werden nicht soft-gelöscht.
