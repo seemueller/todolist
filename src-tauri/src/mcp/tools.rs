@@ -468,7 +468,7 @@ impl TodoServer {
     }
 
     #[tool(
-        description = "Legt eine Aufgabe in den Papierkorb der TodoList-App und gibt zurueck, was abgelegt wurde. Nicht endgueltig: die Nutzerin kann sie in der App wiederherstellen, und nach 30 Tagen raeumt die App sie selbst weg. Zum Abhaken ist stattdessen \"update_todo\" mit dem Status \"done\" gedacht."
+        description = "Legt eine Aufgabe in den Papierkorb der TodoList-App und gibt zurueck, was abgelegt wurde. Nicht endgueltig: die Nutzerin kann sie in der App wiederherstellen, und nach 30 Tagen raeumt die App sie selbst weg. Welche Aufgabe gemeint ist, muss eindeutig sein -- im Zweifel vorher nachfragen. Zum Abhaken ist stattdessen \"update_todo\" mit dem Status \"done\" gedacht."
     )]
     async fn delete_todo(
         &self,
