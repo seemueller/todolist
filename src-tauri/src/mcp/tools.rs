@@ -468,7 +468,7 @@ impl TodoServer {
     }
 
     #[tool(
-        description = "Loescht eine Aufgabe endgueltig und gibt zurueck, was geloescht wurde. Nicht rueckgaengig zu machen -- zum Abhaken ist stattdessen \"update_todo\" mit dem Status \"done\" gedacht."
+        description = "Legt eine Aufgabe in den Papierkorb der TodoList-App und gibt zurueck, was abgelegt wurde. Nicht endgueltig: die Nutzerin kann sie in der App wiederherstellen, und nach 30 Tagen raeumt die App sie selbst weg. Zum Abhaken ist stattdessen \"update_todo\" mit dem Status \"done\" gedacht."
     )]
     async fn delete_todo(
         &self,
@@ -1021,7 +1021,7 @@ mod tests {
     // --- delete_todo --------------------------------------------------------
 
     #[tokio::test]
-    async fn delete_todo_removes_the_todo() {
+    async fn delete_todo_moves_the_todo_to_the_trash() {
         let (server, pool) = server().await;
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO todos (title, created_at) VALUES ('Weg damit', '2026-01-02T00:00:00.000Z')
@@ -1045,6 +1045,29 @@ mod tests {
             .await
             .expect("row");
         assert!(stamp.is_some(), "the row must survive with a deleted_at stamp");
+    }
+
+    #[tokio::test]
+    async fn delete_todo_reports_an_id_already_in_the_trash_as_a_tool_error() {
+        let (server, pool) = server().await;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at) VALUES ('Weg damit', '2026-01-02T00:00:00.000Z')
+             RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("insert todo");
+
+        server
+            .delete_todo(Parameters(super::DeleteTodo { id }))
+            .await
+            .expect("first delete");
+        let result = server
+            .delete_todo(Parameters(super::DeleteTodo { id }))
+            .await
+            .expect("a second delete is not a protocol error");
+
+        tool_error(&result, &id.to_string());
     }
 
     #[tokio::test]
