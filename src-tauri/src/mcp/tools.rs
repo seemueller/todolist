@@ -262,7 +262,8 @@ pub struct UpdateTodo {
     /// Id der Aufgabe, wie "list_todos" sie liefert.
     pub id: i64,
     /// Neuer Titel; darf nicht leer sein. Eine einzelne Zeile bis 500 Zeichen
-    /// -- Steuerzeichen, auch Zeilenumbrueche, werden abgelehnt.
+    /// -- Steuerzeichen, auch Zeilenumbrueche, werden abgelehnt. Ein leerer
+    /// Titel ist ein Fehler, kein "unveraendert".
     pub title: Option<String>,
     /// Neue Beschreibung, hoechstens 4000 Zeichen. Zeilenumbrueche sind
     /// erlaubt und als \n zu schicken; andere Steuerzeichen werden abgelehnt.
@@ -283,14 +284,17 @@ pub struct UpdateTodo {
     /// unveraendert; herausgenommen wird die Aufgabe ausschliesslich ueber
     /// "clear_category".
     pub category: Option<String>,
-    /// true leert die Beschreibung. Nicht zusammen mit "description" zu
-    /// verwenden -- beides zugleich ist ein Fehler.
+    /// true leert die Beschreibung; false und Weglassen lassen sie stehen.
+    /// Nicht zusammen mit "description" zu verwenden -- beides zugleich ist
+    /// ein Fehler.
     pub clear_description: Option<bool>,
-    /// true entfernt die Faelligkeit. Nicht zusammen mit "due_date" zu
-    /// verwenden -- beides zugleich ist ein Fehler.
+    /// true entfernt die Faelligkeit; false und Weglassen lassen sie stehen.
+    /// Nicht zusammen mit "due_date" zu verwenden -- beides zugleich ist ein
+    /// Fehler.
     pub clear_due_date: Option<bool>,
-    /// true nimmt die Aufgabe aus ihrer Kategorie heraus. Nicht zusammen mit
-    /// "category" zu verwenden -- beides zugleich ist ein Fehler.
+    /// true nimmt die Aufgabe aus ihrer Kategorie heraus; false und Weglassen
+    /// lassen sie darin. Nicht zusammen mit "category" zu verwenden -- beides
+    /// zugleich ist ein Fehler.
     pub clear_category: Option<bool>,
 }
 
