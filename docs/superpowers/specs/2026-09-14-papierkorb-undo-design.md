@@ -89,7 +89,12 @@ Das ist die eine Stelle, an der sich das Verhalten für bestehende Aufrufer
 - **Zeitbuchungen** sind nicht betroffen — sie hängen an Kategorien, nie an
   Aufgaben.
 - **Doppeltes Löschen:** `deleteTodo` auf eine Aufgabe, die schon im Papierkorb
-  liegt, verhält sich wie eine unbekannte Id (`Todo <id> not found`).
+  liegt, verhält sich wie auf eine unbekannte Id — und das heißt je Seite, was
+  es dort heute schon heißt. Die beiden Frontend-Stores bleiben still (`deleteTodo`
+  wirft auch bei unbekannter Id nicht und gibt die Id zurück); die MCP-Grenze
+  meldet `Todo <id> not found`, weil `delete_todo` in Rust die Aufgabe vor dem
+  Schreiben liest. Die Semantik ändert sich also an keiner Stelle, sie gilt nur
+  ab jetzt auch für Weggeworfenes.
 
 ## MCP-Grenze
 
