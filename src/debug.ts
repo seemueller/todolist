@@ -11,7 +11,7 @@ export interface DebugLog {
 
 const maxLogs = 200;
 
-export function addDebugLog(level: DebugLogLevel, ...args: any[]) {
+export function addDebugLog(level: DebugLogLevel, ...args: unknown[]) {
   const msg = args
     .map((a) => (typeof a === "string" ? a : typeof a === "object" ? JSON.stringify(a) : String(a)))
     .join(" ");
@@ -41,19 +41,19 @@ export function installDebugInterceptor() {
   const origError = console.error;
   const origInfo = console.info;
 
-  console.log = (...args: any[]) => {
+  console.log = (...args: unknown[]) => {
     addDebugLog("log", ...args);
     origLog.apply(console, args);
   };
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     addDebugLog("warn", ...args);
     origWarn.apply(console, args);
   };
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     addDebugLog("error", ...args);
     origError.apply(console, args);
   };
-  console.info = (...args: any[]) => {
+  console.info = (...args: unknown[]) => {
     addDebugLog("info", ...args);
     origInfo.apply(console, args);
   };

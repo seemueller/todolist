@@ -11,7 +11,7 @@ import {
   TodoStatus,
   fromRow,
   fromCategoryRow,
-  compareCategoryNames,
+  sortCategories,
   categoryNameKey,
   canonicalCategoryName,
 } from "./types";
@@ -23,12 +23,19 @@ const TODO_COLUMNS = `
   t.due_date, t.category_id, c.name AS category_name, c.color AS category_color
 `;
 
+// Die eine Stelle, an der steht, was "nicht im Papierkorb" heisst. Jede
+// Leseabfrage haengt sie an -- eine vergessene wuerde weggeworfene Aufgaben
+// wieder auftauchen lassen. Ohne Tabellen-Alias fuer UPDATE-Statements, die
+// keinen kennen.
+const NOT_DELETED_HERE = "deleted_at IS NULL";
+const NOT_DELETED = `t.${NOT_DELETED_HERE}`;
+
 async function selectTodo(id: number): Promise<Todo> {
   const db = await getDb();
   const rows = await db.select<TodoRow[]>(
     `SELECT ${TODO_COLUMNS}
      FROM todos t LEFT JOIN categories c ON c.id = t.category_id
-     WHERE t.id = $1`,
+     WHERE t.id = $1 AND ${NOT_DELETED}`,
     [id]
   );
   if (rows.length === 0) throw new Error(`Todo ${id} not found`);
@@ -41,7 +48,7 @@ async function listTodos(categoryId?: number | null): Promise<Todo[]> {
   const rows = await db.select<TodoRow[]>(
     `SELECT ${TODO_COLUMNS}
      FROM todos t LEFT JOIN categories c ON c.id = t.category_id
-     ${filter ? "WHERE t.category_id = $1" : ""}
+     WHERE ${NOT_DELETED}${filter ? " AND t.category_id = $1" : ""}
      ORDER BY t.created_at DESC, t.id DESC`,
     filter ? [categoryId] : []
   );
@@ -66,7 +73,10 @@ async function addTodo(
 
 async function updateColumn(id: number, sql: string, params: unknown[]): Promise<Todo> {
   const db = await getDb();
-  await db.execute(sql, [...params, id]);
+  // Der Guard haengt hier, nicht in jedem Aufrufer: eine Aufgabe im Papierkorb
+  // darf sich nicht still veraendern, waehrend der Aufrufer den
+  // "not found"-Fehler von selectTodo bekommt.
+  await db.execute(`${sql} AND ${NOT_DELETED_HERE}`, [...params, id]);
   return selectTodo(id);
 }
 
@@ -105,10 +115,11 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
   if (assignments.length === 0) return selectTodo(id);
 
   const db = await getDb();
-  await db.execute(`UPDATE todos SET ${assignments.join(", ")} WHERE id = $${params.length + 1}`, [
-    ...params,
-    id,
-  ]);
+  // Selber Guard wie in updateColumn -- dieser Pfad geht nicht ueber sie.
+  await db.execute(
+    `UPDATE todos SET ${assignments.join(", ")} WHERE id = $${params.length + 1} AND ${NOT_DELETED_HERE}`,
+    [...params, id]
+  );
   return selectTodo(id);
 }
 
@@ -125,8 +136,59 @@ function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
 
 async function deleteTodo(id: number): Promise<number> {
   const db = await getDb();
-  await db.execute("DELETE FROM todos WHERE id = $1", [id]);
+  // Wirft nicht, wenn die Id unbekannt ist -- wie bisher. Der Aufrufer sieht
+  // an der zurueckgegebenen Id nur, worauf er gezielt hat.
+  //
+  // Das Format ist ausgeschrieben, nicht datetime('now'): die 30-Tage-Frist
+  // wird in JavaScript aus toISOString() berechnet ("...T...Z"), waehrend
+  // datetime('now') "... ..." (Leerzeichen statt "T", kein "Z") liefert. Ein
+  // Vergleich als Text wuerde dann am zehnten Zeichen entscheiden -- Leerzeichen
+  // vor "T" -- und nicht an der Uhrzeit, das Loeschfenster waere also falsch.
+  await db.execute(
+    `UPDATE todos SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = $1 AND ${NOT_DELETED_HERE}`,
+    [id]
+  );
   return id;
+}
+
+async function listDeletedTodos(): Promise<Todo[]> {
+  const db = await getDb();
+  const rows = await db.select<TodoRow[]>(
+    `SELECT ${TODO_COLUMNS}
+     FROM todos t LEFT JOIN categories c ON c.id = t.category_id
+     WHERE t.deleted_at IS NOT NULL
+     ORDER BY t.deleted_at DESC, t.id DESC`
+  );
+  return rows.map(fromRow);
+}
+
+async function restoreTodo(id: number): Promise<Todo> {
+  const db = await getDb();
+  const result = await db.execute(
+    "UPDATE todos SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL",
+    [id]
+  );
+  if (result.rowsAffected === 0) throw new Error(`Todo ${id} not found`);
+  return selectTodo(id);
+}
+
+async function purgeTodo(id: number): Promise<number> {
+  const db = await getDb();
+  // Nur Zeilen im Papierkorb -- eine lebende oder unbekannte Id bleibt
+  // folgenlos, siehe Vertrag in storeTypes.ts.
+  await db.execute("DELETE FROM todos WHERE id = $1 AND deleted_at IS NOT NULL", [id]);
+  return id;
+}
+
+async function purgeDeletedBefore(cutoff: string): Promise<number> {
+  const db = await getDb();
+  // Textvergleich -- gilt nur, weil alle Backends dasselbe ISO-Format
+  // schreiben, siehe storeTypes.ts.
+  const result = await db.execute(
+    "DELETE FROM todos WHERE deleted_at IS NOT NULL AND deleted_at < $1",
+    [cutoff]
+  );
+  return result.rowsAffected;
 }
 
 async function listCategories(): Promise<Category[]> {
@@ -135,9 +197,10 @@ async function listCategories(): Promise<Category[]> {
     "SELECT id, name, color, created_at FROM categories"
   );
   // Sorted here, not in SQL: SQLite's NOCASE collation only case-folds ASCII,
-  // so "Ärzte" would land after "Zebra". compareCategoryNames matches what the
-  // localStorage store does, and there are only ever a handful of categories.
-  return rows.map(fromCategoryRow).sort((a, b) => compareCategoryNames(a.name, b.name));
+  // so "Ärzte" would land after "Zebra". sortCategories is the one order the
+  // localStorage store and the App use too, and there are only ever a handful
+  // of categories.
+  return sortCategories(rows.map(fromCategoryRow));
 }
 
 async function selectCategory(id: number): Promise<Category> {
@@ -205,6 +268,10 @@ export const sqlTodoStore: TodoStore = {
   updateTodoStatus,
   toggleTodoDone,
   deleteTodo,
+  listDeletedTodos,
+  restoreTodo,
+  purgeTodo,
+  purgeDeletedBefore,
   listCategories,
   addCategory,
   updateCategory,

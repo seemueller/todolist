@@ -363,6 +363,15 @@ pub fn run() {
             sql: "ALTER TABLE todos ADD COLUMN description TEXT NOT NULL DEFAULT '';",
             kind: MigrationKind::Up,
         },
+        // Eine geloeschte Aufgabe verschwindet nicht, sie bekommt einen
+        // Zeitstempel: gesetzt heisst "liegt im Papierkorb". Der Wert traegt
+        // zugleich die Aufbewahrungsfrist, eine zweite Spalte braucht es nicht.
+        Migration {
+            version: 11,
+            description: "add_deleted_at_to_todos",
+            sql: "ALTER TABLE todos ADD COLUMN deleted_at TEXT DEFAULT NULL;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

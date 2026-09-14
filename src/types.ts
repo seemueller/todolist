@@ -132,3 +132,34 @@ export const CATEGORY_COLORS = [
   "#f9a03f",
   "#7fd8d0",
 ];
+
+/**
+ * Die eine Reihenfolge, in der Kategorien ueberall auftauchen — in den
+ * Speichern und in der optimistisch aktualisierten Liste der App.
+ *
+ * Eigene Funktion, weil ein blankes `a.name.localeCompare(b.name)` an der
+ * Oberflaeche genau die Divergenz zurueckholt, die `compareCategoryNames`
+ * schliesst: WebKitGTK wuerde die frisch angelegte Kategorie anders einsortieren
+ * als der Speicher sie beim naechsten Laden liefert.
+ *
+ * Sortiert auf einer Kopie: die Aufrufer reichen React-State herein.
+ */
+export function sortCategories(categories: Category[]): Category[] {
+  return categories.slice().sort((a, b) => compareCategoryNames(a.name, b.name));
+}
+
+/**
+ * Die eine Reihenfolge der Aufgabenliste: neueste zuerst, bei gleichem
+ * Zeitpunkt die groessere Id zuerst. Genau das, was `listTodos` laut
+ * storeTypes.ts zusichert -- und was die optimistisch aktualisierte Liste in
+ * App.tsx einhalten muss, damit eine zurueckgeholte Aufgabe dort landet, wo
+ * sie nach einem Neustart auch stuende.
+ *
+ * Sortiert auf einer Kopie: die Aufrufer reichen React-State herein.
+ */
+export function sortTodos(todos: Todo[]): Todo[] {
+  return todos.slice().sort((a, b) => {
+    const dateCmp = b.created_at.localeCompare(a.created_at);
+    return dateCmp !== 0 ? dateCmp : b.id - a.id;
+  });
+}

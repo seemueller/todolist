@@ -3,7 +3,6 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   DragEvent,
   FormEvent,
-  KeyboardEvent,
   ReactNode,
   Suspense,
   lazy,
@@ -16,6 +15,7 @@ import {
   addCategory,
   deleteCategory,
   deleteTodo,
+  restoreTodo,
   listCategories,
   listTodos,
   toggleTodoDone,
@@ -28,12 +28,13 @@ import {
 import { DATA_CHANGED_EVENT } from "./events";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
+import { CATEGORY_COLORS, Category, Priority, sortCategories, sortTodos, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
 import { TimeTrackingView } from "./TimeTrackingView";
 import { TodoDetailModal } from "./TodoDetailModal";
+import { TrashModal } from "./TrashModal";
 
 /** Die drei Ansichten der App. */
 type ViewMode = "list" | "kanban" | "time";
@@ -51,6 +52,7 @@ import {
   CheckIcon,
   ChevronLeftIcon,
   ClockViewIcon,
+  CloseIcon,
   ColorPicker,
   DueDateBadge,
   FilterChip,
@@ -142,6 +144,10 @@ function App({ migrationError = null }: AppProps) {
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(migrationError);
+  // Die zuletzt geloeschte Aufgabe, solange das Rueckgaengig angeboten wird.
+  // Nur eine: das naechste Loeschen ersetzt den Eintrag, statt Hinweise zu
+  // stapeln. Kein Timer -- nichts verschwindet, waehrend jemand hinsieht.
+  const [justDeleted, setJustDeleted] = useState<{ id: number; title: string } | null>(null);
   // Die Aufgabe, deren Detail-Fenster offen ist. Ueber die Id, nicht ueber das
   // Objekt: die Liste bleibt so die einzige Quelle dafuer, ob die Aufgabe noch
   // existiert -- darauf baut die Loesch-Erkennung weiter unten. Das Fenster
@@ -168,6 +174,7 @@ function App({ migrationError = null }: AppProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState(CATEGORY_COLORS[0]);
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
@@ -252,14 +259,16 @@ function App({ migrationError = null }: AppProps) {
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    function handleKey(e: KeyboardEvent) {
+    // Der globale Typ, nicht Reacts synthetischer: das Ereignis kommt hier
+    // direkt vom document, nicht aus einem JSX-Handler.
+    function handleKey(e: globalThis.KeyboardEvent) {
       if (e.ctrlKey && e.shiftKey && e.key === "L") {
         e.preventDefault();
         setShowDebug((d) => !d);
       }
     }
-    document.addEventListener("keydown", handleKey as any);
-    return () => document.removeEventListener("keydown", handleKey as any);
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
   }, []);
 
   const closeChangelog = useCallback(() => setShowChangelog(false), []);
@@ -350,12 +359,26 @@ function App({ migrationError = null }: AppProps) {
   }
 
   async function handleDelete(id: number) {
+    const doomed = todos.find((t) => t.id === id);
     try {
       await deleteTodo(id);
       setTodos((prev) => prev.filter((t) => t.id !== id));
+      setJustDeleted(doomed ? { id, title: doomed.title } : null);
       setError(null);
     } catch (err) {
       setError(String(err));
+    }
+  }
+
+  async function handleUndoDelete() {
+    if (!justDeleted) return;
+    try {
+      const restored = await restoreTodo(justDeleted.id);
+      setTodos((prev) => sortTodos([...prev, restored]));
+      setJustDeleted(null);
+      setError(null);
+    } catch (err) {
+      setError(`Wiederherstellen fehlgeschlagen: ${String(err)}`);
     }
   }
 
@@ -472,7 +495,7 @@ function App({ migrationError = null }: AppProps) {
     if (!name) return;
     try {
       const cat = await addCategory(name, newCategoryColor);
-      setCategories((prev) => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name)));
+      setCategories((prev) => sortCategories([...prev, cat]));
       setNewCategoryName("");
       setNewCategoryColor(CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length]);
       setError(null);
@@ -493,7 +516,7 @@ function App({ migrationError = null }: AppProps) {
     try {
       const updated = await updateCategory(id, name, editingCategoryColor);
       setCategories((prev) =>
-        prev.map((c) => (c.id === updated.id ? updated : c)).sort((a, b) => a.name.localeCompare(b.name))
+        sortCategories(prev.map((c) => (c.id === updated.id ? updated : c)))
       );
       setError(null);
     } catch (err) {
@@ -641,6 +664,9 @@ function App({ migrationError = null }: AppProps) {
               <TagIcon />
               Kategorien
             </IconButton>
+            <IconButton variant="icon" onClick={() => setShowTrash(true)} aria-label="Papierkorb">
+              <TrashIcon />
+            </IconButton>
           </div>
         </div>
 
@@ -668,6 +694,21 @@ function App({ migrationError = null }: AppProps) {
             >
               Zurücksetzen
             </button>
+          </div>
+        )}
+        {justDeleted && (
+          <div className="undo-bar">
+            <span>„{justDeleted.title}" gelöscht.</span>
+            <button type="button" className="undo-bar-action" onClick={handleUndoDelete}>
+              Rückgängig
+            </button>
+            <IconButton
+              variant="icon"
+              onClick={() => setJustDeleted(null)}
+              aria-label="Hinweis schließen"
+            >
+              <CloseIcon />
+            </IconButton>
           </div>
         )}
         {error && <p className="error">Fehler: {error}</p>}
@@ -1085,6 +1126,22 @@ function App({ migrationError = null }: AppProps) {
               ))}
             </ul>
         </Modal>
+      )}
+
+      {showTrash && (
+        <TrashModal
+          onClose={() => setShowTrash(false)}
+          onChanged={() => {
+            // Das Zuruecknehmen der Leiste ist kein Aufraeumen, sondern noetig:
+            // der Papierkorb kann genau die Aufgabe treffen, auf die sie zeigt.
+            // Nach dem Wiederherstellen ist sie schon zurueck, nach dem
+            // endgueltigen Loeschen gibt es sie nicht mehr -- "Rueckgaengig"
+            // liefe dann in ein `Todo <id> not found`, und die Leiste bliebe
+            // fuer einen Versuch stehen, der nie gelingen kann.
+            setJustDeleted(null);
+            void refresh();
+          }}
+        />
       )}
 
       {DebugLogPanel && showDebug && (

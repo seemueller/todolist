@@ -65,7 +65,36 @@ export interface TodoStore {
   updateTodoStatus(id: number, status: TodoStatus): Promise<Todo>;
   /** Haelt `status` konsistent zu `done`; lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   toggleTodoDone(id: number, done: boolean): Promise<Todo>;
+  /** Legt die Aufgabe in den Papierkorb (setzt `deleted_at`); eine unbekannte oder bereits abgelegte Id bleibt folgenlos. Endgueltig entfernt erst `purgeTodo`. */
   deleteTodo(id: number): Promise<number>;
+  /**
+   * Was im Papierkorb liegt, zuletzt Geloeschtes zuerst. `deleteTodo` legt
+   * hier ab, `restoreTodo` holt zurueck, `purgeTodo` raeumt endgueltig weg.
+   */
+  listDeletedTodos(): Promise<Todo[]>;
+  /** Holt eine Aufgabe aus dem Papierkorb zurueck; lehnt mit `Todo <id> not found` ab, wenn `id` nicht im Papierkorb liegt — als Promise-Rejection, nie als synchroner throw. */
+  restoreTodo(id: number): Promise<Todo>;
+  /**
+   * Entfernt eine Aufgabe unwiederbringlich, aber nur, wenn sie im Papierkorb
+   * liegt; gibt die Id zurueck. Eine lebende oder unbekannte Id bleibt wie bei
+   * `deleteTodo` folgenlos -- anders als `restoreTodo` lehnt das hier nicht ab,
+   * weil das Fehlen eines zu entfernenden Datensatzes harmlos ist, waehrend ein
+   * Wiederherstellen-Aufruf ins Leere auf eine verwirrte Aufruferin hindeutet.
+   */
+  purgeTodo(id: number): Promise<number>;
+  /**
+   * Entfernt unwiederbringlich alles, was vor `cutoff` (ISO-Zeitstempel) in den
+   * Papierkorb gelegt wurde, und gibt die Anzahl zurueck. Der Stichtag kommt
+   * vom Aufrufer -- der Store kennt keine Uhr, damit seine Tests keine brauchen.
+   *
+   * Der Vergleich ist ein reiner Textvergleich (`deleted_at < cutoff`); er
+   * traegt nur, weil jedes Backend `deleted_at` in derselben ISO-Form
+   * schreibt (`YYYY-MM-DDTHH:MM:SS.sssZ`) -- der localStorage-Store ueber
+   * `toISOString()`, die SQL-Stores ueber `strftime('%Y-%m-%dT%H:%M:%fZ','now')`.
+   * Weicht ein Backend davon ab, rechnet die Frist falsch, ohne dass ein
+   * Compiler oder Test das meldet.
+   */
+  purgeDeletedBefore(cutoff: string): Promise<number>;
   /**
    * Alle Kategorien, sortiert mit `compareCategoryNames` aus `types.ts` (nicht
    * nach einer DB-Kollation) — das ist der Vertrag, jedes Backend muss

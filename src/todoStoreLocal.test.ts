@@ -270,4 +270,164 @@ describe("localTodoStore", () => {
       );
     });
   });
+
+  describe("der Papierkorb im localStorage-Store", () => {
+    it("nimmt eine gelöschte Aufgabe aus der Liste, behält sie aber gespeichert", async () => {
+      const todo = await localTodoStore.addTodo("Weg damit", "medium", null);
+
+      await localTodoStore.deleteTodo(todo.id);
+
+      expect(await localTodoStore.listTodos()).toEqual([]);
+      const raw = JSON.parse(localStorage.getItem("todolist_todos") ?? "[]");
+      expect(raw).toHaveLength(1);
+      expect(raw[0].deleted_at).toEqual(expect.any(String));
+    });
+
+    it("gibt eine Aufgabe ohne den internen Zeitstempel heraus", async () => {
+      const todo = await localTodoStore.addTodo("Bleibt", "medium", null);
+
+      const [listed] = await localTodoStore.listTodos();
+
+      expect(listed).toEqual(todo);
+      expect("deleted_at" in listed).toBe(false);
+    });
+
+    it("nimmt auch einer Aufgabe im Papierkorb die gelöschte Kategorie", async () => {
+      const kategorie = await localTodoStore.addCategory("Kunde", "#111111");
+      const todo = await localTodoStore.addTodo("Weg damit", "medium", null, kategorie.id);
+      await localTodoStore.deleteTodo(todo.id);
+
+      await localTodoStore.deleteCategory(kategorie.id);
+
+      const raw = JSON.parse(localStorage.getItem("todolist_todos") ?? "[]");
+      expect(raw[0].category_id).toBeNull();
+      expect(raw[0].deleted_at).toEqual(expect.any(String));
+    });
+
+    it("behandelt eine Aufgabe im Papierkorb wie eine unbekannte Id", async () => {
+      const todo = await localTodoStore.addTodo("Weg damit", "medium", null);
+      await localTodoStore.deleteTodo(todo.id);
+
+      await expect(localTodoStore.toggleTodoDone(todo.id, true)).rejects.toThrow(
+        `Todo ${todo.id} not found`
+      );
+      await expect(localTodoStore.updateTodoPriority(todo.id, "high")).rejects.toThrow(
+        `Todo ${todo.id} not found`
+      );
+    });
+  });
+
+  describe("listDeletedTodos und restoreTodo im localStorage-Store", () => {
+    it("zeigt zuletzt Gelöschtes zuerst", async () => {
+      const erste = await localTodoStore.addTodo("Erste", "medium", null);
+      const zweite = await localTodoStore.addTodo("Zweite", "medium", null);
+
+      await localTodoStore.deleteTodo(erste.id);
+      await localTodoStore.deleteTodo(zweite.id);
+
+      const trash = await localTodoStore.listDeletedTodos();
+      expect(trash.map((t) => t.title)).toEqual(["Zweite", "Erste"]);
+      expect("deleted_at" in trash[0]).toBe(false);
+    });
+
+    it("holt eine Aufgabe zurück in die Liste", async () => {
+      const todo = await localTodoStore.addTodo("Zurück", "medium", null);
+      await localTodoStore.deleteTodo(todo.id);
+
+      const restored = await localTodoStore.restoreTodo(todo.id);
+
+      expect(restored).toEqual(todo);
+      expect(await localTodoStore.listTodos()).toEqual([todo]);
+      expect(await localTodoStore.listDeletedTodos()).toEqual([]);
+    });
+
+    it("lehnt das Wiederherstellen einer nicht gelöschten Aufgabe ab", async () => {
+      const todo = await localTodoStore.addTodo("Lebt", "medium", null);
+
+      await expect(localTodoStore.restoreTodo(todo.id)).rejects.toThrow(
+        `Todo ${todo.id} not found`
+      );
+    });
+  });
+
+  describe("purgeTodo und purgeDeletedBefore im localStorage-Store", () => {
+    it("entfernt eine Aufgabe unwiederbringlich", async () => {
+      const todo = await localTodoStore.addTodo("Endgültig", "medium", null);
+      await localTodoStore.deleteTodo(todo.id);
+
+      await localTodoStore.purgeTodo(todo.id);
+
+      expect(await localTodoStore.listDeletedTodos()).toEqual([]);
+      expect(JSON.parse(localStorage.getItem("todolist_todos") ?? "[]")).toEqual([]);
+    });
+
+    it("entfernt nur, was vor dem Stichtag gelöscht wurde", async () => {
+      // Zwei Aufgaben von Hand in den Speicher legen, damit die Zeitstempel fest
+      // stehen: der Store bekommt den Stichtag herein, er kennt keine Uhr.
+      localStorage.setItem(
+        "todolist_todos",
+        JSON.stringify([
+          { id: 1, title: "Alt", description: "", done: false, status: "todo", priority: "medium", created_at: "2026-01-01T00:00:00Z", due_date: null, category_id: null, category_name: null, category_color: null, deleted_at: "2026-01-02T00:00:00Z" },
+          { id: 2, title: "Neu", description: "", done: false, status: "todo", priority: "medium", created_at: "2026-01-01T00:00:00Z", due_date: null, category_id: null, category_name: null, category_color: null, deleted_at: "2026-03-01T00:00:00Z" },
+        ])
+      );
+
+      const removed = await localTodoStore.purgeDeletedBefore("2026-02-01T00:00:00Z");
+
+      expect(removed).toBe(1);
+      expect((await localTodoStore.listDeletedTodos()).map((t) => t.title)).toEqual(["Neu"]);
+    });
+
+    it("schreibt deleted_at in der Form von toISOString() und vergleicht darüber richtig gegen den Stichtag", async () => {
+      // Ein echtes deleteTodo statt eines von Hand gesetzten Zeitstempels:
+      // dieser Test soll pruefen, was `now()` in todoStoreLocal.ts tatsaechlich
+      // schreibt, nicht nur, dass purgeDeletedBefore mit irgendeiner Form
+      // umgehen kann.
+      const todo = await localTodoStore.addTodo("Weg damit", "medium", null);
+      await localTodoStore.deleteTodo(todo.id);
+
+      const raw = JSON.parse(localStorage.getItem("todolist_todos") ?? "[]");
+      const deletedAt: string = raw[0].deleted_at;
+
+      // Form von toISOString(): "YYYY-MM-DDTHH:MM:SS.sssZ", 24 Zeichen.
+      expect(deletedAt).toHaveLength(24);
+      expect(deletedAt[10]).toBe("T");
+      expect(deletedAt[19]).toBe(".");
+      expect(deletedAt.at(-1)).toBe("Z");
+
+      const anHourLater = new Date(Date.parse(deletedAt) + 60 * 60 * 1000).toISOString();
+      const anHourEarlier = new Date(Date.parse(deletedAt) - 60 * 60 * 1000).toISOString();
+
+      expect(await localTodoStore.purgeDeletedBefore(anHourEarlier)).toBe(0);
+      expect(await localTodoStore.listDeletedTodos()).toHaveLength(1);
+
+      expect(await localTodoStore.purgeDeletedBefore(anHourLater)).toBe(1);
+      expect(await localTodoStore.listDeletedTodos()).toEqual([]);
+    });
+
+    it("lässt eine nicht gelöschte Aufgabe vom Stichtag unberührt", async () => {
+      const todo = await localTodoStore.addTodo("Lebt", "medium", null);
+
+      const removed = await localTodoStore.purgeDeletedBefore("2099-01-01T00:00:00Z");
+
+      expect(removed).toBe(0);
+      expect(await localTodoStore.listTodos()).toEqual([todo]);
+    });
+
+    it("lässt eine lebende Aufgabe unberührt, statt sie zu entfernen", async () => {
+      const todo = await localTodoStore.addTodo("Lebt noch", "medium", null);
+
+      await localTodoStore.purgeTodo(todo.id);
+
+      expect(await localTodoStore.listTodos()).toEqual([todo]);
+    });
+
+    it("bleibt bei einer unbekannten Id folgenlos", async () => {
+      const todo = await localTodoStore.addTodo("Unberührt", "medium", null);
+
+      await localTodoStore.purgeTodo(999999);
+
+      expect(await localTodoStore.listTodos()).toEqual([todo]);
+    });
+  });
 });

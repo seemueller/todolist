@@ -2,6 +2,15 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+- Gelöschte Aufgaben landen im Papierkorb statt verloren zu gehen. Direkt nach dem Löschen bietet die App „Rückgängig" an; darüber hinaus sammelt ein Papierkorb-Fenster (Knopf im Kopf) alles Gelöschte, aus dem einzeln wiederhergestellt oder endgültig gelöscht werden kann. Nach 30 Tagen räumt die App den Papierkorb beim Start selbst auf.
+- Was ein KI-Assistent über MCP löscht, liegt ebenfalls im Papierkorb und lässt sich dort zurückholen.
+
+### Behoben
+- Eine gerade angelegte oder umbenannte Kategorie steht jetzt an derselben Stelle der Liste wie nach einem Neustart. Vorher sortierte die Oberfläche anders als der Speicher, was im Desktop-Build (WebKitGTK) eine sichtbar andere Reihenfolge ergab.
+
 ## [0.9.0] - 2026-09-14
 
 ### Hinzugefügt

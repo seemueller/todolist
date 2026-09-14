@@ -29,6 +29,7 @@ export {
   SlidersIcon,
   TagIcon,
   TrashIcon,
+  UndoIcon,
   UpdateIcon,
 } from "./icons";
 

@@ -44,7 +44,7 @@ describe("sqlTodoStore", () => {
     select.mockResolvedValue([ROW]);
     await sqlTodoStore.listTodos(2);
 
-    expect(select.mock.calls[0][0]).toContain("WHERE t.category_id = $1");
+    expect(select.mock.calls[0][0]).toContain("t.deleted_at IS NULL AND t.category_id = $1");
     expect(select.mock.calls[0][1]).toEqual([2]);
   });
 
@@ -68,6 +68,53 @@ describe("sqlTodoStore", () => {
     expect(execute.mock.calls[0][0]).toContain("SET status = $1, done = $2");
     expect(execute.mock.calls[0][1]).toEqual(["done", 1, 7]);
     expect(updated.done).toBe(true);
+  });
+
+  describe("der Papierkorb im SQLite-Store", () => {
+    it("loescht weich statt die Zeile zu entfernen", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+
+      await sqlTodoStore.deleteTodo(7);
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("UPDATE todos");
+      expect(sql).toContain("deleted_at");
+      expect(sql).not.toContain("DELETE FROM todos");
+      expect(params).toEqual([7]);
+    });
+
+    it("schreibt den Zeitstempel im gleichen Format wie toISOString", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+
+      await sqlTodoStore.deleteTodo(7);
+
+      const [sql] = execute.mock.calls[0];
+      expect(sql).toContain("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+      expect(sql).not.toContain("datetime('now')");
+    });
+
+    it("blendet den Papierkorb aus jeder Leseabfrage aus", async () => {
+      select.mockResolvedValue([]);
+
+      await sqlTodoStore.listTodos();
+      await sqlTodoStore.listTodos(3);
+
+      for (const [sql] of select.mock.calls) {
+        expect(sql).toContain("t.deleted_at IS NULL");
+      }
+    });
+
+    it("schreibt nichts, wenn die Aufgabe im Papierkorb liegt", async () => {
+      execute.mockResolvedValue({ rowsAffected: 0 });
+      select.mockResolvedValue([ROW]);
+
+      await sqlTodoStore.updateTodoPriority(7, "low");
+      expect(execute.mock.calls[0][0]).toContain("AND deleted_at IS NULL");
+
+      execute.mockClear();
+      await sqlTodoStore.updateTodoFields(7, { title: "Neuer Titel" });
+      expect(execute.mock.calls[0][0]).toContain("AND deleted_at IS NULL");
+    });
   });
 
   it("sorts categories the way German readers expect", async () => {
@@ -326,6 +373,83 @@ describe("sqlTodoStore", () => {
       const result = sqlTodoStore.updateTodoFields(999, { title: "Neu" });
 
       await expect(result).rejects.toThrow("Todo 999 not found");
+    });
+  });
+
+  describe("listDeletedTodos und restoreTodo im SQLite-Store", () => {
+    it("liest den Papierkorb, zuletzt Gelöschtes zuerst", async () => {
+      select.mockResolvedValue([]);
+
+      await sqlTodoStore.listDeletedTodos();
+
+      const [sql] = select.mock.calls[0];
+      expect(sql).toContain("t.deleted_at IS NOT NULL");
+      expect(sql).toContain("ORDER BY t.deleted_at DESC, t.id DESC");
+    });
+
+    it("setzt den Zeitstempel beim Wiederherstellen zurück", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([
+        {
+          id: 7,
+          title: "Zurück",
+          description: "",
+          done: 0,
+          status: "todo",
+          priority: "medium",
+          created_at: "2026-01-01T00:00:00Z",
+          due_date: null,
+          category_id: null,
+          category_name: null,
+          category_color: null,
+        },
+      ]);
+
+      const restored = await sqlTodoStore.restoreTodo(7);
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("SET deleted_at = NULL");
+      expect(params).toEqual([7]);
+      expect(restored.id).toBe(7);
+    });
+
+    it("lehnt das Wiederherstellen ab, wenn die Aufgabe nicht im Papierkorb liegt", async () => {
+      execute.mockResolvedValue({ rowsAffected: 0 });
+
+      await expect(sqlTodoStore.restoreTodo(999)).rejects.toThrow("Todo 999 not found");
+    });
+  });
+
+  describe("purgeTodo und purgeDeletedBefore im SQLite-Store", () => {
+    it("entfernt die Zeile wirklich", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+
+      await sqlTodoStore.purgeTodo(7);
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("DELETE FROM todos");
+      expect(sql).toContain("deleted_at IS NOT NULL");
+      expect(params).toEqual([7]);
+    });
+
+    it("bleibt bei einer lebenden oder unbekannten Id folgenlos", async () => {
+      execute.mockResolvedValue({ rowsAffected: 0 });
+
+      const result = await sqlTodoStore.purgeTodo(999);
+
+      expect(result).toBe(999);
+    });
+
+    it("räumt nur den Papierkorb vor dem Stichtag", async () => {
+      execute.mockResolvedValue({ rowsAffected: 3 });
+
+      const removed = await sqlTodoStore.purgeDeletedBefore("2026-02-01T00:00:00Z");
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("deleted_at IS NOT NULL");
+      expect(sql).toContain("deleted_at < $1");
+      expect(params).toEqual(["2026-02-01T00:00:00Z"]);
+      expect(removed).toBe(3);
     });
   });
 });

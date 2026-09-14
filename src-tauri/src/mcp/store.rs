@@ -428,11 +428,34 @@ pub async fn resolve_category(pool: &Pool<Sqlite>, name: &str) -> Result<Categor
 const TODO_COLUMNS: &str = "t.id, t.title, t.description, t.done, t.status, t.priority,
      t.created_at, t.due_date, t.category_id, c.name AS category_name, c.color AS category_color";
 
+/// Die eine Stelle, an der steht, was "nicht im Papierkorb" heisst. Spiegelt
+/// `NOT_DELETED` in src/todoStoreSql.ts.
+const NOT_DELETED: &str = "t.deleted_at IS NULL";
+
+/// Ohne Tabellen-Alias: ein UPDATE kennt keinen. Spiegelt `NOT_DELETED_HERE`
+/// in src/todoStoreSql.ts.
+///
+/// **Nicht die Stelle, die heute vor einem Schreibzugriff auf eine
+/// weggeworfene Aufgabe schuetzt.** Das tut `select_todo` am Anfang von
+/// `update_todo` und `delete_todo`: es bricht vorher ab, die folgende
+/// UPDATE-Zeile mit dieser Bedingung sieht eine geloeschte Id also nie.
+/// Anders als in src/todoStoreSql.ts, wo `updateColumn` erst schreibt und
+/// danach liest -- dort ist die Bedingung tatsaechlich das, was den Zugriff
+/// verhindert.
+///
+/// Diese Bedingung ist die zweite Verteidigungslinie: sie haelt dieselbe
+/// Regel am Ort des Schreibens fest, damit eine spaetere Umstellung der
+/// Reihenfolge (oder ein neuer Schreibpfad ohne vorheriges `select_todo`)
+/// die Sperre nicht stillschweigend verliert. Kein Test schlaegt fehl, wenn
+/// sie entfernt wird -- das macht sie nicht ueberfluessig, sondern beweist
+/// nur, dass `select_todo` heute zuerst greift.
+const NOT_DELETED_HERE: &str = "deleted_at IS NULL";
+
 async fn select_todo(pool: &Pool<Sqlite>, id: i64) -> Result<Todo, StoreError> {
     let row: Option<TodoRow> = sqlx::query_as(&format!(
         "SELECT {TODO_COLUMNS}
          FROM todos t LEFT JOIN categories c ON c.id = t.category_id
-         WHERE t.id = ?"
+         WHERE t.id = ? AND {NOT_DELETED}"
     ))
     .bind(id)
     .fetch_optional(pool)
@@ -463,7 +486,7 @@ pub async fn list_todos(
         None => None,
     };
 
-    let mut conditions: Vec<&str> = Vec::new();
+    let mut conditions: Vec<&str> = vec![NOT_DELETED];
     if status.is_some() {
         conditions.push("t.status = ?");
     }
@@ -473,11 +496,7 @@ pub async fn list_todos(
     if due_before.is_some() {
         conditions.push("t.due_date IS NOT NULL AND t.due_date < ?");
     }
-    let where_clause = if conditions.is_empty() {
-        String::new()
-    } else {
-        format!("WHERE {}", conditions.join(" AND "))
-    };
+    let where_clause = format!("WHERE {}", conditions.join(" AND "));
 
     // Dieselbe Ordnung wie `listTodos` in src/todoStoreSql.ts.
     let sql = format!(
@@ -613,7 +632,10 @@ pub async fn update_todo(
         assignments.push("category_id = ?");
     }
 
-    let sql = format!("UPDATE todos SET {} WHERE id = ?", assignments.join(", "));
+    let sql = format!(
+        "UPDATE todos SET {} WHERE id = ? AND {NOT_DELETED_HERE}",
+        assignments.join(", ")
+    );
     let mut query = sqlx::query(&sql);
     if let Some(title) = title {
         query = query.bind(title);
@@ -639,13 +661,23 @@ pub async fn update_todo(
     select_todo(pool, id).await
 }
 
-/// Loescht eine Aufgabe und gibt zurueck, was geloescht wurde.
+/// Legt eine Aufgabe in den Papierkorb und gibt zurueck, was abgelegt wurde.
+/// Die Zeile bleibt stehen; endgueltig entfernt sie nur die Oberflaeche.
+///
+/// Das Zeitformat ist ausgeschrieben und nicht `datetime('now')`: die
+/// 30-Tage-Frist wird in JavaScript aus `toISOString()` berechnet, und ein
+/// Textvergleich der beiden Formate entschiede am zehnten Zeichen
+/// (Leerzeichen vor "T") statt an der Uhrzeit. Dieselbe Formel steht in
+/// src/todoStoreSql.ts.
 pub async fn delete_todo(pool: &Pool<Sqlite>, id: i64) -> Result<Todo, StoreError> {
     let todo = select_todo(pool, id).await?;
-    sqlx::query("DELETE FROM todos WHERE id = ?")
-        .bind(id)
-        .execute(pool)
-        .await?;
+    sqlx::query(&format!(
+        "UPDATE todos SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         WHERE id = ? AND {NOT_DELETED_HERE}"
+    ))
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(todo)
 }
 
@@ -831,7 +863,8 @@ pub(crate) const SCHEMA: &[&str] = &[
         category_id INTEGER DEFAULT NULL REFERENCES categories(id) ON DELETE SET NULL,
         priority TEXT NOT NULL DEFAULT 'medium',
         status TEXT NOT NULL DEFAULT 'todo',
-        description TEXT NOT NULL DEFAULT ''
+        description TEXT NOT NULL DEFAULT '',
+        deleted_at TEXT DEFAULT NULL
     );",
     "CREATE TABLE time_slots (
         date TEXT NOT NULL,
@@ -1897,5 +1930,151 @@ mod tests {
             Err(StoreError::Db(_)) => {}
             other => panic!("expected a database error, got {other:?}"),
         }
+    }
+
+    // --- Papierkorb -----------------------------------------------------------
+
+    #[tokio::test]
+    async fn delete_todo_moves_a_todo_to_the_trash() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+            .await
+            .expect("add");
+
+        delete_todo(&pool, todo.id).await.expect("delete");
+
+        let stamp: Option<(Option<String>,)> =
+            sqlx::query_as("SELECT deleted_at FROM todos WHERE id = ?")
+                .bind(todo.id)
+                .fetch_optional(&pool)
+                .await
+                .expect("select");
+        assert!(
+            stamp.expect("row still there").0.is_some(),
+            "the row must survive with a deleted_at stamp"
+        );
+    }
+
+    /// Der 30-Tage-Papierkorb (`purgeDeletedBefore` in `src/db.ts`, Stichtag
+    /// aus `src/trashRetention.ts`) vergleicht `deleted_at < cutoff` als
+    /// reinen Textvergleich -- er traegt nur, weil `strftime('%Y-%m-%dT%H:%M:%fZ','now')`
+    /// hier dieselbe Form schreibt wie `toISOString()` in JavaScript. Das ist
+    /// schon einmal falsch gewesen: `datetime('now')` schrieb ein Leerzeichen
+    /// statt `T`, was jeden Zeitstempel vom selben Tag als "aelter" sortierte.
+    /// Dieser Test deckt beide SQL-Backends ab (die frontend-seitige
+    /// SQLite-Anbindung in `src/todoStoreSql.ts` benutzt denselben Ausdruck),
+    /// nicht nur den MCP-Store -- ihre eigenen Tests mocken den Tauri-SQL-Client
+    /// und fuehren nie echtes SQL aus, koennen die Form also nicht pruefen.
+    #[tokio::test]
+    async fn the_deleted_at_stamp_compares_against_a_javascript_cutoff() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+            .await
+            .expect("add");
+        delete_todo(&pool, todo.id).await.expect("delete");
+
+        let stamp: (String,) = sqlx::query_as("SELECT deleted_at FROM todos WHERE id = ?")
+            .bind(todo.id)
+            .fetch_one(&pool)
+            .await
+            .expect("select");
+        let deleted_at = stamp.0;
+
+        // Form von `toISOString()`: "YYYY-MM-DDTHH:MM:SS.sssZ", 24 Zeichen.
+        assert_eq!(deleted_at.len(), 24, "got: {deleted_at}");
+        assert_eq!(deleted_at.as_bytes()[10], b'T', "got: {deleted_at}");
+        assert_eq!(deleted_at.as_bytes()[23], b'Z', "got: {deleted_at}");
+        assert_eq!(deleted_at.as_bytes()[19], b'.', "got: {deleted_at}");
+
+        // Und der Textvergleich muss auch tatsaechlich die richtige Richtung
+        // treffen -- gegen einen Stichtag, der wortwoertlich in der Form
+        // steht, die `toISOString()` in src/trashRetention.ts erzeugt, nicht
+        // gegen einen von SQLite selbst berechneten. Wuerde `delete_todo`
+        // wieder `datetime('now')` schreiben (Leerzeichen statt `T`), zoege
+        // ein aus SQLite abgeleiteter Stichtag denselben Fehler mit -- der
+        // Test bliebe gruen, obwohl der echte 30-Tage-Abgleich brechen wuerde.
+        // Deshalb ein eigener, von Hand gesetzter Stempel und zwei feste
+        // Literale als Stichtage.
+        sqlx::query("UPDATE todos SET deleted_at = '2026-03-15T12:00:00.000Z' WHERE id = ?")
+            .bind(todo.id)
+            .execute(&pool)
+            .await
+            .expect("set literal stamp");
+
+        let before: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM todos WHERE deleted_at IS NOT NULL AND deleted_at < ?",
+        )
+        .bind("2026-03-15T11:00:00.000Z")
+        .fetch_one(&pool)
+        .await
+        .expect("count");
+        assert_eq!(before.0, 0, "a cutoff an hour before the stamp must keep the row");
+
+        let after: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM todos WHERE deleted_at IS NOT NULL AND deleted_at < ?",
+        )
+        .bind("2026-03-15T13:00:00.000Z")
+        .fetch_one(&pool)
+        .await
+        .expect("count");
+        assert_eq!(after.0, 1, "a cutoff an hour after the stamp must catch the row");
+    }
+
+    #[tokio::test]
+    async fn list_todos_hides_the_trash() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+            .await
+            .expect("add");
+        delete_todo(&pool, todo.id).await.expect("delete");
+
+        let todos = list_todos(&pool, None, None, None).await.expect("list");
+
+        assert!(todos.is_empty(), "a todo in the trash must not be listed");
+    }
+
+    #[tokio::test]
+    async fn update_todo_does_not_touch_a_todo_in_the_trash() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+            .await
+            .expect("add");
+        delete_todo(&pool, todo.id).await.expect("delete");
+
+        let update = TodoUpdate {
+            title: Some("Neuer Titel".to_string()),
+            ..TodoUpdate::default()
+        };
+        let result = update_todo(&pool, todo.id, update).await;
+
+        assert!(
+            result.is_err(),
+            "a todo in the trash must be unknown to update_todo"
+        );
+
+        // Der Fehler allein genuegt nicht: die Zeile darf sich auch nicht
+        // still veraendert haben.
+        let title: (String,) = sqlx::query_as("SELECT title FROM todos WHERE id = ?")
+            .bind(todo.id)
+            .fetch_one(&pool)
+            .await
+            .expect("row");
+        assert_eq!(
+            title.0, "Weg damit",
+            "a rejected update must not have written anything"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_todo_in_the_trash_is_unknown_to_writes() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+            .await
+            .expect("add");
+        delete_todo(&pool, todo.id).await.expect("delete");
+
+        let again = delete_todo(&pool, todo.id).await;
+
+        assert!(again.is_err(), "deleting twice must report an unknown id");
     }
 }

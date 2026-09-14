@@ -2,13 +2,48 @@
 // storeTypes.ts; the contracts documented there apply here, this file only
 // holds implementation detail.
 
-import { Priority, Todo, TodoStatus, Category, compareCategoryNames, categoryNameKey, canonicalCategoryName } from "./types";
+import {
+  Priority,
+  Todo,
+  TodoStatus,
+  Category,
+  sortCategories,
+  sortTodos,
+  categoryNameKey,
+  canonicalCategoryName,
+} from "./types";
 import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
 // ── localStorage persistence ─────────────────────────────────────────────
 
 const TODOS_KEY = "todolist_todos";
 const CATEGORIES_KEY = "todolist_categories";
+
+/** Wie eine Aufgabe im localStorage liegt: mit dem Papierkorb-Zeitstempel, den
+ *  der `Todo`-Typ bewusst nicht kennt. Gesetzt heisst "liegt im Papierkorb". */
+type StoredTodoRecord = Todo & { deleted_at?: string | null };
+
+/** Streift den internen Zeitstempel ab, bevor eine Aufgabe den Store verlaesst. */
+function toTodo(stored: StoredTodoRecord): Todo {
+  const { deleted_at: _deleted, ...todo } = stored;
+  return todo;
+}
+
+// Als Typ-Praedikat formuliert (statt schlicht boolean): so narrowt TypeScript
+// `deleted_at` an jeder Aufrufstelle automatisch auf `string`, auch in einer
+// `isInTrash(t) && ...`-Verkettung -- kein Cast noetig, etwa in
+// `purgeDeletedBefore`.
+//
+// Ein fehlendes `deleted_at` und ein gesetztes `deleted_at: null` bedeuten
+// beide "nicht im Papierkorb" und werden hier absichtlich nicht
+// unterschieden -- nach einem Loeschen-dann-Wiederherstellen traegt der
+// Datensatz `null` als echten Schluessel, eine nie geloeschte Aufgabe hat ihn
+// gar nicht. Eine spaetere "Aufraeum"-Aenderung sollte das `null` deshalb
+// nicht entfernen, ohne Serialisierung und Iteration (`"deleted_at" in ...`,
+// `JSON.stringify`) an allen Aufrufstellen zu pruefen.
+function isInTrash(stored: StoredTodoRecord): stored is StoredTodoRecord & { deleted_at: string } {
+  return typeof stored.deleted_at === "string";
+}
 
 function generateId(): number {
   return Date.now() + Math.floor(Math.random() * 1000);
@@ -18,7 +53,20 @@ function now(): string {
   return new Date().toISOString();
 }
 
-function loadTodos(): Todo[] {
+// Papierkorb-Zeitstempel duerfen sich nicht wiederholen: `deleteTodo` kann
+// mehrfach innerhalb derselben Millisekunde laufen (typischerweise in Tests),
+// und `listDeletedTodos` sortiert nach `deleted_at` -- ein Gleichstand wuerde
+// die Sortierung von der Zufallszahl in `generateId` abhaengig machen statt
+// von der Loeschreihenfolge. Der neue Zeitstempel ist deshalb mindestens eine
+// Millisekunde nach dem juengsten bereits im Papierkorb liegenden.
+function nextDeletedAt(todos: StoredTodoRecord[]): string {
+  const latestMs = todos
+    .filter(isInTrash)
+    .reduce((max, t) => Math.max(max, Date.parse(t.deleted_at as string)), 0);
+  return new Date(Math.max(Date.now(), latestMs + 1)).toISOString();
+}
+
+function loadTodos(): StoredTodoRecord[] {
   try {
     const raw = localStorage.getItem(TODOS_KEY);
     if (!raw) return [];
@@ -31,16 +79,21 @@ function loadTodos(): Todo[] {
 // Holt Eintraege aus aelteren Staenden auf den heutigen Stand: `status` kam
 // mit dem Brett dazu, `description` mit dem Detail-Fenster. Beides fehlt in
 // Daten, die davor geschrieben wurden.
-function migrateTodos(todos: any[]): Todo[] {
+/** Ein Eintrag so, wie ihn ein aelterer Stand geschrieben haben kann: `status`
+ *  und `description` koennen fehlen. */
+type StoredTodo = Omit<StoredTodoRecord, "status" | "description"> &
+  Partial<Pick<StoredTodoRecord, "status" | "description">>;
+
+function migrateTodos(todos: StoredTodo[]): StoredTodoRecord[] {
   return todos.map((todo) => {
     const description = todo.description ?? "";
-    if (todo.status) return { ...todo, description };
+    if (todo.status) return { ...todo, description, status: todo.status };
     const status: TodoStatus = todo.done ? "done" : "todo";
     return { ...todo, description, status, done: status === "done" };
   });
 }
 
-function saveTodos(todos: Todo[]): void {
+function saveTodos(todos: StoredTodoRecord[]): void {
   localStorage.setItem(TODOS_KEY, JSON.stringify(todos));
 }
 
@@ -61,17 +114,11 @@ function saveCategories(categories: Category[]): void {
 // ── Derived reads ────────────────────────────────────────────────────────
 
 function selectTodos(categoryId?: number | null): Todo[] {
-  let todos = loadTodos();
+  let todos = loadTodos().filter((t) => !isInTrash(t));
   if (categoryId !== undefined && categoryId !== null) {
     todos = todos.filter((t) => t.category_id === categoryId);
   }
-  return todos
-    .slice()
-    .sort((a, b) => {
-      const dateCmp = b.created_at.localeCompare(a.created_at);
-      if (dateCmp !== 0) return dateCmp;
-      return b.id - a.id;
-    });
+  return sortTodos(todos).map(toTodo);
 }
 
 function findCategory(id: number): Category | undefined {
@@ -112,25 +159,25 @@ function addTodo(
 
 async function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   todos[idx] = { ...todos[idx], due_date: dueDate };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 async function updateTodoPriority(id: number, priority: Priority): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   todos[idx] = { ...todos[idx], priority };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 async function updateTodoCategory(id: number, categoryId: number | null): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   const cat = categoryId ? findCategory(categoryId) : null;
   todos[idx] = {
@@ -140,12 +187,12 @@ async function updateTodoCategory(id: number, categoryId: number | null): Promis
     category_color: cat?.color ?? null,
   };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
 
   const next = { ...todos[idx] };
@@ -162,40 +209,81 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
 
   todos[idx] = next;
   saveTodos(todos);
-  return Promise.resolve(next);
+  return Promise.resolve(toTodo(next));
 }
 
 async function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   todos[idx] = { ...todos[idx], status, done: status === "done" };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 async function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   const status: TodoStatus = done ? "done" : "todo";
   todos[idx] = { ...todos[idx], done, status };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 function deleteTodo(id: number): Promise<number> {
-  const todos = loadTodos().filter((t) => t.id !== id);
-  saveTodos(todos);
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
+  if (idx !== -1) {
+    todos[idx] = { ...todos[idx], deleted_at: nextDeletedAt(todos) };
+    saveTodos(todos);
+  }
   return Promise.resolve(id);
+}
+
+function listDeletedTodos(): Promise<Todo[]> {
+  const trash = loadTodos()
+    .filter(isInTrash)
+    .sort((a, b) => {
+      const cmp = (b.deleted_at ?? "").localeCompare(a.deleted_at ?? "");
+      return cmp !== 0 ? cmp : b.id - a.id;
+    })
+    .map(toTodo);
+  return Promise.resolve(trash);
+}
+
+function restoreTodo(id: number): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id && isInTrash(t));
+  if (idx === -1) return Promise.reject(new Error(`Todo ${id} not found`));
+  todos[idx] = { ...todos[idx], deleted_at: null };
+  saveTodos(todos);
+  return Promise.resolve(toTodo(todos[idx]));
+}
+
+function purgeTodo(id: number): Promise<number> {
+  // Nur Zeilen im Papierkorb -- eine lebende oder unbekannte Id bleibt
+  // folgenlos, siehe Vertrag in storeTypes.ts.
+  saveTodos(loadTodos().filter((t) => !(t.id === id && isInTrash(t))));
+  return Promise.resolve(id);
+}
+
+function purgeDeletedBefore(cutoff: string): Promise<number> {
+  const todos = loadTodos();
+  // Textvergleich -- gilt nur, weil alle Backends dasselbe ISO-Format
+  // schreiben, siehe storeTypes.ts.
+  const kept = todos.filter((t) => !(isInTrash(t) && t.deleted_at < cutoff));
+  // Kein Schreiben, wenn nichts entfernt wurde: task 8 ruft das bei jedem
+  // Programmstart auf, ein unveraendertes setItem loest sonst in jedem
+  // offenen Tab unnoetig ein storage-Event aus.
+  if (kept.length !== todos.length) saveTodos(kept);
+  return Promise.resolve(todos.length - kept.length);
 }
 
 // ── Categories ───────────────────────────────────────────────────────────
 
 function listCategories(): Promise<Category[]> {
-  return Promise.resolve(
-    loadCategories().slice().sort((a, b) => compareCategoryNames(a.name, b.name))
-  );
+  return Promise.resolve(sortCategories(loadCategories()));
 }
 
 // Rejects a create/rename that collides with an existing category name,
@@ -274,6 +362,10 @@ export const localTodoStore: TodoStore = {
   updateTodoStatus,
   toggleTodoDone,
   deleteTodo,
+  listDeletedTodos,
+  restoreTodo,
+  purgeTodo,
+  purgeDeletedBefore,
   listCategories,
   addCategory,
   updateCategory,

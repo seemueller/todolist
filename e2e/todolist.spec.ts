@@ -81,7 +81,9 @@ test.describe("TodoList App", () => {
     const deleteBtn = page.getByRole("button", { name: "Löschen" }).first();
     await deleteBtn.click();
 
-    await expect(page.getByText("Delete me")).not.toBeVisible();
+    // Nicht page.getByText("Delete me"): die Rückgängig-Leiste zeigt nach dem
+    // Löschen kurz "„Delete me" gelöscht." und würde denselben Text treffen.
+    await expect(page.locator(".todo-list").getByText("Delete me")).not.toBeVisible();
   });
 
   test("can edit a todo by double-clicking", async ({ page }) => {
@@ -610,5 +612,37 @@ test.describe("Beschreibung", () => {
 
     await page.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }).click();
     await expect(page.getByText("Belege aus dem Ordner")).toBeVisible();
+  });
+});
+
+test.describe("Papierkorb", () => {
+  test("holt eine gelöschte Aufgabe über Rückgängig zurück", async ({ page }) => {
+    await page.goto("/");
+    await page.getByPlaceholder(/Was steht an/i).fill("Versehentlich");
+    await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
+    await expect(page.getByText("Versehentlich")).toBeVisible();
+
+    await page.getByLabel("Löschen").first().click();
+    await expect(page.getByText(/Versehentlich.*gelöscht/)).toBeVisible();
+
+    await page.getByRole("button", { name: "Rückgängig" }).click();
+
+    await expect(page.getByText("Versehentlich")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Rückgängig" })).toHaveCount(0);
+  });
+
+  test("holt eine gelöschte Aufgabe aus dem Papierkorb zurück", async ({ page }) => {
+    await page.goto("/");
+    await page.getByPlaceholder(/Was steht an/i).fill("Im Papierkorb");
+    await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
+    await page.getByLabel("Löschen").first().click();
+
+    await page.getByLabel("Papierkorb").click();
+    await expect(page.getByRole("heading", { name: "Papierkorb" })).toBeVisible();
+    await page.getByLabel("Wiederherstellen").click();
+    await expect(page.getByText("Der Papierkorb ist leer.")).toBeVisible();
+    await page.getByLabel("Schließen").click();
+
+    await expect(page.getByText("Im Papierkorb")).toBeVisible();
   });
 });
