@@ -77,6 +77,15 @@ export function TrashIcon(props: IconProps) {
   );
 }
 
+/** Rueckgaengig-Pfeil - Aufgabe aus dem Papierkorb wiederherstellen. */
+export function UndoIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 16 16" strokeWidth={1.5} {...props}>
+      <path d="M3 7h7a3 3 0 110 6H6M3 7l3-3M3 7l3 3" />
+    </BaseIcon>
+  );
+}
+
 /** Etikett - Knopf "Kategorien verwalten". */
 export function TagIcon(props: IconProps) {
   return (

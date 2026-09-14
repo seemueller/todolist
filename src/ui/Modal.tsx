@@ -9,12 +9,13 @@ import type { HTMLAttributes, MouseEvent, ReactNode, Ref } from "react";
 import { IconButton } from "./IconButton";
 import { CloseIcon } from "./icons";
 
-export type ModalVariant = "changelog" | "category" | "todo";
+export type ModalVariant = "changelog" | "category" | "todo" | "trash";
 
 const VARIANT_CLASS: Record<ModalVariant, string> = {
   changelog: "changelog-modal",
   category: "category-modal",
   todo: "todo-modal",
+  trash: "trash-modal",
 };
 
 export interface ModalProps extends Omit<HTMLAttributes<HTMLDivElement>, "title" | "onClick"> {
