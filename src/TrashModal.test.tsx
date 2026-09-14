@@ -68,6 +68,46 @@ describe("TrashModal", () => {
     await waitFor(() => expect(db.purgeTodo).toHaveBeenCalledWith(1));
   });
 
+  it("zeigt einen Fehler, wenn das Laden fehlschlägt", async () => {
+    vi.mocked(db.listDeletedTodos).mockRejectedValue(new Error("db kaputt"));
+
+    render(<TrashModal onClose={() => {}} onChanged={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Fehler: Error: db kaputt/)).toBeInTheDocument()
+    );
+  });
+
+  it("lädt beim Leeren nach, wenn ein Purge mittendrin fehlschlägt", async () => {
+    vi.mocked(db.listDeletedTodos).mockResolvedValue([makeTodo(1, "Weg"), makeTodo(2, "Auch weg")]);
+    vi.mocked(db.purgeTodo).mockResolvedValueOnce(1).mockRejectedValueOnce(new Error("db kaputt"));
+
+    render(<TrashModal onClose={() => {}} onChanged={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Weg")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Papierkorb leeren" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ja, endgültig löschen" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Fehler: Error: db kaputt/)).toBeInTheDocument()
+    );
+    expect(db.listDeletedTodos).toHaveBeenCalledTimes(2);
+  });
+
+  it("meldet die Änderung nach einem erfolgreichen Purge", async () => {
+    const onChanged = vi.fn();
+    vi.mocked(db.listDeletedTodos).mockResolvedValue([makeTodo(1, "Weg")]);
+    vi.mocked(db.purgeTodo).mockResolvedValue(1);
+
+    render(<TrashModal onClose={() => {}} onChanged={onChanged} />);
+    await waitFor(() => expect(screen.getByText("Weg")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Endgültig löschen"));
+
+    await waitFor(() => expect(db.purgeTodo).toHaveBeenCalledWith(1));
+    expect(onChanged).toHaveBeenCalled();
+  });
+
   it("leert den Papierkorb erst nach der Rückfrage", async () => {
     vi.mocked(db.listDeletedTodos).mockResolvedValue([makeTodo(1, "Weg"), makeTodo(2, "Auch weg")]);
     vi.mocked(db.purgeTodo).mockResolvedValue(1);
