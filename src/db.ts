@@ -50,6 +50,14 @@ export function deleteTodo(id: number): Promise<number> {
   return store().deleteTodo(id);
 }
 
+export function listDeletedTodos(): Promise<Todo[]> {
+  return store().listDeletedTodos();
+}
+
+export function restoreTodo(id: number): Promise<Todo> {
+  return store().restoreTodo(id);
+}
+
 export function listCategories(): Promise<Category[]> {
   return store().listCategories();
 }

@@ -375,4 +375,48 @@ describe("sqlTodoStore", () => {
       await expect(result).rejects.toThrow("Todo 999 not found");
     });
   });
+
+  describe("listDeletedTodos und restoreTodo im SQLite-Store", () => {
+    it("liest den Papierkorb, zuletzt Gelöschtes zuerst", async () => {
+      select.mockResolvedValue([]);
+
+      await sqlTodoStore.listDeletedTodos();
+
+      const [sql] = select.mock.calls[0];
+      expect(sql).toContain("t.deleted_at IS NOT NULL");
+      expect(sql).toContain("ORDER BY t.deleted_at DESC, t.id DESC");
+    });
+
+    it("setzt den Zeitstempel beim Wiederherstellen zurück", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+      select.mockResolvedValue([
+        {
+          id: 7,
+          title: "Zurück",
+          description: "",
+          done: 0,
+          status: "todo",
+          priority: "medium",
+          created_at: "2026-01-01T00:00:00Z",
+          due_date: null,
+          category_id: null,
+          category_name: null,
+          category_color: null,
+        },
+      ]);
+
+      const restored = await sqlTodoStore.restoreTodo(7);
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("SET deleted_at = NULL");
+      expect(params).toEqual([7]);
+      expect(restored.id).toBe(7);
+    });
+
+    it("lehnt das Wiederherstellen ab, wenn die Aufgabe nicht im Papierkorb liegt", async () => {
+      execute.mockResolvedValue({ rowsAffected: 0 });
+
+      await expect(sqlTodoStore.restoreTodo(999)).rejects.toThrow("Todo 999 not found");
+    });
+  });
 });

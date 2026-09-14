@@ -32,6 +32,19 @@ function now(): string {
   return new Date().toISOString();
 }
 
+// Papierkorb-Zeitstempel duerfen sich nicht wiederholen: `deleteTodo` kann
+// mehrfach innerhalb derselben Millisekunde laufen (typischerweise in Tests),
+// und `listDeletedTodos` sortiert nach `deleted_at` -- ein Gleichstand wuerde
+// die Sortierung von der Zufallszahl in `generateId` abhaengig machen statt
+// von der Loeschreihenfolge. Der neue Zeitstempel ist deshalb mindestens eine
+// Millisekunde nach dem juengsten bereits im Papierkorb liegenden.
+function nextDeletedAt(todos: StoredTodoRecord[]): string {
+  const latestMs = todos
+    .filter(isInTrash)
+    .reduce((max, t) => Math.max(max, Date.parse(t.deleted_at as string)), 0);
+  return new Date(Math.max(Date.now(), latestMs + 1)).toISOString();
+}
+
 function loadTodos(): StoredTodoRecord[] {
   try {
     const raw = localStorage.getItem(TODOS_KEY);
@@ -208,10 +221,30 @@ function deleteTodo(id: number): Promise<number> {
   const todos = loadTodos();
   const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx !== -1) {
-    todos[idx] = { ...todos[idx], deleted_at: now() };
+    todos[idx] = { ...todos[idx], deleted_at: nextDeletedAt(todos) };
     saveTodos(todos);
   }
   return Promise.resolve(id);
+}
+
+function listDeletedTodos(): Promise<Todo[]> {
+  const trash = loadTodos()
+    .filter(isInTrash)
+    .sort((a, b) => {
+      const cmp = (b.deleted_at ?? "").localeCompare(a.deleted_at ?? "");
+      return cmp !== 0 ? cmp : b.id - a.id;
+    })
+    .map(toTodo);
+  return Promise.resolve(trash);
+}
+
+function restoreTodo(id: number): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id && isInTrash(t));
+  if (idx === -1) return Promise.reject(new Error(`Todo ${id} not found`));
+  todos[idx] = { ...todos[idx], deleted_at: null };
+  saveTodos(todos);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 // ── Categories ───────────────────────────────────────────────────────────
@@ -296,6 +329,8 @@ export const localTodoStore: TodoStore = {
   updateTodoStatus,
   toggleTodoDone,
   deleteTodo,
+  listDeletedTodos,
+  restoreTodo,
   listCategories,
   addCategory,
   updateCategory,

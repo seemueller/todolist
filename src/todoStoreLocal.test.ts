@@ -316,4 +316,37 @@ describe("localTodoStore", () => {
       );
     });
   });
+
+  describe("listDeletedTodos und restoreTodo im localStorage-Store", () => {
+    it("zeigt zuletzt Gelöschtes zuerst", async () => {
+      const erste = await localTodoStore.addTodo("Erste", "medium", null);
+      const zweite = await localTodoStore.addTodo("Zweite", "medium", null);
+
+      await localTodoStore.deleteTodo(erste.id);
+      await localTodoStore.deleteTodo(zweite.id);
+
+      const trash = await localTodoStore.listDeletedTodos();
+      expect(trash.map((t) => t.title)).toEqual(["Zweite", "Erste"]);
+      expect("deleted_at" in trash[0]).toBe(false);
+    });
+
+    it("holt eine Aufgabe zurück in die Liste", async () => {
+      const todo = await localTodoStore.addTodo("Zurück", "medium", null);
+      await localTodoStore.deleteTodo(todo.id);
+
+      const restored = await localTodoStore.restoreTodo(todo.id);
+
+      expect(restored).toEqual(todo);
+      expect(await localTodoStore.listTodos()).toEqual([todo]);
+      expect(await localTodoStore.listDeletedTodos()).toEqual([]);
+    });
+
+    it("lehnt das Wiederherstellen einer nicht gelöschten Aufgabe ab", async () => {
+      const todo = await localTodoStore.addTodo("Lebt", "medium", null);
+
+      await expect(localTodoStore.restoreTodo(todo.id)).rejects.toThrow(
+        `Todo ${todo.id} not found`
+      );
+    });
+  });
 });

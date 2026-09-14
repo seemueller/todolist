@@ -151,6 +151,27 @@ async function deleteTodo(id: number): Promise<number> {
   return id;
 }
 
+async function listDeletedTodos(): Promise<Todo[]> {
+  const db = await getDb();
+  const rows = await db.select<TodoRow[]>(
+    `SELECT ${TODO_COLUMNS}
+     FROM todos t LEFT JOIN categories c ON c.id = t.category_id
+     WHERE t.deleted_at IS NOT NULL
+     ORDER BY t.deleted_at DESC, t.id DESC`
+  );
+  return rows.map(fromRow);
+}
+
+async function restoreTodo(id: number): Promise<Todo> {
+  const db = await getDb();
+  const result = await db.execute(
+    "UPDATE todos SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL",
+    [id]
+  );
+  if (result.rowsAffected === 0) throw new Error(`Todo ${id} not found`);
+  return selectTodo(id);
+}
+
 async function listCategories(): Promise<Category[]> {
   const db = await getDb();
   const rows = await db.select<CategoryRow[]>(
@@ -228,6 +249,8 @@ export const sqlTodoStore: TodoStore = {
   updateTodoStatus,
   toggleTodoDone,
   deleteTodo,
+  listDeletedTodos,
+  restoreTodo,
   listCategories,
   addCategory,
   updateCategory,

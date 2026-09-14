@@ -65,7 +65,15 @@ export interface TodoStore {
   updateTodoStatus(id: number, status: TodoStatus): Promise<Todo>;
   /** Haelt `status` konsistent zu `done`; lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   toggleTodoDone(id: number, done: boolean): Promise<Todo>;
+  /** Legt die Aufgabe in den Papierkorb (setzt `deleted_at`); eine unbekannte oder bereits abgelegte Id bleibt folgenlos. Endgueltig entfernt erst `purgeTodo`. */
   deleteTodo(id: number): Promise<number>;
+  /**
+   * Was im Papierkorb liegt, zuletzt Geloeschtes zuerst. `deleteTodo` legt
+   * hier ab, `restoreTodo` holt zurueck, `purgeTodo` raeumt endgueltig weg.
+   */
+  listDeletedTodos(): Promise<Todo[]>;
+  /** Holt eine Aufgabe aus dem Papierkorb zurueck; lehnt mit `Todo <id> not found` ab, wenn `id` nicht im Papierkorb liegt — als Promise-Rejection, nie als synchroner throw. */
+  restoreTodo(id: number): Promise<Todo>;
   /**
    * Alle Kategorien, sortiert mit `compareCategoryNames` aus `types.ts` (nicht
    * nach einer DB-Kollation) — das ist der Vertrag, jedes Backend muss
