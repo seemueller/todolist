@@ -147,3 +147,19 @@ export const CATEGORY_COLORS = [
 export function sortCategories(categories: Category[]): Category[] {
   return categories.slice().sort((a, b) => compareCategoryNames(a.name, b.name));
 }
+
+/**
+ * Die eine Reihenfolge der Aufgabenliste: neueste zuerst, bei gleichem
+ * Zeitpunkt die groessere Id zuerst. Genau das, was `listTodos` laut
+ * storeTypes.ts zusichert -- und was die optimistisch aktualisierte Liste in
+ * App.tsx einhalten muss, damit eine zurueckgeholte Aufgabe dort landet, wo
+ * sie nach einem Neustart auch stuende.
+ *
+ * Sortiert auf einer Kopie: die Aufrufer reichen React-State herein.
+ */
+export function sortTodos(todos: Todo[]): Todo[] {
+  return todos.slice().sort((a, b) => {
+    const dateCmp = b.created_at.localeCompare(a.created_at);
+    return dateCmp !== 0 ? dateCmp : b.id - a.id;
+  });
+}

@@ -7,6 +7,7 @@ import {
   categoryNameKey,
   canonicalCategoryName,
   sortCategories,
+  sortTodos,
   Category,
 } from "./types";
 
@@ -207,5 +208,51 @@ describe("sortCategories", () => {
     sortCategories(original);
 
     expect(original.map((c) => c.name)).toEqual(["Sport", "Ärzte"]);
+  });
+});
+
+describe("sortTodos", () => {
+  const todo = (id: number, created_at: string): Todo => ({
+    id,
+    title: `Todo ${id}`,
+    description: "",
+    done: false,
+    status: "todo",
+    priority: "medium",
+    created_at,
+    due_date: null,
+    category_id: null,
+    category_name: null,
+    category_color: null,
+  });
+
+  it("orders by created_at, newest first", () => {
+    const unsorted = [
+      todo(1, "2026-01-01T00:00:00Z"),
+      todo(2, "2026-01-03T00:00:00Z"),
+      todo(3, "2026-01-02T00:00:00Z"),
+    ];
+
+    expect(sortTodos(unsorted).map((t) => t.id)).toEqual([2, 3, 1]);
+  });
+
+  it("breaks ties on the same created_at by descending id", () => {
+    const unsorted = [
+      todo(1, "2026-01-01T00:00:00Z"),
+      todo(3, "2026-01-01T00:00:00Z"),
+      todo(2, "2026-01-01T00:00:00Z"),
+    ];
+
+    expect(sortTodos(unsorted).map((t) => t.id)).toEqual([3, 2, 1]);
+  });
+
+  it("leaves the given array untouched", () => {
+    // Die Aufrufer reichen React-State herein; ein in-place-sort wuerde den
+    // alten State veraendern und das Neuzeichnen verschlucken.
+    const original = [todo(1, "2026-01-01T00:00:00Z"), todo(2, "2026-01-03T00:00:00Z")];
+
+    sortTodos(original);
+
+    expect(original.map((t) => t.id)).toEqual([1, 2]);
   });
 });

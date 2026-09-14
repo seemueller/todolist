@@ -28,7 +28,7 @@ import {
 import { DATA_CHANGED_EVENT } from "./events";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, Priority, sortCategories, Todo, TodoStatus } from "./types";
+import { CATEGORY_COLORS, Category, Priority, sortCategories, sortTodos, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
@@ -372,12 +372,7 @@ function App({ migrationError = null }: AppProps) {
     if (!justDeleted) return;
     try {
       const restored = await restoreTodo(justDeleted.id);
-      setTodos((prev) =>
-        [...prev, restored].sort((a, b) => {
-          const dateCmp = b.created_at.localeCompare(a.created_at);
-          return dateCmp !== 0 ? dateCmp : b.id - a.id;
-        })
-      );
+      setTodos((prev) => sortTodos([...prev, restored]));
       setJustDeleted(null);
       setError(null);
     } catch (err) {

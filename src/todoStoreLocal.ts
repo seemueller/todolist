@@ -2,7 +2,16 @@
 // storeTypes.ts; the contracts documented there apply here, this file only
 // holds implementation detail.
 
-import { Priority, Todo, TodoStatus, Category, sortCategories, categoryNameKey, canonicalCategoryName } from "./types";
+import {
+  Priority,
+  Todo,
+  TodoStatus,
+  Category,
+  sortCategories,
+  sortTodos,
+  categoryNameKey,
+  canonicalCategoryName,
+} from "./types";
 import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
 // ── localStorage persistence ─────────────────────────────────────────────
@@ -109,14 +118,7 @@ function selectTodos(categoryId?: number | null): Todo[] {
   if (categoryId !== undefined && categoryId !== null) {
     todos = todos.filter((t) => t.category_id === categoryId);
   }
-  return todos
-    .slice()
-    .sort((a, b) => {
-      const dateCmp = b.created_at.localeCompare(a.created_at);
-      if (dateCmp !== 0) return dateCmp;
-      return b.id - a.id;
-    })
-    .map(toTodo);
+  return sortTodos(todos).map(toTodo);
 }
 
 function findCategory(id: number): Category | undefined {
