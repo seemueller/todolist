@@ -419,7 +419,7 @@ git commit -m "test: setting and clearing one field at once is an error"
 **Files:**
 - Modify: `src-tauri/src/mcp/tools.rs` — Testmodul, hinter dem Test aus Task 3
 
-- [ ] **Step 1: Beide Tests schreiben**
+- [x] **Step 1: Beide Tests schreiben**
 
 ```rust
     #[tokio::test]
@@ -477,12 +477,12 @@ git commit -m "test: setting and clearing one field at once is an error"
     }
 ```
 
-- [ ] **Step 2: Die Tests laufen lassen**
+- [x] **Step 2: Die Tests laufen lassen**
 
 Run: `cargo test --lib update_todo`
 Expected: PASS für alle `update_todo`-Tests, darunter die beiden neuen.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src-tauri/src/mcp/tools.rs

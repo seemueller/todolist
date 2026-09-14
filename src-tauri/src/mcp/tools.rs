@@ -854,6 +854,60 @@ mod tests {
         assert_eq!(due.as_deref(), Some("2026-05-05"));
     }
 
+    #[tokio::test]
+    async fn update_todo_takes_a_todo_out_of_its_category() {
+        let (server, pool) = server().await;
+        let category_id = category(&pool, "Kundenprojekt").await;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at, category_id)
+             VALUES ('Alt', '2026-01-02T00:00:00.000Z', ?) RETURNING id",
+        )
+        .bind(category_id)
+        .fetch_one(&pool)
+        .await
+        .expect("insert todo");
+
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id,
+                clear_category: Some(true),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        let json = ok_json(&result);
+        assert!(json["category_id"].is_null(), "category should be cleared");
+        assert!(json["category_name"].is_null());
+    }
+
+    /// `false` ist kein Loeschbefehl, sondern ein ausgeschriebenes "nein".
+    #[tokio::test]
+    async fn update_todo_leaves_everything_alone_on_a_false_flag() {
+        let (server, pool) = server().await;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at, description, due_date)
+             VALUES ('Alt', '2026-01-02T00:00:00.000Z', 'Notiz', '2026-05-05') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("insert todo");
+
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id,
+                status: Some("done".into()),
+                clear_description: Some(false),
+                clear_due_date: Some(false),
+                clear_category: Some(false),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        let json = ok_json(&result);
+        assert_eq!(json["due_date"], "2026-05-05");
+        assert_eq!(json["description"], "Notiz");
+    }
+
     /// Die alte API unterschied `null` von einem fehlenden Feld. Sie tut es
     /// nicht mehr: beides heisst "unveraendert", und nur das Flag leert.
     #[test]
