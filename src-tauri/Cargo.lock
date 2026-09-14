@@ -5155,6 +5155,7 @@ version = "0.10.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
+ "dirs",
  "rand 0.9.5",
  "rmcp",
  "serde",
@@ -5166,6 +5167,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-sql",
  "tauri-plugin-updater",
+ "tempfile",
  "tokio",
  "tokio-util",
  "unicode-normalization",

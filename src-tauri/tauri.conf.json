@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "TodoList",
   "version": "0.10.0",
-  "identifier": "com.roomote.todolist",
+  "identifier": "com.seemueller.todolist",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -49,7 +49,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhEOTVEOURCQUYzQTJEQkYKUldTL0xUcXYyOW1Walh6SnlJTlhIOXhXQ0x1amFrRXBkc3ZxUXRIRW5EUEt3aGc3UG53THdHazQK",
       "endpoints": [
-        "https://github.com/seemueller/roomote-test-todolist/releases/latest/download/latest.json"
+        "https://github.com/seemueller/todolist/releases/latest/download/latest.json"
       ]
     }
   }

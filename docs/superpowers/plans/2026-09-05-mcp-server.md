@@ -345,7 +345,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:4319/mcp
 Expected: `401`.
 
 ```bash
-TOKEN=$(sqlite3 ~/.config/com.roomote.todolist/todolist.db \
+TOKEN=$(sqlite3 ~/.config/com.seemueller.todolist/todolist.db \
   "SELECT value FROM app_settings WHERE key='mcp_token';")
 curl -s -D- -o /dev/null -X POST http://127.0.0.1:4319/mcp \
   -H "Authorization: Bearer $TOKEN" \

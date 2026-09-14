@@ -1,3 +1,4 @@
+mod config_migration;
 mod mcp;
 
 use serde::{Deserialize, Serialize};
@@ -252,6 +253,12 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Vor allem anderen: tauri-plugin-sql loest `sqlite:todolist.db` gegen
+    // `app_config_dir()` auf, und das haengt am Bundle-Identifier. Nach dessen
+    // Umbenennung zeigt eine bestehende Installation auf ein leeres
+    // Verzeichnis, in dem sonst kommentarlos eine frische Datenbank entstuende.
+    config_migration::migrate_legacy_config_dir_in_place();
+
     let migrations = vec![
         Migration {
             version: 1,

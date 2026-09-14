@@ -39,7 +39,11 @@ base64 = "0.22"
 # NFC-Normalisierung fuer Kategorienamen; steht ueber idna/url ohnehin schon im
 # Lockfile, kostet als direkte Abhaengigkeit also keine zusaetzliche Crate.
 unicode-normalization = "0.1"
+# Config-Verzeichnis der Alt-Installation (Identifier-Umbenennung); steht ueber
+# die Tauri-Plugins ohnehin im Lockfile.
+dirs = "6"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tempfile = "3"
 
