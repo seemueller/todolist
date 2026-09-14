@@ -1038,11 +1038,13 @@ mod tests {
         let json = ok_json(&result);
         assert_eq!(json["title"], "Weg damit");
 
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM todos")
+        // Weich geloescht: die Zeile bleibt stehen, nur mit einem Zeitstempel.
+        let stamp: Option<String> = sqlx::query_scalar("SELECT deleted_at FROM todos WHERE id = ?")
+            .bind(id)
             .fetch_one(&pool)
             .await
-            .expect("count");
-        assert_eq!(count, 0);
+            .expect("row");
+        assert!(stamp.is_some(), "the row must survive with a deleted_at stamp");
     }
 
     #[tokio::test]
