@@ -606,6 +606,12 @@ Expected: FAIL — `localTodoStore.purgeTodo is not a function`
 
 - [ ] **Step 3: Write minimal implementation**
 
+Der Vergleich `deleted_at < cutoff` ist ein Textvergleich. Er traegt nur, weil
+alle drei Speicher denselben ISO-Zeitstempel schreiben: der localStorage-Store
+ueber `now()` (`toISOString()`), die beiden SQL-Speicher ueber
+`strftime('%Y-%m-%dT%H:%M:%fZ','now')`. Aendert sich eines dieser Formate,
+raeumt die Frist falsch.
+
 In `src/storeTypes.ts`, hinter `restoreTodo`:
 
 ```ts
@@ -751,6 +757,18 @@ Im Testmodul von `src-tauri/src/mcp/store.rs` anhängen:
             result.is_err(),
             "a todo in the trash must be unknown to update_todo"
         );
+
+        // Der Fehler allein genuegt nicht: die Zeile darf sich auch nicht
+        // still veraendert haben.
+        let title: (String,) = sqlx::query_as("SELECT title FROM todos WHERE id = ?")
+            .bind(todo.id)
+            .fetch_one(&pool)
+            .await
+            .expect("row");
+        assert_eq!(
+            title.0, "Weg damit",
+            "a rejected update must not have written anything"
+        );
     }
 
     #[tokio::test]
@@ -789,6 +807,9 @@ In `src-tauri/src/mcp/store.rs`, direkt unter `TODO_COLUMNS`:
 const NOT_DELETED: &str = "t.deleted_at IS NULL";
 ```
 
+(Die unaliasierte Schwester `NOT_DELETED_HERE` fuer die UPDATE-Statements
+kommt weiter unten dazu.)
+
 `select_todo` bekommt die Bedingung:
 
 ```rust
@@ -818,15 +839,41 @@ ersetzt werden. Die Reihenfolge der `bind`-Aufrufe bleibt unverändert, weil
 ```rust
 /// Legt eine Aufgabe in den Papierkorb und gibt zurueck, was abgelegt wurde.
 /// Die Zeile bleibt stehen; endgueltig entfernt sie nur die Oberflaeche.
+///
+/// Das Zeitformat ist ausgeschrieben und nicht `datetime('now')`: die
+/// 30-Tage-Frist wird in JavaScript aus `toISOString()` berechnet, und ein
+/// Textvergleich der beiden Formate entschiede am zehnten Zeichen
+/// (Leerzeichen vor "T") statt an der Uhrzeit. Dieselbe Formel steht in
+/// src/todoStoreSql.ts.
 pub async fn delete_todo(pool: &Pool<Sqlite>, id: i64) -> Result<Todo, StoreError> {
     let todo = select_todo(pool, id).await?;
-    sqlx::query("UPDATE todos SET deleted_at = datetime('now') WHERE id = ?")
-        .bind(id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "UPDATE todos SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+    )
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(todo)
 }
 ```
+
+**Der Papierkorb muss auch die Schreibpfade schuetzen.** `select_todo` davor
+reicht nicht: `update_todo` setzt seine SET-Liste dynamisch zusammen und
+schreibt mit `WHERE id = ?`. Ohne Bedingung liefe der Schreibvorgang gegen eine
+weggeworfene Aufgabe durch, und erst das `select_todo` danach meldete den
+Fehler — die Zeile waere trotzdem veraendert. Haenge darum, analog zu
+`NOT_DELETED_HERE` in `src/todoStoreSql.ts`, an jedes UPDATE auf `todos`:
+
+```rust
+/// Ohne Tabellen-Alias: ein UPDATE kennt keinen. Spiegelt `NOT_DELETED_HERE`
+/// in src/todoStoreSql.ts.
+const NOT_DELETED_HERE: &str = "deleted_at IS NULL";
+```
+
+Pruefe jede Stelle in `store.rs`, die `UPDATE todos` absetzt, und ergaenze sie.
+Die sichtbare Wirkung bleibt: ein Schreibzugriff auf eine Aufgabe im Papierkorb
+endet weiter als `Todo <id> not found` — nur ist jetzt auch wirklich nichts
+geschrieben worden.
 
 `select_todo` davor sorgt dafür, dass eine bereits abgelegte oder unbekannte Id
 denselben Fehler liefert wie bisher.
