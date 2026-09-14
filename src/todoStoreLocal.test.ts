@@ -270,4 +270,50 @@ describe("localTodoStore", () => {
       );
     });
   });
+
+  describe("der Papierkorb im localStorage-Store", () => {
+    it("nimmt eine gelöschte Aufgabe aus der Liste, behält sie aber gespeichert", async () => {
+      const todo = await localTodoStore.addTodo("Weg damit", "medium", null);
+
+      await localTodoStore.deleteTodo(todo.id);
+
+      expect(await localTodoStore.listTodos()).toEqual([]);
+      const raw = JSON.parse(localStorage.getItem("todolist_todos") ?? "[]");
+      expect(raw).toHaveLength(1);
+      expect(raw[0].deleted_at).toEqual(expect.any(String));
+    });
+
+    it("gibt eine Aufgabe ohne den internen Zeitstempel heraus", async () => {
+      const todo = await localTodoStore.addTodo("Bleibt", "medium", null);
+
+      const [listed] = await localTodoStore.listTodos();
+
+      expect(listed).toEqual(todo);
+      expect("deleted_at" in listed).toBe(false);
+    });
+
+    it("nimmt auch einer Aufgabe im Papierkorb die gelöschte Kategorie", async () => {
+      const kategorie = await localTodoStore.addCategory("Kunde", "#111111");
+      const todo = await localTodoStore.addTodo("Weg damit", "medium", null, kategorie.id);
+      await localTodoStore.deleteTodo(todo.id);
+
+      await localTodoStore.deleteCategory(kategorie.id);
+
+      const raw = JSON.parse(localStorage.getItem("todolist_todos") ?? "[]");
+      expect(raw[0].category_id).toBeNull();
+      expect(raw[0].deleted_at).toEqual(expect.any(String));
+    });
+
+    it("behandelt eine Aufgabe im Papierkorb wie eine unbekannte Id", async () => {
+      const todo = await localTodoStore.addTodo("Weg damit", "medium", null);
+      await localTodoStore.deleteTodo(todo.id);
+
+      await expect(localTodoStore.toggleTodoDone(todo.id, true)).rejects.toThrow(
+        `Todo ${todo.id} not found`
+      );
+      await expect(localTodoStore.updateTodoPriority(todo.id, "high")).rejects.toThrow(
+        `Todo ${todo.id} not found`
+      );
+    });
+  });
 });

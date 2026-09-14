@@ -10,6 +10,20 @@ import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 const TODOS_KEY = "todolist_todos";
 const CATEGORIES_KEY = "todolist_categories";
 
+/** Wie eine Aufgabe im localStorage liegt: mit dem Papierkorb-Zeitstempel, den
+ *  der `Todo`-Typ bewusst nicht kennt. Gesetzt heisst "liegt im Papierkorb". */
+type StoredTodoRecord = Todo & { deleted_at?: string | null };
+
+/** Streift den internen Zeitstempel ab, bevor eine Aufgabe den Store verlaesst. */
+function toTodo(stored: StoredTodoRecord): Todo {
+  const { deleted_at: _deleted, ...todo } = stored;
+  return todo;
+}
+
+function isInTrash(stored: StoredTodoRecord): boolean {
+  return typeof stored.deleted_at === "string";
+}
+
 function generateId(): number {
   return Date.now() + Math.floor(Math.random() * 1000);
 }
@@ -18,7 +32,7 @@ function now(): string {
   return new Date().toISOString();
 }
 
-function loadTodos(): Todo[] {
+function loadTodos(): StoredTodoRecord[] {
   try {
     const raw = localStorage.getItem(TODOS_KEY);
     if (!raw) return [];
@@ -33,10 +47,10 @@ function loadTodos(): Todo[] {
 // Daten, die davor geschrieben wurden.
 /** Ein Eintrag so, wie ihn ein aelterer Stand geschrieben haben kann: `status`
  *  und `description` koennen fehlen. */
-type StoredTodo = Omit<Todo, "status" | "description"> &
-  Partial<Pick<Todo, "status" | "description">>;
+type StoredTodo = Omit<StoredTodoRecord, "status" | "description"> &
+  Partial<Pick<StoredTodoRecord, "status" | "description">>;
 
-function migrateTodos(todos: StoredTodo[]): Todo[] {
+function migrateTodos(todos: StoredTodo[]): StoredTodoRecord[] {
   return todos.map((todo) => {
     const description = todo.description ?? "";
     if (todo.status) return { ...todo, description, status: todo.status };
@@ -45,7 +59,7 @@ function migrateTodos(todos: StoredTodo[]): Todo[] {
   });
 }
 
-function saveTodos(todos: Todo[]): void {
+function saveTodos(todos: StoredTodoRecord[]): void {
   localStorage.setItem(TODOS_KEY, JSON.stringify(todos));
 }
 
@@ -66,7 +80,7 @@ function saveCategories(categories: Category[]): void {
 // ── Derived reads ────────────────────────────────────────────────────────
 
 function selectTodos(categoryId?: number | null): Todo[] {
-  let todos = loadTodos();
+  let todos = loadTodos().filter((t) => !isInTrash(t));
   if (categoryId !== undefined && categoryId !== null) {
     todos = todos.filter((t) => t.category_id === categoryId);
   }
@@ -76,7 +90,8 @@ function selectTodos(categoryId?: number | null): Todo[] {
       const dateCmp = b.created_at.localeCompare(a.created_at);
       if (dateCmp !== 0) return dateCmp;
       return b.id - a.id;
-    });
+    })
+    .map(toTodo);
 }
 
 function findCategory(id: number): Category | undefined {
@@ -117,25 +132,25 @@ function addTodo(
 
 async function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   todos[idx] = { ...todos[idx], due_date: dueDate };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 async function updateTodoPriority(id: number, priority: Priority): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   todos[idx] = { ...todos[idx], priority };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 async function updateTodoCategory(id: number, categoryId: number | null): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   const cat = categoryId ? findCategory(categoryId) : null;
   todos[idx] = {
@@ -145,12 +160,12 @@ async function updateTodoCategory(id: number, categoryId: number | null): Promis
     category_color: cat?.color ?? null,
   };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
 
   const next = { ...todos[idx] };
@@ -167,31 +182,35 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
 
   todos[idx] = next;
   saveTodos(todos);
-  return Promise.resolve(next);
+  return Promise.resolve(toTodo(next));
 }
 
 async function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   todos[idx] = { ...todos[idx], status, done: status === "done" };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 async function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
   const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id);
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   const status: TodoStatus = done ? "done" : "todo";
   todos[idx] = { ...todos[idx], done, status };
   saveTodos(todos);
-  return Promise.resolve(todos[idx]);
+  return Promise.resolve(toTodo(todos[idx]));
 }
 
 function deleteTodo(id: number): Promise<number> {
-  const todos = loadTodos().filter((t) => t.id !== id);
-  saveTodos(todos);
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
+  if (idx !== -1) {
+    todos[idx] = { ...todos[idx], deleted_at: now() };
+    saveTodos(todos);
+  }
   return Promise.resolve(id);
 }
 
