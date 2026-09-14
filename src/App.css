@@ -922,7 +922,8 @@ a:hover {
 
 .changelog-modal,
 .category-modal,
-.todo-modal {
+.todo-modal,
+.trash-modal {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -945,6 +946,10 @@ a:hover {
 
 .todo-modal {
   max-width: 560px;
+}
+
+.trash-modal {
+  max-width: 460px;
 }
 
 .todo-modal-body {
@@ -2316,4 +2321,127 @@ a:hover {
   font-size: 12px;
   color: var(--ink-soft);
   text-wrap: pretty;
+}
+
+/* Rueckgaengig-Leiste */
+.undo-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 11px 13px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  box-shadow: var(--shadow-sm);
+}
+
+.undo-bar span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo-bar-action {
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 5px 11px;
+  cursor: pointer;
+}
+
+.undo-bar-action:hover {
+  background: var(--highlight);
+}
+
+/* Papierkorb-Fenster
+   Das Panel selbst traegt kein Padding (.changelog-header braucht die volle
+   Breite fuer seine dunkle Flaeche), darum bekommt jeder Inhaltsblock seinen
+   eigenen Rand -- derselbe Kniff wie bei .add-category-form/.category-list. */
+.trash-modal .error,
+.trash-modal .muted {
+  margin: 18px;
+}
+
+.trash-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+/* Ohne Eintraege bliebe sonst ein leerer, gepolsterter Rahmen unter dem
+   ".muted"-Hinweis stehen. */
+.trash-list:empty {
+  display: none;
+}
+
+.trash-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.trash-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.trash-empty {
+  margin: 0 18px 18px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--accent-ink);
+  padding: 7px 13px;
+  cursor: pointer;
+}
+
+.trash-empty:hover {
+  background: var(--surface-muted);
+}
+
+.trash-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 18px 18px;
+  padding: 11px 13px;
+  border: var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--canvas-sunken);
+}
+
+.trash-confirm p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.trash-confirm button {
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 5px 11px;
+  cursor: pointer;
 }
