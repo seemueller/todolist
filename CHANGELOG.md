@@ -2,6 +2,11 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unveröffentlicht]
+
+### Behoben
+- Eine gerade angelegte oder umbenannte Kategorie steht jetzt an derselben Stelle der Liste wie nach einem Neustart. Vorher sortierte die Oberfläche anders als der Speicher, was im Desktop-Build (WebKitGTK) eine sichtbar andere Reihenfolge ergab.
+
 ## [0.9.0] - 2026-09-14
 
 ### Hinzugefügt

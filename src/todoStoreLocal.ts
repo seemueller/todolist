@@ -2,7 +2,7 @@
 // storeTypes.ts; the contracts documented there apply here, this file only
 // holds implementation detail.
 
-import { Priority, Todo, TodoStatus, Category, compareCategoryNames, categoryNameKey, canonicalCategoryName } from "./types";
+import { Priority, Todo, TodoStatus, Category, sortCategories, categoryNameKey, canonicalCategoryName } from "./types";
 import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
 // ── localStorage persistence ─────────────────────────────────────────────
@@ -193,9 +193,7 @@ function deleteTodo(id: number): Promise<number> {
 // ── Categories ───────────────────────────────────────────────────────────
 
 function listCategories(): Promise<Category[]> {
-  return Promise.resolve(
-    loadCategories().slice().sort((a, b) => compareCategoryNames(a.name, b.name))
-  );
+  return Promise.resolve(sortCategories(loadCategories()));
 }
 
 // Rejects a create/rename that collides with an existing category name,

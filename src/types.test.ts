@@ -6,6 +6,8 @@ import {
   compareCategoryNames,
   categoryNameKey,
   canonicalCategoryName,
+  sortCategories,
+  Category,
 } from "./types";
 
 /** "Ärzte" zerlegt: A plus kombinierendes Trema (NFD). */
@@ -174,5 +176,36 @@ describe("categoryNameKey", () => {
 describe("canonicalCategoryName", () => {
   it("stores the composed form", () => {
     expect(canonicalCategoryName(` ${NFD_AERZTE} `)).toBe(NFC_AERZTE);
+  });
+});
+
+describe("sortCategories", () => {
+  const cat = (id: number, name: string): Category => ({
+    id,
+    name,
+    color: "#111111",
+    created_at: "2026-01-01T00:00:00Z",
+  });
+
+  it("orders categories the way compareCategoryNames orders their names", () => {
+    const unsorted = [cat(1, "Sport"), cat(2, "Ärzte"), cat(3, "xxx"), cat(4, "ärzte"), cat(5, "foo#")];
+
+    expect(sortCategories(unsorted).map((c) => c.name)).toEqual([
+      "ärzte",
+      "Ärzte",
+      "foo#",
+      "Sport",
+      "xxx",
+    ]);
+  });
+
+  it("leaves the given array untouched", () => {
+    // Die Aufrufer reichen React-State herein; ein in-place-sort wuerde den
+    // alten State veraendern und das Neuzeichnen verschlucken.
+    const original = [cat(1, "Sport"), cat(2, "Ärzte")];
+
+    sortCategories(original);
+
+    expect(original.map((c) => c.name)).toEqual(["Sport", "Ärzte"]);
   });
 });

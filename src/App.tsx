@@ -28,7 +28,7 @@ import {
 import { DATA_CHANGED_EVENT } from "./events";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, Priority, Todo, TodoStatus } from "./types";
+import { CATEGORY_COLORS, Category, Priority, sortCategories, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
@@ -472,7 +472,7 @@ function App({ migrationError = null }: AppProps) {
     if (!name) return;
     try {
       const cat = await addCategory(name, newCategoryColor);
-      setCategories((prev) => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name)));
+      setCategories((prev) => sortCategories([...prev, cat]));
       setNewCategoryName("");
       setNewCategoryColor(CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length]);
       setError(null);
@@ -493,7 +493,7 @@ function App({ migrationError = null }: AppProps) {
     try {
       const updated = await updateCategory(id, name, editingCategoryColor);
       setCategories((prev) =>
-        prev.map((c) => (c.id === updated.id ? updated : c)).sort((a, b) => a.name.localeCompare(b.name))
+        sortCategories(prev.map((c) => (c.id === updated.id ? updated : c)))
       );
       setError(null);
     } catch (err) {

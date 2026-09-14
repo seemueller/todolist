@@ -11,7 +11,7 @@ import {
   TodoStatus,
   fromRow,
   fromCategoryRow,
-  compareCategoryNames,
+  sortCategories,
   categoryNameKey,
   canonicalCategoryName,
 } from "./types";
@@ -135,9 +135,10 @@ async function listCategories(): Promise<Category[]> {
     "SELECT id, name, color, created_at FROM categories"
   );
   // Sorted here, not in SQL: SQLite's NOCASE collation only case-folds ASCII,
-  // so "Ärzte" would land after "Zebra". compareCategoryNames matches what the
-  // localStorage store does, and there are only ever a handful of categories.
-  return rows.map(fromCategoryRow).sort((a, b) => compareCategoryNames(a.name, b.name));
+  // so "Ärzte" would land after "Zebra". sortCategories is the one order the
+  // localStorage store and the App use too, and there are only ever a handful
+  // of categories.
+  return sortCategories(rows.map(fromCategoryRow));
 }
 
 async function selectCategory(id: number): Promise<Category> {
