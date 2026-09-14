@@ -31,4 +31,9 @@ describe("sql migrations", () => {
   it("gives todos a description column", () => {
     expect(source).toContain("ALTER TABLE todos ADD COLUMN description TEXT NOT NULL DEFAULT ''");
   });
+
+  it("adds the deleted_at column the trash needs", () => {
+    expect(source).toContain("add_deleted_at_to_todos");
+    expect(source).toContain("ALTER TABLE todos ADD COLUMN deleted_at TEXT DEFAULT NULL;");
+  });
 });
