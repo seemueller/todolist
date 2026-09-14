@@ -419,4 +419,28 @@ describe("sqlTodoStore", () => {
       await expect(sqlTodoStore.restoreTodo(999)).rejects.toThrow("Todo 999 not found");
     });
   });
+
+  describe("purgeTodo und purgeDeletedBefore im SQLite-Store", () => {
+    it("entfernt die Zeile wirklich", async () => {
+      execute.mockResolvedValue({ rowsAffected: 1 });
+
+      await sqlTodoStore.purgeTodo(7);
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("DELETE FROM todos");
+      expect(params).toEqual([7]);
+    });
+
+    it("räumt nur den Papierkorb vor dem Stichtag", async () => {
+      execute.mockResolvedValue({ rowsAffected: 3 });
+
+      const removed = await sqlTodoStore.purgeDeletedBefore("2026-02-01T00:00:00Z");
+
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toContain("deleted_at IS NOT NULL");
+      expect(sql).toContain("deleted_at < $1");
+      expect(params).toEqual(["2026-02-01T00:00:00Z"]);
+      expect(removed).toBe(3);
+    });
+  });
 });

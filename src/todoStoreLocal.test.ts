@@ -349,4 +349,42 @@ describe("localTodoStore", () => {
       );
     });
   });
+
+  describe("purgeTodo und purgeDeletedBefore im localStorage-Store", () => {
+    it("entfernt eine Aufgabe unwiederbringlich", async () => {
+      const todo = await localTodoStore.addTodo("Endgültig", "medium", null);
+      await localTodoStore.deleteTodo(todo.id);
+
+      await localTodoStore.purgeTodo(todo.id);
+
+      expect(await localTodoStore.listDeletedTodos()).toEqual([]);
+      expect(JSON.parse(localStorage.getItem("todolist_todos") ?? "[]")).toEqual([]);
+    });
+
+    it("entfernt nur, was vor dem Stichtag gelöscht wurde", async () => {
+      // Zwei Aufgaben von Hand in den Speicher legen, damit die Zeitstempel fest
+      // stehen: der Store bekommt den Stichtag herein, er kennt keine Uhr.
+      localStorage.setItem(
+        "todolist_todos",
+        JSON.stringify([
+          { id: 1, title: "Alt", description: "", done: false, status: "todo", priority: "medium", created_at: "2026-01-01T00:00:00Z", due_date: null, category_id: null, category_name: null, category_color: null, deleted_at: "2026-01-02T00:00:00Z" },
+          { id: 2, title: "Neu", description: "", done: false, status: "todo", priority: "medium", created_at: "2026-01-01T00:00:00Z", due_date: null, category_id: null, category_name: null, category_color: null, deleted_at: "2026-03-01T00:00:00Z" },
+        ])
+      );
+
+      const removed = await localTodoStore.purgeDeletedBefore("2026-02-01T00:00:00Z");
+
+      expect(removed).toBe(1);
+      expect((await localTodoStore.listDeletedTodos()).map((t) => t.title)).toEqual(["Neu"]);
+    });
+
+    it("lässt eine nicht gelöschte Aufgabe vom Stichtag unberührt", async () => {
+      const todo = await localTodoStore.addTodo("Lebt", "medium", null);
+
+      const removed = await localTodoStore.purgeDeletedBefore("2099-01-01T00:00:00Z");
+
+      expect(removed).toBe(0);
+      expect(await localTodoStore.listTodos()).toEqual([todo]);
+    });
+  });
 });

@@ -58,6 +58,14 @@ export function restoreTodo(id: number): Promise<Todo> {
   return store().restoreTodo(id);
 }
 
+export function purgeTodo(id: number): Promise<number> {
+  return store().purgeTodo(id);
+}
+
+export function purgeDeletedBefore(cutoff: string): Promise<number> {
+  return store().purgeDeletedBefore(cutoff);
+}
+
 export function listCategories(): Promise<Category[]> {
   return store().listCategories();
 }

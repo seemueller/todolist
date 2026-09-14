@@ -20,7 +20,19 @@ function toTodo(stored: StoredTodoRecord): Todo {
   return todo;
 }
 
-function isInTrash(stored: StoredTodoRecord): boolean {
+// Als Typ-Praedikat formuliert (statt schlicht boolean): so narrowt TypeScript
+// `deleted_at` an jeder Aufrufstelle automatisch auf `string`, auch in einer
+// `isInTrash(t) && ...`-Verkettung -- kein Cast noetig, etwa in
+// `purgeDeletedBefore`.
+//
+// Ein fehlendes `deleted_at` und ein gesetztes `deleted_at: null` bedeuten
+// beide "nicht im Papierkorb" und werden hier absichtlich nicht
+// unterschieden -- nach einem Loeschen-dann-Wiederherstellen traegt der
+// Datensatz `null` als echten Schluessel, eine nie geloeschte Aufgabe hat ihn
+// gar nicht. Eine spaetere "Aufraeum"-Aenderung sollte das `null` deshalb
+// nicht entfernen, ohne Serialisierung und Iteration (`"deleted_at" in ...`,
+// `JSON.stringify`) an allen Aufrufstellen zu pruefen.
+function isInTrash(stored: StoredTodoRecord): stored is StoredTodoRecord & { deleted_at: string } {
   return typeof stored.deleted_at === "string";
 }
 
@@ -247,6 +259,18 @@ function restoreTodo(id: number): Promise<Todo> {
   return Promise.resolve(toTodo(todos[idx]));
 }
 
+function purgeTodo(id: number): Promise<number> {
+  saveTodos(loadTodos().filter((t) => t.id !== id));
+  return Promise.resolve(id);
+}
+
+function purgeDeletedBefore(cutoff: string): Promise<number> {
+  const todos = loadTodos();
+  const kept = todos.filter((t) => !(isInTrash(t) && t.deleted_at < cutoff));
+  saveTodos(kept);
+  return Promise.resolve(todos.length - kept.length);
+}
+
 // ── Categories ───────────────────────────────────────────────────────────
 
 function listCategories(): Promise<Category[]> {
@@ -331,6 +355,8 @@ export const localTodoStore: TodoStore = {
   deleteTodo,
   listDeletedTodos,
   restoreTodo,
+  purgeTodo,
+  purgeDeletedBefore,
   listCategories,
   addCategory,
   updateCategory,

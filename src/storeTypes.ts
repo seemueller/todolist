@@ -74,6 +74,14 @@ export interface TodoStore {
   listDeletedTodos(): Promise<Todo[]>;
   /** Holt eine Aufgabe aus dem Papierkorb zurueck; lehnt mit `Todo <id> not found` ab, wenn `id` nicht im Papierkorb liegt — als Promise-Rejection, nie als synchroner throw. */
   restoreTodo(id: number): Promise<Todo>;
+  /** Entfernt eine Aufgabe unwiederbringlich; gibt die Id zurueck. */
+  purgeTodo(id: number): Promise<number>;
+  /**
+   * Entfernt unwiederbringlich alles, was vor `cutoff` (ISO-Zeitstempel) in den
+   * Papierkorb gelegt wurde, und gibt die Anzahl zurueck. Der Stichtag kommt
+   * vom Aufrufer -- der Store kennt keine Uhr, damit seine Tests keine brauchen.
+   */
+  purgeDeletedBefore(cutoff: string): Promise<number>;
   /**
    * Alle Kategorien, sortiert mit `compareCategoryNames` aus `types.ts` (nicht
    * nach einer DB-Kollation) — das ist der Vertrag, jedes Backend muss

@@ -172,6 +172,21 @@ async function restoreTodo(id: number): Promise<Todo> {
   return selectTodo(id);
 }
 
+async function purgeTodo(id: number): Promise<number> {
+  const db = await getDb();
+  await db.execute("DELETE FROM todos WHERE id = $1", [id]);
+  return id;
+}
+
+async function purgeDeletedBefore(cutoff: string): Promise<number> {
+  const db = await getDb();
+  const result = await db.execute(
+    "DELETE FROM todos WHERE deleted_at IS NOT NULL AND deleted_at < $1",
+    [cutoff]
+  );
+  return result.rowsAffected;
+}
+
 async function listCategories(): Promise<Category[]> {
   const db = await getDb();
   const rows = await db.select<CategoryRow[]>(
@@ -251,6 +266,8 @@ export const sqlTodoStore: TodoStore = {
   deleteTodo,
   listDeletedTodos,
   restoreTodo,
+  purgeTodo,
+  purgeDeletedBefore,
   listCategories,
   addCategory,
   updateCategory,
