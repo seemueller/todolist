@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.0";
+export const APP_VERSION = "0.10.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.10.0",
+    date: "2026-09-14",
+    changes: [
+      "Gelöschte Aufgaben landen im Papierkorb statt verloren zu gehen: Direkt nach dem Löschen steht „Rückgängig“ bereit",
+      "Ein Papierkorb-Fenster — der Knopf steht neben „Kategorien“ — sammelt alles Gelöschte: einzeln wiederherstellen oder endgültig entfernen",
+      "Nach 30 Tagen räumt die App den Papierkorb beim Start selbst auf",
+      "Was ein KI-Assistent über MCP löscht, liegt ebenfalls im Papierkorb und lässt sich dort zurückholen",
+      "Eine gerade angelegte oder umbenannte Kategorie steht jetzt an derselben Stelle der Liste wie nach einem Neustart",
+    ],
+  },
   {
     version: "0.9.0",
     date: "2026-09-14",

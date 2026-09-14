@@ -2,7 +2,7 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [Unveröffentlicht]
+## [0.10.0] - 2026-09-14
 
 ### Hinzugefügt
 - Gelöschte Aufgaben landen im Papierkorb statt verloren zu gehen. Direkt nach dem Löschen bietet die App „Rückgängig" an; darüber hinaus sammelt ein Papierkorb-Fenster (Knopf im Kopf) alles Gelöschte, aus dem einzeln wiederhergestellt oder endgültig gelöscht werden kann. Nach 30 Tagen räumt die App den Papierkorb beim Start selbst auf.
