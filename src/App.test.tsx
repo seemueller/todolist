@@ -566,6 +566,12 @@ describe("App", () => {
 });
 
 describe("die Rückgängig-Leiste", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    insideTauri = true;
+  });
+
   it("bietet nach dem Löschen an, die Aufgabe zurückzuholen", async () => {
     const todo = makeTodo({ id: 1, title: "Versehentlich" });
     vi.mocked(db.listTodos).mockResolvedValue([todo]);
@@ -604,5 +610,56 @@ describe("die Rückgängig-Leiste", () => {
     await waitFor(() => expect(screen.getByText(/Zweite.*gelöscht/i)).toBeInTheDocument());
     expect(screen.queryByText(/Erste.*gelöscht/i)).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Rückgängig" })).toHaveLength(1);
+  });
+
+  it("behaelt die Leiste, wenn das Zurueckholen fehlschlaegt", async () => {
+    const todo = makeTodo({ id: 1, title: "Versehentlich" });
+    vi.mocked(db.listTodos).mockResolvedValue([todo]);
+    vi.mocked(db.deleteTodo).mockResolvedValue(1);
+    vi.mocked(db.restoreTodo).mockRejectedValue(new Error("boom"));
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Versehentlich")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Löschen"));
+    await waitFor(() => expect(screen.getByText(/Versehentlich.*gelöscht/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Rückgängig" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Wiederherstellen fehlgeschlagen/i)).toBeInTheDocument()
+    );
+    expect(screen.getByRole("button", { name: "Rückgängig" })).toBeInTheDocument();
+  });
+
+  it("schliesst die Leiste ueber den Schliessen-Knopf, ohne wiederherzustellen", async () => {
+    const todo = makeTodo({ id: 1, title: "Versehentlich" });
+    vi.mocked(db.listTodos).mockResolvedValue([todo]);
+    vi.mocked(db.deleteTodo).mockResolvedValue(1);
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Versehentlich")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Löschen"));
+    await waitFor(() => expect(screen.getByText(/Versehentlich.*gelöscht/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Hinweis schließen"));
+
+    expect(screen.queryByRole("button", { name: "Rückgängig" })).not.toBeInTheDocument();
+    expect(db.restoreTodo).not.toHaveBeenCalled();
+  });
+
+  it("zeigt keine Leiste, wenn das Loeschen fehlschlaegt", async () => {
+    const todo = makeTodo({ id: 1, title: "Versehentlich" });
+    vi.mocked(db.listTodos).mockResolvedValue([todo]);
+    vi.mocked(db.deleteTodo).mockRejectedValue(new Error("boom"));
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Versehentlich")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Löschen"));
+
+    await waitFor(() => expect(screen.getByText(/Fehler/i)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Rückgängig" })).not.toBeInTheDocument();
   });
 });

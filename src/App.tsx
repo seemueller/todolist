@@ -376,7 +376,7 @@ function App({ migrationError = null }: AppProps) {
       setJustDeleted(null);
       setError(null);
     } catch (err) {
-      setError(String(err));
+      setError(`Wiederherstellen fehlgeschlagen: ${String(err)}`);
     }
   }
 
