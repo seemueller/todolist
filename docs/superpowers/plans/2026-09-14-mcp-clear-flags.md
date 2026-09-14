@@ -29,7 +29,7 @@ Alle Befehle laufen aus `src-tauri/`.
 **Files:**
 - Modify: `src-tauri/src/mcp/tools.rs` — Testmodul, direkt nach `update_todo_changes_only_the_given_fields` (endet bei ~Zeile 724)
 
-- [ ] **Step 1: Den fehlschlagenden Test schreiben**
+- [x] **Step 1: Den fehlschlagenden Test schreiben**
 
 Der Test geht bewusst über `serde_json::from_str` statt über ein Struct-Literal: Genau das Stück Weg — `null` auf dem Draht — ist das, was kaputt ist.
 
@@ -69,12 +69,12 @@ Der Test geht bewusst über `serde_json::from_str` statt über ein Struct-Litera
     }
 ```
 
-- [ ] **Step 2: Den Test laufen lassen und den Fehlschlag sehen**
+- [x] **Step 2: Den Test laufen lassen und den Fehlschlag sehen**
 
 Run: `cargo test --lib update_todo_keeps_everything_that_arrives_as_null`
 Expected: FAIL — `assertion \`left == right\` failed: null must not clear`, links `Null`, rechts `"2026-09-03"`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src-tauri/src/mcp/tools.rs

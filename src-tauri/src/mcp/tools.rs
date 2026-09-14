@@ -727,6 +727,40 @@ mod tests {
         assert_eq!(json["done"], true);
     }
 
+    /// Issue #35: Ein Modell, das sein Parameterobjekt vollstaendig ausfuellt,
+    /// schickt `null` fuer alles mit, was es nicht anfassen wollte. Das darf
+    /// nichts loeschen.
+    #[tokio::test]
+    async fn update_todo_keeps_everything_that_arrives_as_null() {
+        let (server, pool) = server().await;
+        let category_id = category(&pool, "iteratec").await;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at, description, due_date, category_id)
+             VALUES ('Angebot', '2026-01-02T00:00:00.000Z', 'Notiz', '2026-09-03', ?)
+             RETURNING id",
+        )
+        .bind(category_id)
+        .fetch_one(&pool)
+        .await
+        .expect("insert todo");
+
+        let params: super::UpdateTodo = serde_json::from_str(&format!(
+            r#"{{"id":{id},"status":"done","description":null,"due_date":null,"category":null}}"#
+        ))
+        .expect("params parse");
+
+        let result = server
+            .update_todo(Parameters(params))
+            .await
+            .expect("no protocol error");
+        let json = ok_json(&result);
+        assert_eq!(json["status"], "done");
+        assert_eq!(json["done"], true);
+        assert_eq!(json["due_date"], "2026-09-03", "null must not clear");
+        assert_eq!(json["category_name"], "iteratec", "null must not clear");
+        assert_eq!(json["description"], "Notiz", "null must not clear");
+    }
+
     #[tokio::test]
     async fn update_todo_clears_a_due_date_when_given_null() {
         let (server, pool) = server().await;
