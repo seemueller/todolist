@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import App from "./App";
 import * as db from "./db";
 import { debugLogs, clearDebugLogs, installDebugInterceptor } from "./debug";
@@ -822,6 +822,32 @@ describe("der Kategorie-Filter im Brett", () => {
 
     expect(screen.getByText("Privat-Aufgabe")).toBeInTheDocument();
     expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
+  });
+
+  // Bleibt die Id der geloeschten Kategorie in der Auswahl stehen, ist der Chip
+  // weg, "Alle" aber weiter inaktiv -- und das Brett zeigt keine Karte mehr.
+  it("nimmt eine geloeschte Kategorie aus der Auswahl", async () => {
+    vi.mocked(db.deleteCategory).mockResolvedValue(1);
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    expect(screen.queryByText("Privat-Aufgabe")).not.toBeInTheDocument();
+
+    // Das Kategorien-Fenster haengt an der Filterleiste der Liste, also zurueck.
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Liste wechseln/i }));
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+    const item = (await screen.findByLabelText("Zeitart Arbeit")).closest(
+      ".category-item",
+    ) as HTMLElement;
+    fireEvent.click(within(item).getByLabelText("Löschen"));
+    await waitFor(() => expect(db.deleteCategory).toHaveBeenCalledWith(1));
+
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+
+    expect(await screen.findByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Alle Kategorien" })).toHaveClass("active");
   });
 });
 
