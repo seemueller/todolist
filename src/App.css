@@ -1630,6 +1630,19 @@ a:hover {
   font-size: 13px;
 }
 
+/* Pausen und Privates stehen neben der Wochensumme, zaehlen aber nicht mit. */
+.time-non-work {
+  padding: 6px 12px;
+  border: var(--border-thin);
+  border-color: var(--ink-ghost);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Einstellungen liegen im Popup, damit die Kopfzeile ruhig bleibt. */
 .time-settings {
   display: flex;
