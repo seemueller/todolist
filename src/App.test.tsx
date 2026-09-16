@@ -853,6 +853,24 @@ describe("App", () => {
     });
   });
 
+  it("shows the insertion line over an empty lane too", async () => {
+    const container = await renderBoard([makeTodo({ id: 1, title: "Erste", board_order: 0 })]);
+
+    const [card] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    const lanes = container.querySelectorAll<HTMLElement>(".kanban-lane");
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", card, dataTransfer);
+    // "In Bearbeitung" ist leer -- dort gibt es keine Karte, ueber der die
+    // Linie haengen koennte, also muss die Spalte selbst sie zeigen.
+    fireDrag("dragover", lanes[1], dataTransfer);
+
+    await waitFor(() => {
+      expect(lanes[1].querySelectorAll(".kanban-drop-indicator").length).toBe(1);
+    });
+    expect(lanes[0].querySelector(".kanban-drop-indicator")).toBeNull();
+  });
+
   it("writes nothing when a card is dropped on its own place", async () => {
     const container = await renderBoard([
       makeTodo({ id: 1, title: "Erste", board_order: 0 }),

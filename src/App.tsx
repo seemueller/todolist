@@ -638,9 +638,17 @@ function App({ migrationError = null }: AppProps) {
     e.stopPropagation();
   }
 
-  function handleLaneDragOver(e: DragEvent) {
+  /**
+   * Die freie Flaeche der Spalte -- Karten stoppen das Ereignis, hier kommt es
+   * also nur an, wenn der Zeiger neben ihnen steht. Gesetzt wird nur, wenn fuer
+   * diese Spalte noch kein Ziel feststeht: sonst spraenge die Linie ans Ende,
+   * sobald der Zeiger durch die Luecke zwischen zwei Karten faehrt.
+   */
+  function handleLaneDragOver(e: DragEvent, status: TodoStatus, count: number) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
+    setDragOverLane(status);
+    setDropTarget((prev) => (prev && prev.status === status ? prev : { status, index: count }));
   }
 
   function handleLaneDragLeave(e: DragEvent) {
@@ -1089,10 +1097,7 @@ function App({ migrationError = null }: AppProps) {
                 <div
                   key={lane.status}
                   className={`kanban-lane ${dragOverLane === lane.status ? "drag-over" : ""}`}
-                  onDragOver={(e) => {
-                    handleLaneDragOver(e);
-                    setDragOverLane(lane.status);
-                  }}
+                  onDragOver={(e) => handleLaneDragOver(e, lane.status, dropCount)}
                   onDragLeave={handleLaneDragLeave}
                   onDrop={(e) => handleLaneDrop(e, lane.status)}
                 >
