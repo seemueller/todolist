@@ -30,7 +30,7 @@ import { DATA_CHANGED_EVENT } from "./events";
 import { loadStatusFilter, saveStatusFilter, type StatusFilter } from "./listPrefs";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, Priority, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus } from "./types";
+import { CATEGORY_COLORS, Category, Priority, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
@@ -933,20 +933,9 @@ function App({ migrationError = null }: AppProps) {
 
           <div className="kanban-wrapper">
             {kanbanLanes.map((lane) => {
-              const laneTodos = boardTodos
-                .filter((t) => t.status === lane.status)
-                .sort((a, b) => {
-                  // Earliest due date on top, tickets without a date at the bottom.
-                  if (a.due_date !== b.due_date) {
-                    if (!a.due_date) return 1;
-                    if (!b.due_date) return -1;
-                    return a.due_date.localeCompare(b.due_date);
-                  }
-                  const priorityOrder = { high: 0, medium: 1, low: 2 };
-                  const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-                  if (pDiff !== 0) return pDiff;
-                  return b.created_at.localeCompare(a.created_at);
-                });
+              const laneTodos = sortBoardTodos(
+                boardTodos.filter((t) => t.status === lane.status)
+              );
 
               return (
                 <div
