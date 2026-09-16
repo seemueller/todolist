@@ -595,8 +595,14 @@ function App({ migrationError = null }: AppProps) {
     e.dataTransfer.dropEffect = "move";
     const rect = e.currentTarget.getBoundingClientRect();
     const after = e.clientY > rect.top + rect.height / 2;
+    const next = after ? index + 1 : index;
     setDragOverLane(status);
-    setDropTarget({ status, index: after ? index + 1 : index });
+    // dragover feuert waehrend des Ziehens laufend. Ein neues Objekt bei
+    // jedem Ereignis wuerde die ganze Ansicht neu zeichnen, obwohl sich das
+    // Ziel gar nicht bewegt hat.
+    setDropTarget((prev) =>
+      prev && prev.status === status && prev.index === next ? prev : { status, index: next }
+    );
   }
 
   function handleCardDrop(e: DragEvent, status: TodoStatus, index: number) {
