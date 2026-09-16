@@ -98,6 +98,7 @@ describe("App", () => {
     vi.clearAllMocks();
     handlers.clear();
     insideTauri = true;
+    localStorage.clear();
   });
 
   it("shows empty state when no todos exist", async () => {
@@ -140,8 +141,12 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Buy milk")).toBeInTheDocument();
-      expect(screen.getByText("Walk dog")).toBeInTheDocument();
     });
+    // Die Liste startet auf "Offen"; die erledigte Aufgabe erscheint erst
+    // ueber die Statusleiste.
+    expect(screen.queryByText("Walk dog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Status Alle" }));
+    expect(screen.getByText("Walk dog")).toBeInTheDocument();
   });
 
   it("adds a new todo on form submit", async () => {
@@ -584,6 +589,7 @@ describe("die Rückgängig-Leiste", () => {
     vi.clearAllMocks();
     handlers.clear();
     insideTauri = true;
+    localStorage.clear();
   });
 
   it("bietet nach dem Löschen an, die Aufgabe zurückzuholen", async () => {
@@ -678,6 +684,63 @@ describe("die Rückgängig-Leiste", () => {
   });
 });
 
+describe("die Voreinstellung der Liste", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    insideTauri = true;
+    localStorage.clear();
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 1, title: "Offene Aufgabe", done: false }),
+      makeTodo({ id: 2, title: "Erledigte Aufgabe", done: true }),
+    ]);
+  });
+
+  it("startet die Liste auf 'Offen'", async () => {
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: "Status Offen" })).toHaveClass("active");
+    expect(screen.getByText("Offene Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByText("Erledigte Aufgabe")).not.toBeInTheDocument();
+  });
+
+  it("merkt sich die Wahl", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Offene Aufgabe")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Status Alle" }));
+
+    expect(localStorage.getItem("todolist.statusFilter")).toBe("all");
+  });
+
+  it("nimmt die gemerkte Wahl beim naechsten Start wieder auf", async () => {
+    localStorage.setItem("todolist.statusFilter", "done");
+
+    render(<App />);
+
+    expect(await screen.findByText("Erledigte Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByText("Offene Aufgabe")).not.toBeInTheDocument();
+  });
+
+  it("setzt 'Zuruecksetzen' auf 'Offen', nicht auf 'Alle'", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Offene Aufgabe")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Status Alle" }));
+    fireEvent.click(screen.getByText("Zurücksetzen"));
+
+    expect(screen.getByRole("button", { name: "Status Offen" })).toHaveClass("active");
+    expect(localStorage.getItem("todolist.statusFilter")).toBe("open");
+  });
+
+  it("weist 'Offen' nicht als aktiven Filter aus", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Offene Aufgabe")).toBeInTheDocument());
+
+    expect(screen.queryByText("Zurücksetzen")).not.toBeInTheDocument();
+  });
+});
+
 describe("der Kategorie-Filter im Brett", () => {
   const arbeit = makeCategory({ id: 1, name: "Arbeit" });
   const privat = makeCategory({ id: 2, name: "Privat", color: "#6fcf7f" });
@@ -686,6 +749,7 @@ describe("der Kategorie-Filter im Brett", () => {
     vi.clearAllMocks();
     handlers.clear();
     insideTauri = true;
+    localStorage.clear();
     vi.mocked(db.listCategories).mockResolvedValue([arbeit, privat]);
     vi.mocked(db.listTodos).mockResolvedValue([
       makeTodo({ id: 1, title: "Arbeit-Aufgabe", category_id: 1, category_name: "Arbeit" }),
@@ -766,6 +830,7 @@ describe("die Zeitart im Kategorien-Fenster", () => {
     vi.clearAllMocks();
     handlers.clear();
     insideTauri = true;
+    localStorage.clear();
   });
 
   it("legt eine Kategorie mit gewaehlter Zeitart an", async () => {
@@ -851,6 +916,7 @@ describe("der Papierkorb-Knopf", () => {
     vi.clearAllMocks();
     handlers.clear();
     insideTauri = true;
+    localStorage.clear();
   });
 
   it("öffnet das Papierkorb-Fenster", async () => {
