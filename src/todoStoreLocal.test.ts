@@ -458,4 +458,59 @@ describe("localTodoStore", () => {
       expect(await localTodoStore.listTodos()).toEqual([todo]);
     });
   });
+
+  it("starts a new todo at position zero", async () => {
+    const created = await localTodoStore.addTodo("Schreiben", "high", null, null);
+    expect(created.board_order).toBe(0);
+  });
+
+  it("defaults the position of entries written before the column", async () => {
+    localStorage.setItem(
+      "todolist_todos",
+      JSON.stringify([
+        {
+          id: 1,
+          title: "Alt",
+          done: false,
+          status: "todo",
+          priority: "medium",
+          created_at: "2026-01-01T00:00:00.000Z",
+          due_date: null,
+          category_id: null,
+          category_name: null,
+          category_color: null,
+        },
+      ])
+    );
+
+    const [todo] = await localTodoStore.listTodos();
+    expect(todo.board_order).toBe(0);
+  });
+
+  it("moves a card inside its lane without touching the status", async () => {
+    const created = await localTodoStore.addTodo("Schreiben", "high", null, null);
+    const moved = await localTodoStore.updateTodoBoardOrder(created.id, -1.5);
+
+    expect(moved.board_order).toBe(-1.5);
+    expect(moved.status).toBe("todo");
+
+    const [reloaded] = await localTodoStore.listTodos();
+    expect(reloaded.board_order).toBe(-1.5);
+  });
+
+  it("sets status, done and position together", async () => {
+    const created = await localTodoStore.addTodo("Schreiben", "high", null, null);
+    const moved = await localTodoStore.updateTodoStatusAndOrder(created.id, "done", 2);
+
+    expect(moved.status).toBe("done");
+    expect(moved.done).toBe(true);
+    expect(moved.board_order).toBe(2);
+  });
+
+  it("rejects an unknown id on both new writes", async () => {
+    await expect(localTodoStore.updateTodoBoardOrder(99, 1)).rejects.toThrow("Todo 99 not found");
+    await expect(localTodoStore.updateTodoStatusAndOrder(99, "todo", 1)).rejects.toThrow(
+      "Todo 99 not found"
+    );
+  });
 });
