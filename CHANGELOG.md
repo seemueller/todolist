@@ -2,7 +2,7 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [Unreleased]
+## [0.11.0] - 2026-09-16
 
 ### Hinzugefügt
 - Das Brett hat eine Chipleiste über den Spalten: ein Klick auf eine Kategorie zeigt nur deren Karten, mehrere lassen sich zusammenschalten, „Ohne Kategorie" sammelt die Aufgaben ohne Zuordnung, „Alle" hebt die Auswahl wieder auf. Die Auswahl ist unabhängig vom Filter der Liste.
