@@ -496,4 +496,62 @@ describe("TimeTrackingView", () => {
       expect(listenMock).not.toHaveBeenCalled();
     });
   });
+
+  describe("Arbeitszeit und Nicht-Arbeitszeit", () => {
+    // "Daily" ist hier keine Arbeitszeit; die vier Viertelstunden darauf duerfen
+    // weder gegen das Soll noch in die Tagessumme zaehlen.
+    const mixedCategories: Category[] = [
+      categories[0],
+      { ...categories[1], time_kind: "none" },
+    ];
+
+    /** Vier Viertelstunden Alpha und vier Viertelstunden Daily am Montag. */
+    function seedMixedMonday() {
+      store.set(MO, [
+        { slot: 36, category_id: 7, note: "" },
+        { slot: 37, category_id: 7, note: "" },
+        { slot: 38, category_id: 7, note: "" },
+        { slot: 39, category_id: 7, note: "" },
+        { slot: 44, category_id: 9, note: "" },
+        { slot: 45, category_id: 9, note: "" },
+        { slot: 46, category_id: 9, note: "" },
+        { slot: 47, category_id: 9, note: "" },
+      ]);
+    }
+
+    it("zaehlt 'keine Arbeitszeit' nicht gegen das Soll", async () => {
+      seedMixedMonday();
+      renderView({ categories: mixedCategories });
+
+      expect(await screen.findByText("= 1:00")).toBeInTheDocument();
+      expect(screen.getByText(/1:00 keine Arbeitszeit/)).toBeInTheDocument();
+      expect(weekTotal()).toBe("1:00");
+      expect(target().difference).toBe("-39:00");
+    });
+
+    it("laesst die Tagessumme nur die Arbeitszeit zeigen", async () => {
+      seedMixedMonday();
+      renderView({ categories: mixedCategories });
+
+      await screen.findByText("= 1:00");
+      expect(daySums()).toEqual(["1:00", "0:00", "0:00", "0:00", "0:00"]);
+    });
+
+    it("weist ohne Nicht-Arbeitszeit keinen Zusatz aus", async () => {
+      seedMixedMonday();
+      renderView();
+
+      expect(await screen.findByText("= 2:00")).toBeInTheDocument();
+      expect(screen.queryByText(/keine Arbeitszeit/)).not.toBeInTheDocument();
+      expect(document.querySelector(".time-non-work")).toBeNull();
+    });
+
+    it("zaehlt eine geloeschte Kategorie als Arbeitszeit", async () => {
+      store.set(MO, [{ slot: 36, category_id: 99, note: "" }]);
+      renderView({ categories: mixedCategories });
+
+      expect(await screen.findByText("= 0:15")).toBeInTheDocument();
+      expect(document.querySelector(".time-non-work")).toBeNull();
+    });
+  });
 });
