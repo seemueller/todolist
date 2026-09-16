@@ -7,6 +7,9 @@ import {
   Todo,
   TodoStatus,
   Category,
+  CategoryRow,
+  TimeKind,
+  fromCategoryRow,
   sortCategories,
   sortTodos,
   categoryNameKey,
@@ -101,7 +104,10 @@ function loadCategories(): Category[] {
   try {
     const raw = localStorage.getItem(CATEGORIES_KEY);
     if (!raw) return [];
-    return JSON.parse(raw);
+    // Jede Zeile durch fromCategoryRow: Eintraege aus der Zeit vor der Zeitart
+    // liegen ohne time_kind im Speicher und bekommen so den Vorgabewert
+    // "internal" -- dieselbe Rolle, die in SQLite der Spaltenvorgabewert hat.
+    return (JSON.parse(raw) as CategoryRow[]).map(fromCategoryRow);
   } catch {
     return [];
   }
@@ -297,7 +303,11 @@ function assertNameAvailable(categories: Category[], name: string, excludeId?: n
   }
 }
 
-async function addCategory(name: string, color: string): Promise<Category> {
+async function addCategory(
+  name: string,
+  color: string,
+  timeKind: TimeKind = "internal"
+): Promise<Category> {
   const categories = loadCategories();
   assertNameAvailable(categories, name);
   const cat: Category = {
@@ -305,6 +315,7 @@ async function addCategory(name: string, color: string): Promise<Category> {
     name: canonicalCategoryName(name),
     color,
     created_at: now(),
+    time_kind: timeKind,
   };
   categories.push(cat);
   saveCategories(categories);
@@ -312,12 +323,22 @@ async function addCategory(name: string, color: string): Promise<Category> {
   return Promise.resolve(cat);
 }
 
-async function updateCategory(id: number, name: string, color: string): Promise<Category> {
+async function updateCategory(
+  id: number,
+  name: string,
+  color: string,
+  timeKind: TimeKind = "internal"
+): Promise<Category> {
   const categories = loadCategories();
   const idx = categories.findIndex((c) => c.id === id);
   if (idx === -1) throw new Error(`Category ${id} not found`);
   assertNameAvailable(categories, name, id);
-  categories[idx] = { ...categories[idx], name: canonicalCategoryName(name), color };
+  categories[idx] = {
+    ...categories[idx],
+    name: canonicalCategoryName(name),
+    color,
+    time_kind: timeKind,
+  };
   saveCategories(categories);
 
   // Update todos referencing this category
