@@ -42,6 +42,18 @@ export function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> 
   return store().updateTodoStatus(id, status);
 }
 
+export function updateTodoBoardOrder(id: number, order: number): Promise<Todo> {
+  return store().updateTodoBoardOrder(id, order);
+}
+
+export function updateTodoStatusAndOrder(
+  id: number,
+  status: TodoStatus,
+  order: number
+): Promise<Todo> {
+  return store().updateTodoStatusAndOrder(id, status, order);
+}
+
 export function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
   return store().toggleTodoDone(id, done);
 }
