@@ -785,6 +785,47 @@ describe("App", () => {
     });
   });
 
+  it("draws one insertion line when a card hovers over its own place", async () => {
+    // Die Anzahl, nicht nur die Anwesenheit: der Index der gezogenen Karte
+    // faellt mit dem der Karte darunter zusammen, und das gaebe zwei Linien.
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Erste", board_order: 0 }),
+      makeTodo({ id: 2, title: "Zweite", board_order: 1 }),
+      makeTodo({ id: 3, title: "Dritte", board_order: 2 }),
+    ]);
+
+    const cards = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(cards[1]);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", cards[1], dataTransfer);
+    fireDrag("dragover", cards[1], dataTransfer, 10);
+
+    await waitFor(() => {
+      expect(container.querySelectorAll(".kanban-drop-indicator").length).toBe(1);
+    });
+  });
+
+  it("draws one insertion line when the last card hovers over itself", async () => {
+    // Am Spaltenende trifft der Index der gezogenen Karte ausserdem auf die
+    // Bedingung fuer die Linie hinter der letzten Karte.
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Erste", board_order: 0 }),
+      makeTodo({ id: 2, title: "Zweite", board_order: 1 }),
+    ]);
+
+    const [, second] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(second);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", second, dataTransfer);
+    fireDrag("dragover", second, dataTransfer, 10);
+
+    await waitFor(() => {
+      expect(container.querySelectorAll(".kanban-drop-indicator").length).toBe(1);
+    });
+  });
+
   it("renumbers the lane when two neighbours sit on the same position", async () => {
     // Beide Karten stehen auf 0 -- der Normalfall, solange niemand gezogen
     // hat. Zwischen ihnen ist kein Platz, also wird die Spalte neu verteilt.
