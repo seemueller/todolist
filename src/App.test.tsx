@@ -853,6 +853,49 @@ describe("App", () => {
     });
   });
 
+  it("renumbers the hidden cards of the lane too when a filter is active", async () => {
+    // Beim Umnummerieren duerfen die ausgeblendeten Karten nicht auf ihren
+    // alten Werten stehenbleiben -- sonst tauchen sie zwischen den sichtbaren
+    // auf, sobald der Filter faellt.
+    vi.mocked(db.listCategories).mockResolvedValue([
+      makeCategory({ id: 1, name: "Arbeit" }),
+      makeCategory({ id: 2, name: "Privat", color: "#6fcf7f" }),
+    ]);
+    const lane = [
+      makeTodo({ id: 1, title: "A", board_order: 0, due_date: "2026-01-01", category_id: 1, category_name: "Arbeit" }),
+      makeTodo({ id: 2, title: "B", board_order: 0, due_date: "2026-02-01", category_id: 1, category_name: "Arbeit" }),
+      makeTodo({ id: 3, title: "C", board_order: 0, due_date: "2026-03-01", category_id: 1, category_name: "Arbeit" }),
+      makeTodo({ id: 4, title: "H", board_order: 0, due_date: "2026-04-01", category_id: 2, category_name: "Privat" }),
+    ];
+    const container = await renderBoard(lane);
+    vi.mocked(db.updateTodoBoardOrder).mockImplementation((id, order) =>
+      Promise.resolve({ ...lane.find((t) => t.id === id)!, board_order: order }),
+    );
+
+    const titlesNow = () =>
+      Array.from(container.querySelectorAll<HTMLElement>(".kanban-card-title")).map(
+        (el) => el.textContent,
+      );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Kategorie Arbeit" }));
+    await waitFor(() => expect(titlesNow()).toEqual(["A", "B", "C"]));
+
+    // "C" zwischen "A" und "B" ziehen -- die beiden stossen auf derselben
+    // Position aneinander, also wird umnummeriert.
+    const cards = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(cards[1]);
+    const dataTransfer = makeDataTransfer();
+    fireDrag("dragstart", cards[2], dataTransfer);
+    fireDrag("dragover", cards[1], dataTransfer, 10);
+    fireDrag("drop", cards[1], dataTransfer, 10);
+
+    await waitFor(() => expect(titlesNow()).toEqual(["A", "C", "B"]));
+
+    // Filter aus: "H" muss hinter den dreien stehen, nicht zwischen ihnen.
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    await waitFor(() => expect(titlesNow()).toEqual(["A", "C", "B", "H"]));
+  });
+
   it("keeps a half-written rebalance on screen and reports the failure", async () => {
     // Die Spalte wird Karte fuer Karte umnummeriert; bricht das in der Mitte
     // ab, steht die Haelfte schon in der Datenbank. Die Werte sind so gewaehlt,
