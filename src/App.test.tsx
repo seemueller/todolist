@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import App from "./App";
 import * as db from "./db";
 import { debugLogs, clearDebugLogs, installDebugInterceptor } from "./debug";
+import type { Category } from "./types";
 
 const invokeMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -57,6 +58,10 @@ vi.mock("./db", () => ({
   updateTodoPriority: vi.fn(),
   updateTodoStatus: vi.fn(),
   updateTodoFields: vi.fn(),
+  updateTodoCategory: vi.fn(),
+  addCategory: vi.fn(),
+  updateCategory: vi.fn(),
+  deleteCategory: vi.fn(),
 }));
 
 vi.mock("./version", () => ({
@@ -79,11 +84,21 @@ const makeTodo = (overrides = {}) => ({
   ...overrides,
 });
 
+const makeCategory = (overrides: Partial<Category> = {}): Category => ({
+  id: 1,
+  name: "Arbeit",
+  color: "#7cc3f7",
+  created_at: "2026-01-01T00:00:00Z",
+  time_kind: "internal",
+  ...overrides,
+});
+
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     handlers.clear();
     insideTauri = true;
+    localStorage.clear();
   });
 
   it("shows empty state when no todos exist", async () => {
@@ -126,8 +141,12 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Buy milk")).toBeInTheDocument();
-      expect(screen.getByText("Walk dog")).toBeInTheDocument();
     });
+    // Die Liste startet auf "Offen"; die erledigte Aufgabe erscheint erst
+    // ueber die Statusleiste.
+    expect(screen.queryByText("Walk dog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Status Alle" }));
+    expect(screen.getByText("Walk dog")).toBeInTheDocument();
   });
 
   it("adds a new todo on form submit", async () => {
@@ -570,6 +589,7 @@ describe("die Rückgängig-Leiste", () => {
     vi.clearAllMocks();
     handlers.clear();
     insideTauri = true;
+    localStorage.clear();
   });
 
   it("bietet nach dem Löschen an, die Aufgabe zurückzuholen", async () => {
@@ -664,11 +684,265 @@ describe("die Rückgängig-Leiste", () => {
   });
 });
 
+describe("die Voreinstellung der Liste", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    insideTauri = true;
+    localStorage.clear();
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 1, title: "Offene Aufgabe", done: false }),
+      makeTodo({ id: 2, title: "Erledigte Aufgabe", done: true }),
+    ]);
+  });
+
+  it("startet die Liste auf 'Offen'", async () => {
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: "Status Offen" })).toHaveClass("active");
+    expect(screen.getByText("Offene Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByText("Erledigte Aufgabe")).not.toBeInTheDocument();
+  });
+
+  it("merkt sich die Wahl", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Offene Aufgabe")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Status Alle" }));
+
+    expect(localStorage.getItem("todolist.statusFilter")).toBe("all");
+  });
+
+  it("nimmt die gemerkte Wahl beim naechsten Start wieder auf", async () => {
+    localStorage.setItem("todolist.statusFilter", "done");
+
+    render(<App />);
+
+    expect(await screen.findByText("Erledigte Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByText("Offene Aufgabe")).not.toBeInTheDocument();
+  });
+
+  it("setzt 'Zuruecksetzen' auf 'Offen', nicht auf 'Alle'", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Offene Aufgabe")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Status Alle" }));
+    fireEvent.click(screen.getByText("Zurücksetzen"));
+
+    expect(screen.getByRole("button", { name: "Status Offen" })).toHaveClass("active");
+    expect(localStorage.getItem("todolist.statusFilter")).toBe("open");
+  });
+
+  it("weist 'Offen' nicht als aktiven Filter aus", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Offene Aufgabe")).toBeInTheDocument());
+
+    expect(screen.queryByText("Zurücksetzen")).not.toBeInTheDocument();
+  });
+});
+
+describe("der Kategorie-Filter im Brett", () => {
+  const arbeit = makeCategory({ id: 1, name: "Arbeit" });
+  const privat = makeCategory({ id: 2, name: "Privat", color: "#6fcf7f" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    insideTauri = true;
+    localStorage.clear();
+    vi.mocked(db.listCategories).mockResolvedValue([arbeit, privat]);
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 1, title: "Arbeit-Aufgabe", category_id: 1, category_name: "Arbeit" }),
+      makeTodo({ id: 2, title: "Privat-Aufgabe", category_id: 2, category_name: "Privat" }),
+      makeTodo({ id: 3, title: "Aufgabe ohne Kategorie" }),
+    ]);
+  });
+
+  /** Rendert die App und schaltet auf das Brett um. */
+  async function renderBoard() {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+    await screen.findByRole("button", { name: "Alle Kategorien" });
+  }
+
+  it("zeigt ohne Auswahl alle Aufgaben", async () => {
+    await renderBoard();
+
+    expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
+  });
+
+  it("filtert das Brett auf die gewaehlten Kategorien", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+
+    expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByText("Privat-Aufgabe")).not.toBeInTheDocument();
+    expect(screen.queryByText("Aufgabe ohne Kategorie")).not.toBeInTheDocument();
+  });
+
+  it("sammelt mehrere Kategorien statt sie zu ersetzen", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Privat" }));
+
+    expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByText("Aufgabe ohne Kategorie")).not.toBeInTheDocument();
+  });
+
+  it("nimmt einen zweiten Klick auf denselben Chip wieder zurueck", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+
+    expect(screen.getByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Alle Kategorien" })).toHaveClass("active");
+  });
+
+  it("zeigt mit 'Ohne Kategorie' die Aufgaben ohne Kategorie", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ohne Kategorie" }));
+
+    expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
+    expect(screen.queryByText("Arbeit-Aufgabe")).not.toBeInTheDocument();
+  });
+
+  it("zeigt nach 'Alle' wieder alles", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Alle Kategorien" }));
+
+    expect(screen.getByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
+  });
+
+  // Bleibt die Id der geloeschten Kategorie in der Auswahl stehen, ist der Chip
+  // weg, "Alle" aber weiter inaktiv -- und das Brett zeigt keine Karte mehr.
+  it("nimmt eine geloeschte Kategorie aus der Auswahl", async () => {
+    vi.mocked(db.deleteCategory).mockResolvedValue(1);
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    expect(screen.queryByText("Privat-Aufgabe")).not.toBeInTheDocument();
+
+    // Das Kategorien-Fenster haengt an der Filterleiste der Liste, also zurueck.
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Liste wechseln/i }));
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+    const item = (await screen.findByLabelText("Zeitart Arbeit")).closest(
+      ".category-item",
+    ) as HTMLElement;
+    fireEvent.click(within(item).getByLabelText("Löschen"));
+    await waitFor(() => expect(db.deleteCategory).toHaveBeenCalledWith(1));
+
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+
+    expect(await screen.findByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Alle Kategorien" })).toHaveClass("active");
+  });
+});
+
+describe("die Zeitart im Kategorien-Fenster", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    insideTauri = true;
+    localStorage.clear();
+  });
+
+  it("legt eine Kategorie mit gewaehlter Zeitart an", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    vi.mocked(db.listCategories).mockResolvedValue([]);
+    vi.mocked(db.addCategory).mockResolvedValue(
+      makeCategory({ id: 2, name: "Kunde X", time_kind: "external" }),
+    );
+
+    render(<App />);
+    await waitFor(() => expect(db.listCategories).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+    fireEvent.change(await screen.findByPlaceholderText(/Neue Kategorie/i), {
+      target: { value: "Kunde X" },
+    });
+    fireEvent.click(screen.getByLabelText("Zeitart neue Kategorie: Extern"));
+    fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
+
+    await waitFor(() =>
+      expect(db.addCategory).toHaveBeenCalledWith("Kunde X", expect.any(String), "external"),
+    );
+  });
+
+  it("faellt nach dem Anlegen auf Intern zurueck", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    vi.mocked(db.listCategories).mockResolvedValue([]);
+    vi.mocked(db.addCategory).mockResolvedValue(
+      makeCategory({ id: 2, name: "Kunde X", time_kind: "external" }),
+    );
+
+    render(<App />);
+    await waitFor(() => expect(db.listCategories).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+    fireEvent.change(await screen.findByPlaceholderText(/Neue Kategorie/i), {
+      target: { value: "Kunde X" },
+    });
+    fireEvent.click(screen.getByLabelText("Zeitart neue Kategorie: Extern"));
+    fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
+
+    await waitFor(() => expect(db.addCategory).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Zeitart neue Kategorie: Intern")).toHaveClass("active"),
+    );
+  });
+
+  it("stellt die Zeitart einer bestehenden Kategorie um", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    vi.mocked(db.listCategories).mockResolvedValue([makeCategory()]);
+    vi.mocked(db.updateCategory).mockResolvedValue(makeCategory({ time_kind: "none" }));
+
+    render(<App />);
+    await waitFor(() => expect(db.listCategories).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+    fireEvent.click(await screen.findByLabelText("Zeitart Arbeit: Keine"));
+
+    await waitFor(() =>
+      expect(db.updateCategory).toHaveBeenCalledWith(1, "Arbeit", "#7cc3f7", "none"),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Zeitart Arbeit: Keine")).toHaveClass("active"),
+    );
+  });
+
+  it("zeigt die gespeicherte Zeitart als gewaehlt an", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    vi.mocked(db.listCategories).mockResolvedValue([makeCategory({ time_kind: "external" })]);
+
+    render(<App />);
+    await waitFor(() => expect(db.listCategories).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+
+    expect(await screen.findByLabelText("Zeitart Arbeit: Extern")).toHaveClass("active");
+    expect(screen.getByLabelText("Zeitart Arbeit: Intern")).not.toHaveClass("active");
+  });
+});
+
 describe("der Papierkorb-Knopf", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     handlers.clear();
     insideTauri = true;
+    localStorage.clear();
   });
 
   it("öffnet das Papierkorb-Fenster", async () => {

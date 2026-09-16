@@ -1,4 +1,4 @@
-import { Category, Priority, Todo, TodoStatus } from "./types";
+import { Category, Priority, TimeKind, Todo, TodoStatus } from "./types";
 import { DaySlot } from "./timeSlots";
 import { TimeSettings } from "./timeTypes";
 
@@ -114,8 +114,14 @@ export interface TodoStore {
    * der Meldung `Es gibt bereits eine Kategorie "<vorhandener Name>".` — als
    * Promise-Rejection, nie als synchroner throw. Das ist bewusst strenger als
    * SQLites `UNIQUE COLLATE NOCASE`, das nur ASCII case-faltet.
+   *
+   * `timeKind` entscheidet, ob gebuchte Zeit dieser Kategorie als Arbeitszeit
+   * gegen das Soll zaehlt und wie sie gebucht wird; ohne Angabe "internal".
+   * Der Parameter ist optional, damit Aufrufer, die die Zeitart nichts angeht
+   * (der MCP-Pfad legt bewusst keine mit an), unveraendert bleiben und den
+   * Vorgabewert bekommen -- denselben, den auch die Spalte in SQLite setzt.
    */
-  addCategory(name: string, color: string): Promise<Category>;
+  addCategory(name: string, color: string, timeKind?: TimeKind): Promise<Category>;
   /**
    * Aktualisiert Name (getrimmt) und Farbe und denormalisiert beides auf alle
    * referenzierenden Todos; lehnt mit `Category <id> not found` ab, wenn `id`
@@ -123,8 +129,14 @@ export interface TodoStore {
    * ab, wenn der neue Name mit einer *anderen* Kategorie kollidiert (dieselbe
    * Kategorie darf ihren eigenen Namen in anderer Gross-/Kleinschreibung
    * behalten) — beides als Promise-Rejection, nie als synchroner throw.
+   *
+   * `timeKind` ist hier **Pflicht**, anders als bei `addCategory`: die Zeitart
+   * wird immer mitgeschrieben, ein Vorgabewert wuerde also beim blossen
+   * Umbenennen die bestehende Einstufung still auf "internal" zuruecksetzen.
+   * Wer nur Name oder Farbe aendert, reicht die vorhandene Zeitart mit herein;
+   * der Compiler erinnert daran.
    */
-  updateCategory(id: number, name: string, color: string): Promise<Category>;
+  updateCategory(id: number, name: string, color: string, timeKind: TimeKind): Promise<Category>;
   /**
    * Loescht die Kategorie; Todos, die sie referenzierten, verlieren sie
    * (category_id/category_name/category_color werden null), werden aber nicht
