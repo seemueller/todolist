@@ -110,6 +110,16 @@ function daySums(): string[] {
   return [...document.querySelectorAll(".time-day-sum")].map((el) => el.textContent ?? "");
 }
 
+/** Die Kategoriezeilen des Summenbandes, in Reihenfolge. */
+function sumRows(): string[] {
+  return [...document.querySelectorAll(".time-sum")].map((el) => el.textContent ?? "");
+}
+
+/** Die Abschlusszeile des Summenbandes. */
+function sumTotal(): string {
+  return document.querySelector(".time-sum-total")?.textContent ?? "";
+}
+
 /** Die Wochensumme aus der Kopfzeile. */
 function weekTotal(): string {
   return document.querySelector(".time-total strong")?.textContent ?? "";
@@ -523,17 +533,30 @@ describe("TimeTrackingView", () => {
       seedMixedMonday();
       renderView({ categories: mixedCategories });
 
-      expect(await screen.findByText("= 1:00")).toBeInTheDocument();
+      expect(await screen.findByText("= 2:00")).toBeInTheDocument();
       expect(screen.getByText(/1:00 keine Arbeitszeit/)).toBeInTheDocument();
       expect(weekTotal()).toBe("1:00");
       expect(target().difference).toBe("-39:00");
+    });
+
+    // Das Band ist flach: es zeigt jede Kategorie, also muss seine
+    // Abschlusszeile auch alles aufaddieren, was ueber ihr steht.
+    it("summiert im Band alle gezeigten Zeilen, nicht nur die Arbeitszeit", async () => {
+      seedMixedMonday();
+      renderView({ categories: mixedCategories });
+
+      await screen.findByText("= 2:00");
+      expect(sumRows()).toEqual(["Alpha1:00", "Daily1:00"]);
+      expect(sumTotal()).toBe("= 2:00");
+      // Die Kopfzeile bleibt bei der Arbeitszeit.
+      expect(weekTotal()).toBe("1:00");
     });
 
     it("laesst die Tagessumme nur die Arbeitszeit zeigen", async () => {
       seedMixedMonday();
       renderView({ categories: mixedCategories });
 
-      await screen.findByText("= 1:00");
+      await screen.findByText("= 2:00");
       expect(daySums()).toEqual(["1:00", "0:00", "0:00", "0:00", "0:00"]);
     });
 

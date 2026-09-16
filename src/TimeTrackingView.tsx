@@ -571,7 +571,11 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
                   {formatDuration(sum.slotCount)}
                 </span>
               ))}
-              <span className="time-sum-total">= {formatDuration(weekWorkTotal)}</span>
+              {/* Das Band zeigt jede Kategorie, also summiert seine Abschlusszeile
+                  auch jede -- die Kopfzeile bleibt dagegen bei der Arbeitszeit. */}
+              <span className="time-sum-total">
+                = {formatDuration(weekWorkTotal + weekNonWorkTotal)}
+              </span>
             </div>
           )}
         </>
