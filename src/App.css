@@ -1354,6 +1354,14 @@ a:hover {
 }
 
 /* Kanban */
+/* Chipleiste ueber dem Brett, im Muster der .filter-row der Liste. */
+.board-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .kanban-wrapper {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -8,6 +8,7 @@ import {
   lazy,
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import {
@@ -187,6 +188,17 @@ function App({ migrationError = null }: AppProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [draggedTodoId, setDraggedTodoId] = useState<number | null>(null);
   const [dragOverLane, setDragOverLane] = useState<TodoStatus | null>(null);
+  // Leere Menge heisst "alles zeigen" -- kein Sonderwert, kein null-fuer-alle.
+  // null als Element steht fuer Aufgaben ohne Kategorie.
+  const [boardCategories, setBoardCategories] = useState<Set<number | null>>(new Set());
+
+  const toggleBoardCategory = useCallback((id: number | null) => {
+    setBoardCategories((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
 
   // Debug log panel (Ctrl+Shift+L)
   const [showDebug, setShowDebug] = useState(false);
@@ -578,6 +590,16 @@ function App({ migrationError = null }: AppProps) {
     return true;
   });
 
+  // Gefiltert wird im State, nicht in der Datenbank: die Aufgaben liegen ohnehin
+  // vollstaendig vor, ein Nachladen je Klick waere nur traeger.
+  const boardTodos = useMemo(
+    () =>
+      boardCategories.size === 0
+        ? todos
+        : todos.filter((t) => boardCategories.has(t.category_id)),
+    [todos, boardCategories]
+  );
+
   const detailTodo = detailTodoId === null ? null : todos.find((t) => t.id === detailTodoId) ?? null;
 
   const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "all" || searchQuery || categoryFilter !== null;
@@ -842,9 +864,41 @@ function App({ migrationError = null }: AppProps) {
         )}
 
         {viewMode === "kanban" && (
+          <>
+          {/* Die Kategoriefarbe kommt als Inline-Style aus den Daten, wie bei
+              CategoryBadge auch -- hier als Rahmen, damit der aktive Chip
+              weiterhin die Tintenflaeche tragen kann. */}
+          <div className="board-filter" role="group" aria-label="Kategorien filtern">
+            <FilterChip
+              active={boardCategories.size === 0}
+              onClick={() => setBoardCategories(new Set())}
+              aria-label="Alle Kategorien"
+            >
+              Alle
+            </FilterChip>
+            {categories.map((category) => (
+              <FilterChip
+                key={category.id}
+                active={boardCategories.has(category.id)}
+                onClick={() => toggleBoardCategory(category.id)}
+                aria-label={`Kategorie ${category.name}`}
+                style={{ borderColor: category.color }}
+              >
+                {category.name}
+              </FilterChip>
+            ))}
+            <FilterChip
+              active={boardCategories.has(null)}
+              onClick={() => toggleBoardCategory(null)}
+              aria-label="Ohne Kategorie"
+            >
+              Ohne Kategorie
+            </FilterChip>
+          </div>
+
           <div className="kanban-wrapper">
             {kanbanLanes.map((lane) => {
-              const laneTodos = todos
+              const laneTodos = boardTodos
                 .filter((t) => t.status === lane.status)
                 .sort((a, b) => {
                   const priorityOrder = { high: 0, medium: 1, low: 2 };
@@ -943,6 +997,7 @@ function App({ migrationError = null }: AppProps) {
               );
             })}
           </div>
+          </>
         )}
 
         {viewMode === "time" && (

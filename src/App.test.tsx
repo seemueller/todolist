@@ -678,6 +678,89 @@ describe("die Rückgängig-Leiste", () => {
   });
 });
 
+describe("der Kategorie-Filter im Brett", () => {
+  const arbeit = makeCategory({ id: 1, name: "Arbeit" });
+  const privat = makeCategory({ id: 2, name: "Privat", color: "#6fcf7f" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    insideTauri = true;
+    vi.mocked(db.listCategories).mockResolvedValue([arbeit, privat]);
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 1, title: "Arbeit-Aufgabe", category_id: 1, category_name: "Arbeit" }),
+      makeTodo({ id: 2, title: "Privat-Aufgabe", category_id: 2, category_name: "Privat" }),
+      makeTodo({ id: 3, title: "Aufgabe ohne Kategorie" }),
+    ]);
+  });
+
+  /** Rendert die App und schaltet auf das Brett um. */
+  async function renderBoard() {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+    await screen.findByRole("button", { name: "Alle Kategorien" });
+  }
+
+  it("zeigt ohne Auswahl alle Aufgaben", async () => {
+    await renderBoard();
+
+    expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
+  });
+
+  it("filtert das Brett auf die gewaehlten Kategorien", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+
+    expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByText("Privat-Aufgabe")).not.toBeInTheDocument();
+    expect(screen.queryByText("Aufgabe ohne Kategorie")).not.toBeInTheDocument();
+  });
+
+  it("sammelt mehrere Kategorien statt sie zu ersetzen", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Privat" }));
+
+    expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByText("Aufgabe ohne Kategorie")).not.toBeInTheDocument();
+  });
+
+  it("nimmt einen zweiten Klick auf denselben Chip wieder zurueck", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+
+    expect(screen.getByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Alle Kategorien" })).toHaveClass("active");
+  });
+
+  it("zeigt mit 'Ohne Kategorie' die Aufgaben ohne Kategorie", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ohne Kategorie" }));
+
+    expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
+    expect(screen.queryByText("Arbeit-Aufgabe")).not.toBeInTheDocument();
+  });
+
+  it("zeigt nach 'Alle' wieder alles", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Alle Kategorien" }));
+
+    expect(screen.getByText("Privat-Aufgabe")).toBeInTheDocument();
+    expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
+  });
+});
+
 describe("die Zeitart im Kategorien-Fenster", () => {
   beforeEach(() => {
     vi.clearAllMocks();
