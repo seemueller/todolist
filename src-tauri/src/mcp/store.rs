@@ -126,6 +126,10 @@ pub struct Category {
     pub name: String,
     pub color: String,
     pub created_at: String,
+    /// "none", "internal" oder "external" -- siehe TimeKind in src/types.ts.
+    /// Ueber MCP nur lesbar: `add_todo` und Co. legen keine Kategorien an, und
+    /// der Vorgabewert der Spalte ist "internal".
+    pub time_kind: String,
 }
 
 /// Was an einer Aufgabe geaendert werden soll.
@@ -390,7 +394,7 @@ pub async fn list_categories(pool: &Pool<Sqlite>) -> Result<Vec<Category>, Store
     // ausdruecken, und es sind ohnehin nur eine Handvoll Zeilen. Dieselbe
     // Begruendung steht in `listCategories` in src/todoStoreSql.ts.
     let mut categories: Vec<Category> =
-        sqlx::query_as("SELECT id, name, color, created_at FROM categories")
+        sqlx::query_as("SELECT id, name, color, created_at, time_kind FROM categories")
             .fetch_all(pool)
             .await?;
     categories.sort_by(|a, b| compare_category_names(&a.name, &b.name));
@@ -836,7 +840,7 @@ pub async fn book_time(
     })
 }
 
-/// Muss dem echten Schema nach Migration 10 entsprechen -- insbesondere
+/// Muss dem echten Schema nach Migration 12 entsprechen -- insbesondere
 /// `categories.name` mit `UNIQUE COLLATE NOCASE` und `time_slots` OHNE
 /// Fremdschluessel auf die Kategorie. Ein Testschema, das vom echten
 /// abweicht, ist der Grund, warum das ON DELETE CASCADE aus Migration 7
@@ -852,7 +856,8 @@ pub(crate) const SCHEMA: &[&str] = &[
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE COLLATE NOCASE,
         color TEXT NOT NULL DEFAULT '#a78bfa',
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        time_kind TEXT NOT NULL DEFAULT 'internal'
     );",
     "CREATE TABLE todos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1564,6 +1569,28 @@ mod tests {
         assert_eq!(categories[0].id, id);
         assert_eq!(categories[0].name, "Kundenprojekt");
         assert_eq!(categories[0].color, "#111111");
+    }
+
+    #[tokio::test]
+    async fn list_categories_returns_the_time_kind() {
+        let pool = setup().await;
+        category(&pool, "Pause").await;
+        sqlx::query("UPDATE categories SET time_kind = 'none'")
+            .execute(&pool)
+            .await
+            .expect("set time kind");
+
+        let categories = list_categories(&pool).await.expect("list");
+        assert_eq!(categories[0].time_kind, "none");
+    }
+
+    #[tokio::test]
+    async fn a_category_without_a_stated_time_kind_is_internal() {
+        let pool = setup().await;
+        category(&pool, "Kundenprojekt").await;
+
+        let categories = list_categories(&pool).await.expect("list");
+        assert_eq!(categories[0].time_kind, "internal");
     }
 
     // --- week_time ----------------------------------------------------------
