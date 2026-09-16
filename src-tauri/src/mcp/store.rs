@@ -869,7 +869,8 @@ pub(crate) const SCHEMA: &[&str] = &[
         priority TEXT NOT NULL DEFAULT 'medium',
         status TEXT NOT NULL DEFAULT 'todo',
         description TEXT NOT NULL DEFAULT '',
-        deleted_at TEXT DEFAULT NULL
+        deleted_at TEXT DEFAULT NULL,
+        board_order REAL NOT NULL DEFAULT 0
     );",
     "CREATE TABLE time_slots (
         date TEXT NOT NULL,
