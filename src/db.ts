@@ -38,6 +38,11 @@ export function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<To
   return store().updateTodoFields(id, patch);
 }
 
+/**
+ * Setzt den Status ohne Brett-Kontext. Seit das Brett Status und Position in
+ * einem Schreibvorgang setzt, hat sie in der Oberflaeche keinen Aufrufer mehr
+ * -- sie bleibt, damit diese Fassade den Store-Vertrag vollstaendig spiegelt.
+ */
 export function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
   return store().updateTodoStatus(id, status);
 }
