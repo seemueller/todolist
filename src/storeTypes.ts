@@ -130,11 +130,13 @@ export interface TodoStore {
    * Kategorie darf ihren eigenen Namen in anderer Gross-/Kleinschreibung
    * behalten) — beides als Promise-Rejection, nie als synchroner throw.
    *
-   * `timeKind` wie bei `addCategory`: ohne Angabe "internal". Die Zeitart wird
-   * also mitgeschrieben, nicht nur bei Angabe — wer nur die Farbe aendern will,
-   * reicht die bestehende Zeitart mit herein, sonst faellt sie auf "internal".
+   * `timeKind` ist hier **Pflicht**, anders als bei `addCategory`: die Zeitart
+   * wird immer mitgeschrieben, ein Vorgabewert wuerde also beim blossen
+   * Umbenennen die bestehende Einstufung still auf "internal" zuruecksetzen.
+   * Wer nur Name oder Farbe aendert, reicht die vorhandene Zeitart mit herein;
+   * der Compiler erinnert daran.
    */
-  updateCategory(id: number, name: string, color: string, timeKind?: TimeKind): Promise<Category>;
+  updateCategory(id: number, name: string, color: string, timeKind: TimeKind): Promise<Category>;
   /**
    * Loescht die Kategorie; Todos, die sie referenzierten, verlieren sie
    * (category_id/category_name/category_color werden null), werden aber nicht

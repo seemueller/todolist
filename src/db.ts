@@ -82,7 +82,7 @@ export function updateCategory(
   id: number,
   name: string,
   color: string,
-  timeKind?: TimeKind
+  timeKind: TimeKind
 ): Promise<Category> {
   return store().updateCategory(id, name, color, timeKind);
 }
