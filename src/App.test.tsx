@@ -283,7 +283,7 @@ describe("App", () => {
     installDebugInterceptor();
     clearDebugLogs();
     vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
-    vi.mocked(db.updateTodoStatus).mockResolvedValue(
+    vi.mocked(db.updateTodoStatusAndOrder).mockResolvedValue(
       makeTodo({ id: 7, title: "Task", status: "in_progress" }),
     );
 
@@ -317,12 +317,14 @@ describe("App", () => {
     fireEvent.drop(lanes[1], { dataTransfer });
 
     await waitFor(() => {
-      expect(db.updateTodoStatus).toHaveBeenCalledWith(7, "in_progress");
+      // Status und Platz gehen in einem Schreibvorgang weg -- die leere
+      // Zielspalte nimmt die Karte auf Platz 0.
+      expect(db.updateTodoStatusAndOrder).toHaveBeenCalledWith(7, "in_progress", 0);
     });
 
     const messages = debugLogs.map((l) => l.message);
     expect(messages.some((m) => m.includes("dragstart für Aufgabe 7"))).toBe(true);
-    expect(messages.some((m) => m.includes('nach "in_progress" verschoben'))).toBe(true);
+    expect(messages.some((m) => m.includes('nach "in_progress" an Platz 0 verschoben'))).toBe(true);
   });
 
   it("reports a failed update check instead of staying silent", async () => {

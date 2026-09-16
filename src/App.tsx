@@ -522,7 +522,7 @@ function App({ migrationError = null }: AppProps) {
         setTimeout(() => setBurstId(null), 800);
       }
       setError(null);
-      console.log(`drag: Aufgabe ${todoId} nach "${targetStatus}" verschoben, Platz ${place}`);
+      console.log(`drag: Aufgabe ${todoId} nach "${targetStatus}" an Platz ${place} verschoben`);
     } catch (err) {
       console.error(`drag: Verschieben von Aufgabe ${todoId} fehlgeschlagen:`, String(err));
       setError(String(err));
