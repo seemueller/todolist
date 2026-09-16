@@ -49,11 +49,44 @@ export function fromRow(row: TodoRow): Todo {
   };
 }
 
+/**
+ * Was eine Kategorie fuer die Zeiterfassung bedeutet.
+ *
+ * "none" ist keine Arbeitszeit (Pause, Privat) und zaehlt nie gegen das Soll;
+ * "internal" und "external" sind beide Arbeitszeit und trennen nur, wie sie
+ * gebucht wird. Ein Feld statt zweier Flags, damit es die Kombination
+ * "keine Arbeitszeit, extern abgerechnet" gar nicht erst gibt.
+ */
+export type TimeKind = "none" | "internal" | "external";
+
+/** Die Zeitarten in der Reihenfolge, in der die Oberflaeche sie anbietet. */
+export const TIME_KINDS: TimeKind[] = ["none", "internal", "external"];
+
+/** Deutsche Beschriftungen der Zeitarten fuer die Oberflaeche. */
+export const TIME_KIND_LABELS: Record<TimeKind, string> = {
+  none: "Keine",
+  internal: "Intern",
+  external: "Extern",
+};
+
+/**
+ * Liest einen gespeicherten Wert als Zeitart, mit "internal" als Rueckfall.
+ *
+ * Der Rueckfall trifft zwei Faelle zugleich: Eintraege aus der Zeit vor der
+ * Spalte (localStorage-Speicher) und Werte, die nicht zu den drei bekannten
+ * gehoeren. Beide werden Arbeitszeit, weil das die grosse Mehrheit trifft und
+ * eine stillschweigend aus dem Soll fallende Buchung der teurere Irrtum waere.
+ */
+export function toTimeKind(value: string | null | undefined): TimeKind {
+  return value === "none" || value === "external" ? value : "internal";
+}
+
 export interface Category {
   id: number;
   name: string;
   color: string;
   created_at: string;
+  time_kind: TimeKind;
 }
 
 export interface CategoryRow {
@@ -61,6 +94,9 @@ export interface CategoryRow {
   name: string;
   color: string;
   created_at: string;
+  /** Optional und breit getypt, weil der localStorage-Speicher Eintraege aus
+   *  der Zeit vor dieser Spalte liefert; `toTimeKind` faengt beides ab. */
+  time_kind?: string;
 }
 
 export function fromCategoryRow(row: CategoryRow): Category {
@@ -69,6 +105,7 @@ export function fromCategoryRow(row: CategoryRow): Category {
     name: row.name,
     color: row.color,
     created_at: row.created_at,
+    time_kind: toTimeKind(row.time_kind),
   };
 }
 

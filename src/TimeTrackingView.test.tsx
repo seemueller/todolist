@@ -74,8 +74,8 @@ function emit(name: string) {
 }
 
 const categories: Category[] = [
-  { id: 7, name: "Alpha", color: "#7cc3f7", created_at: "2026-09-01T08:00:00.000Z" },
-  { id: 9, name: "Daily", color: "#ffd43b", created_at: "2026-09-01T08:00:00.000Z" },
+  { id: 7, name: "Alpha", color: "#7cc3f7", created_at: "2026-09-01T08:00:00.000Z", time_kind: "internal" },
+  { id: 9, name: "Daily", color: "#ffd43b", created_at: "2026-09-01T08:00:00.000Z", time_kind: "internal" },
 ];
 
 // Die View zeigt immer die laufende Woche. Die erwarteten Beschriftungen werden

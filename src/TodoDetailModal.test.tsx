@@ -4,7 +4,7 @@ import { TodoDetailModal } from "./TodoDetailModal";
 import { Category, Todo } from "./types";
 
 const categories: Category[] = [
-  { id: 1, name: "Arbeit", color: "#7cc3f7", created_at: "2026-01-01T00:00:00.000Z" },
+  { id: 1, name: "Arbeit", color: "#7cc3f7", created_at: "2026-01-01T00:00:00.000Z", time_kind: "internal" },
 ];
 
 function makeTodo(overrides: Partial<Todo> = {}): Todo {
