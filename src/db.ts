@@ -1,4 +1,4 @@
-import { Priority, Todo, TodoStatus, Category } from "./types";
+import { Priority, TimeKind, Todo, TodoStatus, Category } from "./types";
 import { localTodoStore } from "./todoStoreLocal";
 import { sqlTodoStore } from "./todoStoreSql";
 import { isTauri } from "./sqlClient";
@@ -70,12 +70,21 @@ export function listCategories(): Promise<Category[]> {
   return store().listCategories();
 }
 
-export function addCategory(name: string, color: string): Promise<Category> {
-  return store().addCategory(name, color);
+export function addCategory(
+  name: string,
+  color: string,
+  timeKind?: TimeKind
+): Promise<Category> {
+  return store().addCategory(name, color, timeKind);
 }
 
-export function updateCategory(id: number, name: string, color: string): Promise<Category> {
-  return store().updateCategory(id, name, color);
+export function updateCategory(
+  id: number,
+  name: string,
+  color: string,
+  timeKind?: TimeKind
+): Promise<Category> {
+  return store().updateCategory(id, name, color, timeKind);
 }
 
 export function deleteCategory(id: number): Promise<number> {
