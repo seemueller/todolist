@@ -490,6 +490,10 @@ function App({ migrationError = null }: AppProps) {
     const before = place > 0 ? laneTodos[place - 1].board_order : null;
     const after = place < laneTodos.length ? laneTodos[place].board_order : null;
 
+    // Was der Rebalance-Pfad schon weggeschrieben hat. Steht ausserhalb des
+    // try, weil es auch der Fehlerzweig braucht.
+    const written: Todo[] = [];
+
     try {
       if (needsRebalance(before, after)) {
         // Kein Platz zwischen den Nachbarn: die Spalte einmal neu
@@ -497,7 +501,6 @@ function App({ migrationError = null }: AppProps) {
         const ordered = [...laneTodos];
         ordered.splice(place, 0, dragged);
         const positions = rebalanceBoardOrders(ordered);
-        const written: Todo[] = [];
         for (const { id, board_order } of positions) {
           written.push(
             id === todoId && dragged.status !== targetStatus
@@ -524,6 +527,14 @@ function App({ migrationError = null }: AppProps) {
       setError(null);
       console.log(`drag: Aufgabe ${todoId} nach "${targetStatus}" an Platz ${place} verschoben`);
     } catch (err) {
+      // Der Rebalance-Pfad schreibt die Spalte bewusst Karte fuer Karte --
+      // tauri-plugin-sql kennt keine Transaktion ueber mehrere Aufrufe (siehe
+      // Spec). Bricht er in der Mitte ab, steht die Haelfte schon in der
+      // Datenbank; die muss auch auf den Schirm, sonst zeigt das Brett bis zum
+      // naechsten Laden eine Reihenfolge, die es so nicht mehr gibt.
+      if (written.length > 0) {
+        setTodos((prev) => prev.map((t) => written.find((w) => w.id === t.id) ?? t));
+      }
       console.error(`drag: Verschieben von Aufgabe ${todoId} fehlgeschlagen:`, String(err));
       setError(String(err));
     } finally {
@@ -1057,8 +1068,12 @@ function App({ migrationError = null }: AppProps) {
                     {laneTodos.map((todo, position) => {
                       const index =
                         draggedPosition !== -1 && draggedPosition < position ? position - 1 : position;
+                      // Die gezogene Karte ist kein Anker: ihr Index faellt mit
+                      // dem der Karte darunter zusammen, das gaebe zwei Linien.
                       const showIndicator =
-                        dropTarget?.status === lane.status && dropTarget.index === index;
+                        dropTarget?.status === lane.status &&
+                        dropTarget.index === index &&
+                        position !== draggedPosition;
                       const overdue = !todo.done && isOverdue(todo.due_date);
                       const today = isDueToday(todo.due_date);
 
