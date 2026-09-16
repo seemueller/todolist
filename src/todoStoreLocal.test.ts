@@ -150,6 +150,34 @@ describe("localTodoStore", () => {
     );
   });
 
+  it("legt mit time_kind an", async () => {
+    const cat = await localTodoStore.addCategory("Kunde X", "#7cc3f7", "external");
+    expect(cat.time_kind).toBe("external");
+    expect((await localTodoStore.listCategories())[0].time_kind).toBe("external");
+  });
+
+  it("legt ohne Angabe als internal an", async () => {
+    expect((await localTodoStore.addCategory("Arbeit", "#7cc3f7")).time_kind).toBe("internal");
+  });
+
+  it("aendert time_kind", async () => {
+    const cat = await localTodoStore.addCategory("Pause", "#7cc3f7");
+    const updated = await localTodoStore.updateCategory(cat.id, "Pause", "#7cc3f7", "none");
+    expect(updated.time_kind).toBe("none");
+    expect((await localTodoStore.listCategories())[0].time_kind).toBe("none");
+  });
+
+  it("liest Altbestand ohne time_kind als internal", async () => {
+    localStorage.setItem(
+      "todolist_categories",
+      JSON.stringify([
+        { id: 1, name: "Arbeit", color: "#7cc3f7", created_at: "2026-09-16T08:00:00.000Z" },
+      ])
+    );
+
+    expect((await localTodoStore.listCategories())[0].time_kind).toBe("internal");
+  });
+
   it("creates a todo without a description by default", async () => {
     const todo = await localTodoStore.addTodo("Ohne Text", "medium", null);
 
