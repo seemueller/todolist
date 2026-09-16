@@ -1449,6 +1449,13 @@ a:hover {
   -webkit-user-drag: none;
 }
 
+/* Zeigt beim Ziehen, zwischen welche beiden Karten die gezogene faellt. */
+.kanban-drop-indicator {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
 .kanban-card.priority-high {
   border-top-color: var(--prio-high);
 }

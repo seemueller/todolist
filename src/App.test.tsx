@@ -57,6 +57,8 @@ vi.mock("./db", () => ({
   updateTodoDueDate: vi.fn(),
   updateTodoPriority: vi.fn(),
   updateTodoStatus: vi.fn(),
+  updateTodoBoardOrder: vi.fn(),
+  updateTodoStatusAndOrder: vi.fn(),
   updateTodoFields: vi.fn(),
   updateTodoCategory: vi.fn(),
   addCategory: vi.fn(),
@@ -619,6 +621,219 @@ describe("App", () => {
       ).map((el) => el.textContent);
       expect(titles).toEqual(["Hochgezogen", "Frueh", "Runtergezogen"]);
     });
+  });
+
+  /** Ein DataTransfer-Ersatz: jsdom bringt keinen mit. */
+  function makeDataTransfer() {
+    let payload = "";
+    return {
+      effectAllowed: "",
+      dropEffect: "",
+      setData: (_type: string, value: string) => {
+        payload = value;
+      },
+      getData: () => payload,
+    };
+  }
+
+  /** Gibt der Karte eine Hoehe, damit die Mitte-Berechnung etwas zu rechnen hat. */
+  function stubRect(card: HTMLElement) {
+    card.getBoundingClientRect = () =>
+      ({ top: 0, height: 100, bottom: 100, left: 0, right: 100, width: 100, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+  }
+
+  /**
+   * jsdom kennt kein `DragEvent`: `fireEvent.dragOver` baut dann ein nacktes
+   * `Event`, und `clientY` faellt unterwegs weg. Also selbst ein MouseEvent
+   * bauen -- das traegt die Koordinate -- und den DataTransfer anhaengen.
+   */
+  function fireDrag(
+    type: "dragstart" | "dragover" | "drop" | "dragend",
+    element: HTMLElement,
+    dataTransfer: ReturnType<typeof makeDataTransfer>,
+    clientY = 0,
+  ) {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientY });
+    Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+    fireEvent(element, event);
+  }
+
+  async function renderBoard(todos: ReturnType<typeof makeTodo>[]) {
+    vi.mocked(db.listTodos).mockResolvedValue(todos);
+    const { container } = render(<App />);
+    // Nicht ueber einen Titel warten: erledigte Aufgaben blendet die Liste in
+    // ihrer Voreinstellung aus, im Brett stehen sie trotzdem.
+    fireEvent.click(await screen.findByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+    await waitFor(() => {
+      expect(container.querySelectorAll(".kanban-card").length).toBe(todos.length);
+    });
+    return container;
+  }
+
+  it("moves a card above its neighbour inside the lane", async () => {
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Erste", board_order: 0 }),
+      makeTodo({ id: 2, title: "Zweite", board_order: 1 }),
+    ]);
+    vi.mocked(db.updateTodoBoardOrder).mockResolvedValue(
+      makeTodo({ id: 2, title: "Zweite", board_order: -1 }),
+    );
+
+    const [first, second] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(first);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", second, dataTransfer);
+    // Obere Haelfte der ersten Karte: davor einfuegen.
+    fireDrag("dragover", first, dataTransfer, 10);
+    fireDrag("drop", first, dataTransfer, 10);
+
+    await waitFor(() => {
+      expect(db.updateTodoBoardOrder).toHaveBeenCalledWith(2, -1);
+    });
+    expect(db.updateTodoStatusAndOrder).not.toHaveBeenCalled();
+  });
+
+  it("moves a card below its neighbour inside the lane", async () => {
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Erste", board_order: 0 }),
+      makeTodo({ id: 2, title: "Zweite", board_order: 1 }),
+    ]);
+    vi.mocked(db.updateTodoBoardOrder).mockResolvedValue(
+      makeTodo({ id: 1, title: "Erste", board_order: 2 }),
+    );
+
+    const [first, second] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(second);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", first, dataTransfer);
+    // Untere Haelfte der zweiten Karte: dahinter einfuegen.
+    fireDrag("dragover", second, dataTransfer, 90);
+    fireDrag("drop", second, dataTransfer, 90);
+
+    await waitFor(() => {
+      expect(db.updateTodoBoardOrder).toHaveBeenCalledWith(1, 2);
+    });
+  });
+
+  it("sets status and position in one write when the card changes lane", async () => {
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Laeuft", status: "in_progress", board_order: 0 }),
+      makeTodo({ id: 2, title: "Offen", status: "todo", board_order: 0 }),
+    ]);
+    vi.mocked(db.updateTodoStatusAndOrder).mockResolvedValue(
+      makeTodo({ id: 2, title: "Offen", status: "in_progress", board_order: -1 }),
+    );
+
+    const cards = container.querySelectorAll<HTMLElement>(".kanban-card");
+    const running = Array.from(cards).find((c) => c.textContent?.includes("Laeuft")) as HTMLElement;
+    const open = Array.from(cards).find((c) => c.textContent?.includes("Offen")) as HTMLElement;
+    stubRect(running);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", open, dataTransfer);
+    fireDrag("dragover", running, dataTransfer, 10);
+    fireDrag("drop", running, dataTransfer, 10);
+
+    await waitFor(() => {
+      expect(db.updateTodoStatusAndOrder).toHaveBeenCalledWith(2, "in_progress", -1);
+    });
+    expect(db.updateTodoStatus).not.toHaveBeenCalled();
+  });
+
+  it("shows an insertion line while dragging over a card", async () => {
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Erste", board_order: 0 }),
+      makeTodo({ id: 2, title: "Zweite", board_order: 1 }),
+    ]);
+
+    const [first, second] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(first);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", second, dataTransfer);
+    fireDrag("dragover", first, dataTransfer, 10);
+
+    await waitFor(() => {
+      expect(container.querySelector(".kanban-drop-indicator")).not.toBeNull();
+    });
+  });
+
+  it("clears the insertion line when the drag is abandoned", async () => {
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Erste", board_order: 0 }),
+      makeTodo({ id: 2, title: "Zweite", board_order: 1 }),
+    ]);
+
+    const [first, second] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(first);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", second, dataTransfer);
+    fireDrag("dragover", first, dataTransfer, 10);
+    await waitFor(() => {
+      expect(container.querySelector(".kanban-drop-indicator")).not.toBeNull();
+    });
+
+    fireDrag("dragend", second, dataTransfer);
+
+    await waitFor(() => {
+      expect(container.querySelector(".kanban-drop-indicator")).toBeNull();
+    });
+  });
+
+  it("renumbers the lane when two neighbours sit on the same position", async () => {
+    // Beide Karten stehen auf 0 -- der Normalfall, solange niemand gezogen
+    // hat. Zwischen ihnen ist kein Platz, also wird die Spalte neu verteilt.
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Erste", board_order: 0, due_date: "2026-01-01" }),
+      makeTodo({ id: 2, title: "Zweite", board_order: 0, due_date: "2026-02-01" }),
+      makeTodo({ id: 3, title: "Dritte", board_order: 0, due_date: "2026-03-01" }),
+    ]);
+    vi.mocked(db.updateTodoBoardOrder).mockImplementation((id, order) =>
+      Promise.resolve(makeTodo({ id, title: `#${id}`, board_order: order })),
+    );
+
+    const cards = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(cards[1]);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", cards[2], dataTransfer);
+    fireDrag("dragover", cards[1], dataTransfer, 10);
+    fireDrag("drop", cards[1], dataTransfer, 10);
+
+    await waitFor(() => {
+      // Jede Karte der Spalte bekommt einen eigenen Wert, die gezogene den
+      // Platz, auf den sie gezogen wurde.
+      expect(vi.mocked(db.updateTodoBoardOrder).mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  it("keeps a reorder inside the done lane a plain position write", async () => {
+    // Das Feuerwerk (`burstId`/`.done-flash`) zeichnet nur die Listenansicht;
+    // im Brett ist es nicht sichtbar. Pruefbar ist deshalb der Schreibpfad:
+    // eine Karte, die "erledigt" bleibt, darf keinen Status-Schreibvorgang
+    // ausloesen.
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Fertig A", status: "done", done: true, board_order: 0 }),
+      makeTodo({ id: 2, title: "Fertig B", status: "done", done: true, board_order: 1 }),
+    ]);
+    vi.mocked(db.updateTodoBoardOrder).mockResolvedValue(
+      makeTodo({ id: 2, title: "Fertig B", status: "done", done: true, board_order: -1 }),
+    );
+
+    const [first, second] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(first);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", second, dataTransfer);
+    fireDrag("dragover", first, dataTransfer, 10);
+    fireDrag("drop", first, dataTransfer, 10);
+
+    await waitFor(() => expect(db.updateTodoBoardOrder).toHaveBeenCalledWith(2, -1));
+    expect(db.updateTodoStatusAndOrder).not.toHaveBeenCalled();
+    expect(db.updateTodoStatus).not.toHaveBeenCalled();
   });
 });
 
