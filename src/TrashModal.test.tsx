@@ -25,6 +25,7 @@ const makeTodo = (id: number, title: string) => ({
   category_id: null,
   category_name: null,
   category_color: null,
+  board_order: 0,
 });
 
 describe("TrashModal", () => {

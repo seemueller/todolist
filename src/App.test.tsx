@@ -73,7 +73,7 @@ vi.mock("./CustomTitleBar", () => ({
   CustomTitleBar: () => null,
 }));
 
-const todoBase = { description: "", priority: "medium" as const, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null, status: "todo" as const };
+const todoBase = { description: "", priority: "medium" as const, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null, status: "todo" as const, board_order: 0 };
 
 const makeTodo = (overrides = {}) => ({
   id: 1,
@@ -599,6 +599,25 @@ describe("App", () => {
         container.querySelectorAll<HTMLElement>(".kanban-card-title")
       ).map((el) => el.textContent);
       expect(titles).toEqual(["Frueh", "Spaet", "Ohne Datum"]);
+    });
+  });
+
+  it("puts a dragged card where it was dropped, ahead of the due date rule", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 1, title: "Frueh", due_date: "2026-01-15" }),
+      makeTodo({ id: 2, title: "Hochgezogen", due_date: "2026-12-01", board_order: -1 }),
+      makeTodo({ id: 3, title: "Runtergezogen", due_date: "2026-01-01", board_order: 5 }),
+    ]);
+
+    const { container } = render(<App />);
+    await waitFor(() => expect(screen.getByText("Frueh")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+
+    await waitFor(() => {
+      const titles = Array.from(
+        container.querySelectorAll<HTMLElement>(".kanban-card-title")
+      ).map((el) => el.textContent);
+      expect(titles).toEqual(["Hochgezogen", "Frueh", "Runtergezogen"]);
     });
   });
 });
