@@ -384,6 +384,44 @@ a:hover {
   color: var(--canvas);
 }
 
+/* Zeitart einer Kategorie: dieselbe Segmentleiste wie .status-filter, nur eine
+   Spur kompakter -- sie steht zu dritt in einer Zeile des Kategorien-Fensters. */
+.time-kind-select {
+  display: flex;
+  flex-shrink: 0;
+  border: var(--border-thin);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.time-kind-select button {
+  padding: 7px 12px;
+  border: none;
+  border-left: var(--border-thin);
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.time-kind-select button:first-child {
+  border-left: none;
+}
+
+.time-kind-select button:hover {
+  background: var(--highlight);
+}
+
+.time-kind-select button.active {
+  background: var(--ink);
+  color: var(--canvas);
+}
+
 .search-input {
   flex: 1;
   min-width: 150px;
@@ -1270,9 +1308,12 @@ a:hover {
   overflow-y: auto;
 }
 
+/* Umbruch, weil Name, Zeitart-Leiste und die beiden Knoepfe im 460 px breiten
+   Kategorien-Fenster nicht nebeneinander passen. */
 .category-item {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 11px 13px;
   border: var(--border);

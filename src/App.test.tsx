@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import App from "./App";
 import * as db from "./db";
 import { debugLogs, clearDebugLogs, installDebugInterceptor } from "./debug";
+import type { Category } from "./types";
 
 const invokeMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -57,6 +58,10 @@ vi.mock("./db", () => ({
   updateTodoPriority: vi.fn(),
   updateTodoStatus: vi.fn(),
   updateTodoFields: vi.fn(),
+  updateTodoCategory: vi.fn(),
+  addCategory: vi.fn(),
+  updateCategory: vi.fn(),
+  deleteCategory: vi.fn(),
 }));
 
 vi.mock("./version", () => ({
@@ -76,6 +81,15 @@ const makeTodo = (overrides = {}) => ({
   done: false,
   created_at: "2026-01-01T00:00:00Z",
   ...todoBase,
+  ...overrides,
+});
+
+const makeCategory = (overrides: Partial<Category> = {}): Category => ({
+  id: 1,
+  name: "Arbeit",
+  color: "#7cc3f7",
+  created_at: "2026-01-01T00:00:00Z",
+  time_kind: "internal",
   ...overrides,
 });
 
@@ -661,6 +675,91 @@ describe("die Rückgängig-Leiste", () => {
 
     await waitFor(() => expect(screen.getByText(/Fehler/i)).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Rückgängig" })).not.toBeInTheDocument();
+  });
+});
+
+describe("die Zeitart im Kategorien-Fenster", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    insideTauri = true;
+  });
+
+  it("legt eine Kategorie mit gewaehlter Zeitart an", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    vi.mocked(db.listCategories).mockResolvedValue([]);
+    vi.mocked(db.addCategory).mockResolvedValue(
+      makeCategory({ id: 2, name: "Kunde X", time_kind: "external" }),
+    );
+
+    render(<App />);
+    await waitFor(() => expect(db.listCategories).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+    fireEvent.change(await screen.findByPlaceholderText(/Neue Kategorie/i), {
+      target: { value: "Kunde X" },
+    });
+    fireEvent.click(screen.getByLabelText("Zeitart neue Kategorie: Extern"));
+    fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
+
+    await waitFor(() =>
+      expect(db.addCategory).toHaveBeenCalledWith("Kunde X", expect.any(String), "external"),
+    );
+  });
+
+  it("faellt nach dem Anlegen auf Intern zurueck", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    vi.mocked(db.listCategories).mockResolvedValue([]);
+    vi.mocked(db.addCategory).mockResolvedValue(
+      makeCategory({ id: 2, name: "Kunde X", time_kind: "external" }),
+    );
+
+    render(<App />);
+    await waitFor(() => expect(db.listCategories).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+    fireEvent.change(await screen.findByPlaceholderText(/Neue Kategorie/i), {
+      target: { value: "Kunde X" },
+    });
+    fireEvent.click(screen.getByLabelText("Zeitart neue Kategorie: Extern"));
+    fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
+
+    await waitFor(() => expect(db.addCategory).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Zeitart neue Kategorie: Intern")).toHaveClass("active"),
+    );
+  });
+
+  it("stellt die Zeitart einer bestehenden Kategorie um", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    vi.mocked(db.listCategories).mockResolvedValue([makeCategory()]);
+    vi.mocked(db.updateCategory).mockResolvedValue(makeCategory({ time_kind: "none" }));
+
+    render(<App />);
+    await waitFor(() => expect(db.listCategories).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+    fireEvent.click(await screen.findByLabelText("Zeitart Arbeit: Keine"));
+
+    await waitFor(() =>
+      expect(db.updateCategory).toHaveBeenCalledWith(1, "Arbeit", "#7cc3f7", "none"),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Zeitart Arbeit: Keine")).toHaveClass("active"),
+    );
+  });
+
+  it("zeigt die gespeicherte Zeitart als gewaehlt an", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([]);
+    vi.mocked(db.listCategories).mockResolvedValue([makeCategory({ time_kind: "external" })]);
+
+    render(<App />);
+    await waitFor(() => expect(db.listCategories).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Kategorien verwalten"));
+
+    expect(await screen.findByLabelText("Zeitart Arbeit: Extern")).toHaveClass("active");
+    expect(screen.getByLabelText("Zeitart Arbeit: Intern")).not.toHaveClass("active");
   });
 });
 

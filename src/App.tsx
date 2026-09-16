@@ -28,7 +28,7 @@ import {
 import { DATA_CHANGED_EVENT } from "./events";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, Priority, sortCategories, sortTodos, Todo, TodoStatus } from "./types";
+import { CATEGORY_COLORS, Category, Priority, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
@@ -68,6 +68,7 @@ import {
   PlusIcon,
   PrioritySelect,
   TagIcon,
+  TimeKindSelect,
   TrashIcon,
   UpdateIcon,
 } from "./ui";
@@ -177,6 +178,7 @@ function App({ migrationError = null }: AppProps) {
   const [showTrash, setShowTrash] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState(CATEGORY_COLORS[0]);
+  const [newCategoryTimeKind, setNewCategoryTimeKind] = useState<TimeKind>("internal");
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingCategoryColor, setEditingCategoryColor] = useState("");
@@ -494,10 +496,11 @@ function App({ migrationError = null }: AppProps) {
     const name = newCategoryName.trim();
     if (!name) return;
     try {
-      const cat = await addCategory(name, newCategoryColor);
+      const cat = await addCategory(name, newCategoryColor, newCategoryTimeKind);
       setCategories((prev) => sortCategories([...prev, cat]));
       setNewCategoryName("");
       setNewCategoryColor(CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length]);
+      setNewCategoryTimeKind("internal");
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -510,11 +513,14 @@ function App({ migrationError = null }: AppProps) {
     setEditingCategoryColor(cat.color);
   }
 
-  async function commitEditCategory(id: number) {
+  // Die Zeitart wird mitgeschickt, obwohl sie hier nicht bearbeitet wird: der
+  // Vorgabewert des Store-Vertrags ist "internal", ein Weglassen wuerde also
+  // beim Umbenennen still eine Kategorie "Keine" zu Arbeitszeit machen.
+  async function commitEditCategory(cat: Category) {
     const name = editingCategoryName.trim();
     if (!name) return;
     try {
-      const updated = await updateCategory(id, name, editingCategoryColor);
+      const updated = await updateCategory(cat.id, name, editingCategoryColor, cat.time_kind);
       setCategories((prev) =>
         sortCategories(prev.map((c) => (c.id === updated.id ? updated : c)))
       );
@@ -523,6 +529,19 @@ function App({ migrationError = null }: AppProps) {
       setError(String(err));
     }
     setEditingCategoryId(null);
+  }
+
+  async function handleCategoryTimeKindChange(cat: Category, timeKind: TimeKind) {
+    if (cat.time_kind === timeKind) return;
+    try {
+      const updated = await updateCategory(cat.id, cat.name, cat.color, timeKind);
+      setCategories((prev) =>
+        sortCategories(prev.map((c) => (c.id === updated.id ? updated : c)))
+      );
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   async function handleDeleteCategory(id: number) {
@@ -1064,6 +1083,11 @@ function App({ migrationError = null }: AppProps) {
                 onSelect={setNewCategoryColor}
                 swatchLabel={(color) => `Farbe ${color} auswählen`}
               />
+              <TimeKindSelect
+                value={newCategoryTimeKind}
+                onValueChange={setNewCategoryTimeKind}
+                label="neue Kategorie"
+              />
               <button type="submit">Hinzufügen</button>
             </form>
 
@@ -1075,7 +1099,7 @@ function App({ migrationError = null }: AppProps) {
                       <InlineEditInput
                         value={editingCategoryName}
                         onValueChange={setEditingCategoryName}
-                        onCommit={() => commitEditCategory(cat.id)}
+                        onCommit={() => commitEditCategory(cat)}
                         onCancel={() => setEditingCategoryId(null)}
                       />
                       <ColorPicker
@@ -1095,11 +1119,17 @@ function App({ migrationError = null }: AppProps) {
                     </>
                   )}
 
+                  <TimeKindSelect
+                    value={cat.time_kind}
+                    onValueChange={(kind) => handleCategoryTimeKindChange(cat, kind)}
+                    label={cat.name}
+                  />
+
                   <div className="category-actions">
                     {editingCategoryId === cat.id ? (
                       <IconButton
                         variant="icon"
-                        onClick={() => commitEditCategory(cat.id)}
+                        onClick={() => commitEditCategory(cat)}
                         aria-label="Speichern"
                       >
                         <CheckIcon />
