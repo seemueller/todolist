@@ -60,6 +60,11 @@ test.describe("TodoList App", () => {
     const checkbox = page.getByRole("button", { name: /als erledigt markieren/i }).first();
     await checkbox.click();
 
+    // Die Liste startet auf "Offen", die erledigte Aufgabe verschwindet also
+    // daraus; erst "Alle" zeigt sie wieder.
+    await expect(page.locator(".todo-list li")).toHaveCount(0);
+    await page.locator(".status-filter").getByRole("button", { name: "Alle" }).click();
+
     // Todo should appear done (reduced opacity)
     const todoItem = page.locator(".todo-list li").first();
     await expect(todoItem).toHaveClass(/done/);
@@ -363,6 +368,44 @@ test.describe("Filtering and Search", () => {
     await expect(page.locator(".todo-list .title").getByText("Open task")).not.toBeVisible();
   });
 
+  test("startet auf Offen und merkt sich die Wahl", async ({ page }) => {
+    const input = page.getByPlaceholder(/Was steht an/i);
+    const addButton = page.getByRole("button", { name: /Aufgabe hinzufügen/i });
+
+    await input.fill("Offene Aufgabe");
+    await addButton.click();
+    await input.fill("Erledigte Aufgabe");
+    await addButton.click();
+    await page.getByRole("button", { name: /als erledigt markieren/i }).first().click();
+
+    // Ohne gespeicherte Wahl steht die Liste auf "Offen".
+    await expect(page.getByRole("button", { name: "Status Offen" })).toHaveClass(/active/);
+    await expect(page.locator(".todo-list .title").getByText("Offene Aufgabe")).toBeVisible();
+    await expect(page.locator(".todo-list .title").getByText("Erledigte Aufgabe")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Status Alle" }).click();
+    await expect(page.locator(".todo-list .title").getByText("Erledigte Aufgabe")).toBeVisible();
+
+    // Die Wahl ueberlebt den Neustart.
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Status Alle" })).toHaveClass(/active/);
+    await expect(page.locator(".todo-list .title").getByText("Erledigte Aufgabe")).toBeVisible();
+  });
+
+  test("setzt Zurücksetzen auf Offen, nicht auf Alle", async ({ page }) => {
+    const input = page.getByPlaceholder(/Was steht an/i);
+    await input.fill("Eine Aufgabe");
+    await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
+
+    await page.getByRole("button", { name: "Status Alle" }).click();
+    await expect(page.locator(".active-filters")).toBeVisible();
+
+    await page.getByRole("button", { name: /Zurücksetzen/i }).click();
+
+    await expect(page.getByRole("button", { name: "Status Offen" })).toHaveClass(/active/);
+    await expect(page.locator(".active-filters")).toHaveCount(0);
+  });
+
   test("can clear all filters", async ({ page }) => {
     const input = page.getByPlaceholder(/Was steht an/i);
     const addButton = page.getByRole("button", { name: /Aufgabe hinzufügen/i });
@@ -612,6 +655,63 @@ test.describe("Beschreibung", () => {
 
     await page.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }).click();
     await expect(page.getByText("Belege aus dem Ordner")).toBeVisible();
+  });
+});
+
+test.describe("Brett-Filter", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "TodoList" })).toBeVisible();
+
+    // Eine Kategorie, eine Aufgabe darin und eine ohne Kategorie.
+    await page.getByRole("button", { name: /Kategorien verwalten/i }).click();
+    await page.getByPlaceholder(/Neue Kategorie/i).fill("Arbeit");
+    await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
+    await expect(page.locator(".category-name").getByText("Arbeit")).toBeVisible();
+    await page.getByRole("button", { name: /Schließen/i }).click();
+
+    const input = page.getByPlaceholder(/Was steht an/i);
+    await input.fill("Arbeit-Aufgabe");
+    await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
+    await page.locator(".todo-select").first().selectOption("Arbeit");
+    await expect(page.locator(".category-badge").getByText("Arbeit")).toBeVisible();
+
+    await input.fill("Aufgabe ohne Kategorie");
+    await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
+
+    await page.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }).click();
+    await expect(page.locator(".kanban-wrapper")).toBeVisible();
+  });
+
+  test("filtert das Brett auf eine Kategorie und wieder zurück", async ({ page }) => {
+    await expect(page.locator(".board-filter").getByRole("button", { name: "Alle Kategorien" })).toHaveClass(/active/);
+    await expect(page.locator(".kanban-wrapper").getByText("Arbeit-Aufgabe")).toBeVisible();
+    await expect(page.locator(".kanban-wrapper").getByText("Aufgabe ohne Kategorie")).toBeVisible();
+
+    await page.locator(".board-filter").getByRole("button", { name: "Kategorie Arbeit" }).click();
+
+    await expect(page.locator(".kanban-wrapper").getByText("Arbeit-Aufgabe")).toBeVisible();
+    await expect(page.locator(".kanban-wrapper").getByText("Aufgabe ohne Kategorie")).toHaveCount(0);
+
+    await page.locator(".board-filter").getByRole("button", { name: "Alle Kategorien" }).click();
+
+    await expect(page.locator(".kanban-wrapper").getByText("Aufgabe ohne Kategorie")).toBeVisible();
+  });
+
+  test("zeigt mit Ohne Kategorie nur die Aufgaben ohne Kategorie", async ({ page }) => {
+    await page.locator(".board-filter").getByRole("button", { name: "Ohne Kategorie" }).click();
+
+    await expect(page.locator(".kanban-wrapper").getByText("Aufgabe ohne Kategorie")).toBeVisible();
+    await expect(page.locator(".kanban-wrapper").getByText("Arbeit-Aufgabe")).toHaveCount(0);
+  });
+
+  test("hält den Brett-Filter vom Listen-Filter getrennt", async ({ page }) => {
+    await page.locator(".board-filter").getByRole("button", { name: "Kategorie Arbeit" }).click();
+    await expect(page.locator(".kanban-wrapper").getByText("Aufgabe ohne Kategorie")).toHaveCount(0);
+
+    await page.getByRole("button", { name: /Zur Ansicht Liste wechseln/i }).click();
+
+    await expect(page.locator(".todo-list .title").getByText("Aufgabe ohne Kategorie")).toBeVisible();
   });
 });
 
