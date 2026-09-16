@@ -582,6 +582,25 @@ describe("App", () => {
 
     expect(await screen.findByText("Zeile eins Zeile zwei")).toBeInTheDocument();
   });
+
+  it("sorts the kanban cards by due date, the furthest in the future at the bottom", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 1, title: "Ohne Datum", priority: "high" }),
+      makeTodo({ id: 2, title: "Spaet", due_date: "2026-12-01" }),
+      makeTodo({ id: 3, title: "Frueh", due_date: "2026-01-15", priority: "low" }),
+    ]);
+
+    const { container } = render(<App />);
+    await waitFor(() => expect(screen.getByText("Frueh")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+
+    await waitFor(() => {
+      const titles = Array.from(
+        container.querySelectorAll<HTMLElement>(".kanban-card-title")
+      ).map((el) => el.textContent);
+      expect(titles).toEqual(["Frueh", "Spaet", "Ohne Datum"]);
+    });
+  });
 });
 
 describe("die Rückgängig-Leiste", () => {

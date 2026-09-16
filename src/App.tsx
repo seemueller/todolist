@@ -936,6 +936,12 @@ function App({ migrationError = null }: AppProps) {
               const laneTodos = boardTodos
                 .filter((t) => t.status === lane.status)
                 .sort((a, b) => {
+                  // Earliest due date on top, tickets without a date at the bottom.
+                  if (a.due_date !== b.due_date) {
+                    if (!a.due_date) return 1;
+                    if (!b.due_date) return -1;
+                    return a.due_date.localeCompare(b.due_date);
+                  }
                   const priorityOrder = { high: 0, medium: 1, low: 2 };
                   const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
                   if (pDiff !== 0) return pDiff;
