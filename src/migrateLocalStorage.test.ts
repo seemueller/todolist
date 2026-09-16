@@ -118,11 +118,34 @@ describe("migrateLocalStorage", () => {
 
     const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
     expect(todoCall).toBeDefined();
-    // params: id, title, description, done, status, priority, created_at, due_date, category_id
+    // params: id, title, description, done, status, priority, created_at, due_date, category_id, board_order
     const params = todoCall![1] as unknown[];
     expect(params[3]).toBe(1); // done -> 1
     expect(params[4]).toBe("done"); // status derived
     expect(params[5]).toBe("medium"); // priority default
+    expect(params[9]).toBe(0); // board_order default
+  });
+
+  it("carries the board position over from localStorage", async () => {
+    // Wer im Browser sortiert hat, darf beim ersten Start in Tauri nicht
+    // wieder auf der Vorgabe 0 landen.
+    set(TODOS_KEY, [
+      {
+        id: 11,
+        title: "Hochgezogen",
+        done: false,
+        created_at: "2026-01-02",
+        due_date: null,
+        category_id: null,
+        board_order: -2.5,
+      },
+    ]);
+
+    await migrateLocalStorage();
+
+    const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
+    expect(String(todoCall![0])).toContain("board_order");
+    expect((todoCall![1] as unknown[])[9]).toBe(-2.5);
   });
 
   it("maps two categories differing only in case onto one id, and rewrites a slot referencing the second", async () => {
@@ -386,8 +409,8 @@ describe("migrateLocalStorage", () => {
 
     const todoCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO todos"));
     expect(todoCall).toBeDefined();
-    // id, title, description, done, status, priority, created_at, due_date, category_id
-    expect(todoCall![1]).toEqual([1, "Alt", "", 0, "todo", "medium", "2026-01-01T00:00:00.000Z", null, null]);
+    // id, title, description, done, status, priority, created_at, due_date, category_id, board_order
+    expect(todoCall![1]).toEqual([1, "Alt", "", 0, "todo", "medium", "2026-01-01T00:00:00.000Z", null, null, 0]);
   });
 
   it("carries an existing description over", async () => {
@@ -419,6 +442,7 @@ describe("migrateLocalStorage", () => {
       "2026-01-01T00:00:00.000Z",
       null,
       null,
+      0,
     ]);
   });
 });

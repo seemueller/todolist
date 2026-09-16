@@ -147,10 +147,14 @@ export async function migrateLocalStorage(): Promise<void> {
     const dueDate = typeof todo.due_date === "string" ? todo.due_date : null;
     const categoryId = todo.category_id == null ? null : resolveCategory(todo.category_id);
     const description = typeof todo.description === "string" ? todo.description : "";
+    // Wer im Browser sortiert hat, soll seine Reihenfolge behalten: ohne diese
+    // Spalte faenden alle Karten beim ersten Start in Tauri wieder auf der
+    // Vorgabe 0 zusammen.
+    const boardOrder = typeof todo.board_order === "number" ? todo.board_order : 0;
 
     await db.execute(
-      `INSERT OR IGNORE INTO todos (id, title, description, done, status, priority, created_at, due_date, category_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT OR IGNORE INTO todos (id, title, description, done, status, priority, created_at, due_date, category_id, board_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         todo.id,
         todo.title,
@@ -161,6 +165,7 @@ export async function migrateLocalStorage(): Promise<void> {
         createdAt,
         dueDate,
         categoryId,
+        boardOrder,
       ]
     );
   }
