@@ -570,6 +570,14 @@ function App({ migrationError = null }: AppProps) {
       setCategories((prev) => prev.filter((c) => c.id !== id));
       setTodos((prev) => prev.map((t) => (t.category_id === id ? { ...t, category_id: null, category_name: null, category_color: null } : t)));
       if (categoryFilter === id) setCategoryFilter(null);
+      // Bliebe die Id in der Brett-Auswahl stehen, waere ihr Chip weg, "Alle"
+      // aber weiter inaktiv -- das Brett zeigte dann keine Karte mehr.
+      setBoardCategories((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       setError(null);
     } catch (err) {
       setError(String(err));
