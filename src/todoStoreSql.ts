@@ -21,7 +21,8 @@ import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
 const TODO_COLUMNS = `
   t.id, t.title, t.description, t.done, t.status, t.priority, t.created_at,
-  t.due_date, t.category_id, c.name AS category_name, c.color AS category_color
+  t.due_date, t.category_id, t.board_order,
+  c.name AS category_name, c.color AS category_color
 `;
 
 // Die eine Stelle, an der steht, was "nicht im Papierkorb" heisst. Jede
@@ -129,6 +130,25 @@ function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
     status,
     status === "done" ? 1 : 0,
   ]);
+}
+
+function updateTodoBoardOrder(id: number, order: number): Promise<Todo> {
+  return updateColumn(id, "UPDATE todos SET board_order = $1 WHERE id = $2", [order]);
+}
+
+// Ein einziges UPDATE ueber beide Spalten, aus demselben Grund wie bei
+// updateTodoFields: der Pool kann zwischen zwei Aufrufen die Verbindung
+// wechseln, zwei Anweisungen waeren also keine Transaktion.
+function updateTodoStatusAndOrder(
+  id: number,
+  status: TodoStatus,
+  order: number
+): Promise<Todo> {
+  return updateColumn(
+    id,
+    "UPDATE todos SET status = $1, done = $2, board_order = $3 WHERE id = $4",
+    [status, status === "done" ? 1 : 0, order]
+  );
 }
 
 function toggleTodoDone(id: number, done: boolean): Promise<Todo> {
@@ -277,6 +297,8 @@ export const sqlTodoStore: TodoStore = {
   updateTodoCategory,
   updateTodoFields,
   updateTodoStatus,
+  updateTodoBoardOrder,
+  updateTodoStatusAndOrder,
   toggleTodoDone,
   deleteTodo,
   listDeletedTodos,
