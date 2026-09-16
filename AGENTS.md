@@ -61,6 +61,7 @@ Beschriftung umbenennt, zieht den Test mit.
 - `src/sqlClient.test.ts` — Tauri detection and the single shared connection
 - `src/migrations.test.ts` — guards the migration list in `src-tauri/src/lib.rs`
 - `src/migrateLocalStorage.test.ts` — the one-shot localStorage → SQLite migration
+- `src/listPrefs.test.ts` — the list view's preferences in `localStorage`
 - `e2e/todolist.spec.ts` — Playwright end-to-end tests against the dev server
 - `e2e/timetracking.spec.ts` — Playwright end-to-end tests for the time tracking view
 
@@ -76,13 +77,20 @@ Playwright-Suite. `db.ts` und `timeDb.ts` sind dünne Dispatcher, die pro Aufruf
 `isTauri()` entscheiden; dahinter liegen zwei austauschbare Implementierungen der
 Interfaces aus `src/storeTypes.ts`.
 
+**Oberflächen-Vorlieben gehören nicht in den Store.** Was nur die Ansicht betrifft
+— etwa der Statusfilter der Liste (`todolist.statusFilter`) — liegt in
+`localStorage` und wird über `src/listPrefs.ts` gelesen und geschrieben, nicht
+über `app_settings`. Sonst müsste das Store-Interface in beiden Backends wachsen
+und das Lesen asynchron werden, womit die Liste beim Start kurz im falschen
+Filter stünde. `localStorage` ist in beiden Umgebungen da und synchron.
+
 **Die Doc-Kommentare in `storeTypes.ts` sind der verbindliche Vertrag.** Wer eine
 Store-Funktion ändert, ändert sie in beiden Implementierungen oder begründet die
 Abweichung dort. Speicherunabhängige Regeln gehören nicht in einen Store, sondern
 nach `types.ts` (Todo-Regeln) oder `timeSlots.ts` (Zeit-Regeln) — eine handkopierte
 Regel ist der Weg, auf dem Browser- und Desktop-Build auseinanderlaufen.
 
-Drei Fallen, in die dieses Projekt schon getreten ist:
+Vier Fallen, in die dieses Projekt schon getreten ist:
 
 - **`localeCompare` allein sortiert nicht überall gleich.** WebKitGTK gewichtet
   Groß- und Kleinschreibung auf primärer Ebene, Chromium und Node erst auf
@@ -97,6 +105,13 @@ Drei Fallen, in die dieses Projekt schon getreten ist:
   erwischen, `BEGIN` und `COMMIT` als getrennte Aufrufe bilden also keine
   Transaktion. Wo Atomarität nötig ist, gehört die Operation als Tauri-Command nach
   `src-tauri/src/lib.rs` — siehe `replace_time_day`.
+- **Ein optionaler Parameter mit Vorgabewert schluckt bestehende Werte.**
+  `updateCategory(id, name, color, timeKind = "internal")` schreibt die Spalte
+  jedes Mal mit; wer beim Umbenennen die Zeitart weglässt, stuft die Kategorie
+  still auf Arbeitszeit zurück. `commitEditCategory` in `App.tsx` reicht
+  `cat.time_kind` deshalb ausdrücklich mit durch. Aus demselben Grund sind
+  `kindOf` in `buildCsv`/`blockRow` (`src/timeCsv.ts`) Pflichtparameter und kein
+  Vorgabewert: eine still auf „intern" gesetzte Spalte fällt in keinem Test auf.
 
 ## MCP-Server
 

@@ -247,6 +247,27 @@ Farbwahl aus einer festen Liste; ohne `colors` sind es die `CATEGORY_COLORS` aus
 | `inline` | `boolean` | Kleine 20 px Felder für die Bearbeitungszeile. |
 | `swatchLabel` | `(color: string) => string` | Liefert das `aria-label` je Feld — bitte immer setzen. |
 
+### `TimeKindSelect`
+
+Dreier-Segmentleiste für die Zeitart einer Kategorie: **Keine · Intern · Extern**.
+Gebaut aus `FilterChip variant="segment"` in der Gruppe `.time-kind-select`, im
+selben Muster wie der Status-Filter der Liste. Steht im Kategorien-Fenster
+zweimal: im Anlege-Formular und in jeder Kategoriezeile.
+
+| Prop | Typ | Bedeutung |
+|---|---|---|
+| `value` | `TimeKind` | Gewählte Zeitart. |
+| `onValueChange` | `(kind: TimeKind) => void` | Auswahl. |
+| `label` | `string` | Kategoriename für die Beschriftung; im Anlege-Formular „neue Kategorie". |
+
+Die Gruppe trägt `aria-label="Zeitart <Label>"`, jeder Knopf
+`aria-label="Zeitart <Label>: Keine"` und so fort — die E2E-Tests greifen
+darüber.
+
+```tsx
+<TimeKindSelect value={cat.time_kind} onValueChange={(k) => change(cat, k)} label={cat.name} />
+```
+
 ### `InlineEditInput`
 
 Textfeld für Umbenennen an Ort und Stelle, mit dem überall gleichen
@@ -274,6 +295,19 @@ Der Kopf trägt die Segmentleiste `.view-switch` mit den drei Ansichten Liste,
 Brett und Zeit. Die Knöpfe sind `FilterChip variant="segment"`; die Beschriftung
 lautet „Zur Ansicht <Name> wechseln" und wird von den Tests gegriffen.
 
+### Brett
+
+Über dem Brett steht die Chipleiste `.board-filter` (`role="group"`,
+`aria-label="Kategorien filtern"`): *Alle*, dann eine Pille je Kategorie im
+Rahmen ihrer Farbe, dann *Ohne Kategorie*. Die Knöpfe sind `FilterChip`, die
+Kategoriefarbe kommt als Inline-Style aus den Daten, wie bei `CategoryBadge`.
+
+Die Beschriftungen sind sprechend, weil der sichtbare Text es nicht ist:
+`aria-label="Alle Kategorien"`, `"Kategorie <Name>"`, `"Ohne Kategorie"`. Die
+Leiste erscheint nur bei `viewMode === "kanban"`; ihr Zustand ist vom
+Kategorie-Filter der Liste getrennt, ein Ansichtswechsel verstellt also nicht
+still die andere Sicht.
+
 ### Zeiterfassung
 
 Die Zeit-Ansicht liegt komplett in `src/TimeTrackingView.tsx` und bringt eigene
@@ -297,6 +331,11 @@ Viertelstunden). Ihre Regeln:
   „08:15, Projekt Alpha" bzw. „08:15, frei".
 - Fachlogik gehört nach `src/timeSlots.ts` (rein, ohne React), Persistenz nach
   `src/timeDb.ts`. Die View rechnet nichts selbst außer der Zug-Vorschau.
+- Die Wochensumme in der Kopfzeile zeigt **Arbeitszeit** und nur sie; gegen das
+  Soll zählt dieselbe Zahl. Zeit auf Kategorien der Zeitart `none` steht daneben
+  im Band `.time-non-work` („+ 1:00 keine Arbeitszeit"), das nur erscheint, wenn
+  es solche Zeit gibt. Das Summenband je Kategorie (`.time-sums`) bleibt flach
+  und ungruppiert — die Farbe trägt die Zuordnung schon.
 - Selten Gebrauchtes gehört ins Einstellungs-Popup (`Modal variant="category"`),
   nicht in die Kopfzeile: dort stehen nur Navigation, Wochensumme und Differenz.
 
