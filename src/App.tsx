@@ -483,12 +483,16 @@ function App({ migrationError = null }: AppProps) {
     const dragged = todos.find((t) => t.id === todoId);
     if (!dragged) return;
 
+    // Die Nachbarschaft kommt aus dem, was der Mensch sieht: er legt die Karte
+    // zwischen zwei sichtbare Karten, nicht zwischen zwei Datensaetze.
     const laneTodos = sortBoardTodos(
       boardTodos.filter((t) => t.status === targetStatus && t.id !== todoId)
     );
     const place = Math.max(0, Math.min(index, laneTodos.length));
-    const before = place > 0 ? laneTodos[place - 1].board_order : null;
-    const after = place < laneTodos.length ? laneTodos[place].board_order : null;
+    const beforeTodo = place > 0 ? laneTodos[place - 1] : null;
+    const afterTodo = place < laneTodos.length ? laneTodos[place] : null;
+    const before = beforeTodo?.board_order ?? null;
+    const after = afterTodo?.board_order ?? null;
 
     // Was der Rebalance-Pfad schon weggeschrieben hat. Steht ausserhalb des
     // try, weil es auch der Fehlerzweig braucht.
@@ -497,9 +501,22 @@ function App({ migrationError = null }: AppProps) {
     try {
       if (needsRebalance(before, after)) {
         // Kein Platz zwischen den Nachbarn: die Spalte einmal neu
-        // durchnummerieren, mit der gezogenen Karte an ihrem neuen Index.
-        const ordered = [...laneTodos];
-        ordered.splice(place, 0, dragged);
+        // durchnummerieren -- und zwar ganz, auch was der Kategorie-Filter
+        // gerade ausblendet. Bekaemen nur die sichtbaren Karten neue Werte,
+        // stuenden die ausgeblendeten weiter auf ihren alten und tauchten
+        // zwischen ihnen auf, sobald der Filter faellt.
+        const fullLane = sortBoardTodos(
+          todos.filter((t) => t.status === targetStatus && t.id !== todoId)
+        );
+        // Die gezogene Karte kommt dorthin, wo sie zwischen ihren sichtbaren
+        // Nachbarn liegt; ausgeblendete behalten ihre Lage zu diesen beiden.
+        const fullPlace = beforeTodo
+          ? fullLane.findIndex((t) => t.id === beforeTodo.id) + 1
+          : afterTodo
+            ? fullLane.findIndex((t) => t.id === afterTodo.id)
+            : fullLane.length;
+        const ordered = [...fullLane];
+        ordered.splice(fullPlace, 0, dragged);
         const positions = rebalanceBoardOrders(ordered);
         for (const { id, board_order } of positions) {
           written.push(
