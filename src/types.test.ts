@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   fromRow,
+  fromCategoryRow,
   TodoRow,
   Todo,
   compareCategoryNames,
@@ -184,6 +185,7 @@ describe("sortCategories", () => {
   const cat = (id: number, name: string): Category => ({
     id,
     name,
+    time_kind: "internal",
     color: "#111111",
     created_at: "2026-01-01T00:00:00Z",
   });
@@ -254,5 +256,26 @@ describe("sortTodos", () => {
     sortTodos(original);
 
     expect(original.map((t) => t.id)).toEqual([1, 2]);
+  });
+});
+
+describe("fromCategoryRow", () => {
+  const row = {
+    id: 1,
+    name: "Arbeit",
+    color: "#7cc3f7",
+    created_at: "2026-09-16T08:00:00.000Z",
+  };
+
+  it("nimmt time_kind aus der Zeile", () => {
+    expect(fromCategoryRow({ ...row, time_kind: "external" }).time_kind).toBe("external");
+  });
+
+  it("faellt auf internal zurueck, wenn die Spalte fehlt", () => {
+    expect(fromCategoryRow(row).time_kind).toBe("internal");
+  });
+
+  it("faellt auf internal zurueck, wenn der Wert unbekannt ist", () => {
+    expect(fromCategoryRow({ ...row, time_kind: "quatsch" }).time_kind).toBe("internal");
   });
 });

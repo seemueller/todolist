@@ -2,6 +2,17 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unreleased]
+
+### Hinzugefügt
+- Das Brett hat eine Chipleiste über den Spalten: ein Klick auf eine Kategorie zeigt nur deren Karten, mehrere lassen sich zusammenschalten, „Ohne Kategorie" sammelt die Aufgaben ohne Zuordnung, „Alle" hebt die Auswahl wieder auf. Die Auswahl ist unabhängig vom Filter der Liste.
+- Eine Kategorie trägt jetzt eine Zeitart: **Keine** (Pause, Privat, Arzt), **Intern** oder **Extern**. Eingestellt wird sie im Kategorien-Fenster, beim Anlegen wie bei jeder bestehenden Kategorie. Bestehende Kategorien sind Arbeitszeit („Intern"); wer eine anders eingestuft haben will, stellt sie dort einmal um.
+- Der CSV-Export der Woche hat die Spalte „Art" hinter der Kategorie und schreibt dort „intern", „extern" oder „keine".
+
+### Geändert
+- Die Liste startet auf **Offen** statt auf **Alle** und merkt sich, was zuletzt gewählt war. „Zurücksetzen" landet ebenfalls auf **Offen** — das Zurücksetzen blendet damit nicht mehr den erledigten Altbestand ein.
+- Die Wochensumme der Zeiterfassung und die Summe je Tag zeigen nur noch Arbeitszeit, und nur sie zählt gegen das Soll. Gebuchte Zeit auf Kategorien der Zeitart „Keine" steht daneben als eigener Ausweis, etwa „+ 1:00 keine Arbeitszeit", und erscheint nur, wenn es solche Zeit gibt.
+
 ## [0.10.0] - 2026-09-14
 
 ### Hinzugefügt

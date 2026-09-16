@@ -379,6 +379,16 @@ pub fn run() {
             sql: "ALTER TABLE todos ADD COLUMN deleted_at TEXT DEFAULT NULL;",
             kind: MigrationKind::Up,
         },
+        // Bestehende Kategorien werden Arbeitszeit: das trifft die grosse
+        // Mehrheit, und wer eine Kategorie anders eingestuft haben will, stellt
+        // sie einmal im Kategorien-Fenster um. Bewusst kein Rateversuch anhand
+        // des Namens.
+        Migration {
+            version: 12,
+            description: "add_time_kind_to_categories",
+            sql: "ALTER TABLE categories ADD COLUMN time_kind TEXT NOT NULL DEFAULT 'internal';",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

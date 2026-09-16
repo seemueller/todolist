@@ -8,6 +8,7 @@ import {
   lazy,
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import {
@@ -26,9 +27,10 @@ import {
   updateTodoStatus,
 } from "./db";
 import { DATA_CHANGED_EVENT } from "./events";
+import { loadStatusFilter, saveStatusFilter, type StatusFilter } from "./listPrefs";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, Priority, sortCategories, sortTodos, Todo, TodoStatus } from "./types";
+import { CATEGORY_COLORS, Category, Priority, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
@@ -68,6 +70,7 @@ import {
   PlusIcon,
   PrioritySelect,
   TagIcon,
+  TimeKindSelect,
   TrashIcon,
   UpdateIcon,
 } from "./ui";
@@ -167,7 +170,7 @@ function App({ migrationError = null }: AppProps) {
     null,
   );
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "done">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(loadStatusFilter);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Category state
@@ -177,6 +180,7 @@ function App({ migrationError = null }: AppProps) {
   const [showTrash, setShowTrash] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState(CATEGORY_COLORS[0]);
+  const [newCategoryTimeKind, setNewCategoryTimeKind] = useState<TimeKind>("internal");
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingCategoryColor, setEditingCategoryColor] = useState("");
@@ -185,11 +189,29 @@ function App({ migrationError = null }: AppProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [draggedTodoId, setDraggedTodoId] = useState<number | null>(null);
   const [dragOverLane, setDragOverLane] = useState<TodoStatus | null>(null);
+  // Leere Menge heisst "alles zeigen" -- kein Sonderwert, kein null-fuer-alle.
+  // null als Element steht fuer Aufgaben ohne Kategorie.
+  const [boardCategories, setBoardCategories] = useState<Set<number | null>>(new Set());
+
+  const toggleBoardCategory = useCallback((id: number | null) => {
+    setBoardCategories((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
 
   // Debug log panel (Ctrl+Shift+L)
   const [showDebug, setShowDebug] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
   const closeDebug = useCallback(() => setShowDebug(false), []);
+
+  // Jede Aenderung der Statusleiste wird gemerkt -- die Liste soll beim
+  // naechsten Start dort stehen, wo man sie verlassen hat.
+  const changeStatusFilter = useCallback((value: StatusFilter) => {
+    setStatusFilter(value);
+    saveStatusFilter(value);
+  }, []);
 
   /**
    * Laedt Aufgaben und Kategorien neu.
@@ -494,10 +516,11 @@ function App({ migrationError = null }: AppProps) {
     const name = newCategoryName.trim();
     if (!name) return;
     try {
-      const cat = await addCategory(name, newCategoryColor);
+      const cat = await addCategory(name, newCategoryColor, newCategoryTimeKind);
       setCategories((prev) => sortCategories([...prev, cat]));
       setNewCategoryName("");
       setNewCategoryColor(CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length]);
+      setNewCategoryTimeKind("internal");
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -510,11 +533,14 @@ function App({ migrationError = null }: AppProps) {
     setEditingCategoryColor(cat.color);
   }
 
-  async function commitEditCategory(id: number) {
+  // Die Zeitart wird mitgeschickt, obwohl sie hier nicht bearbeitet wird: der
+  // Vorgabewert des Store-Vertrags ist "internal", ein Weglassen wuerde also
+  // beim Umbenennen still eine Kategorie "Keine" zu Arbeitszeit machen.
+  async function commitEditCategory(cat: Category) {
     const name = editingCategoryName.trim();
     if (!name) return;
     try {
-      const updated = await updateCategory(id, name, editingCategoryColor);
+      const updated = await updateCategory(cat.id, name, editingCategoryColor, cat.time_kind);
       setCategories((prev) =>
         sortCategories(prev.map((c) => (c.id === updated.id ? updated : c)))
       );
@@ -525,12 +551,33 @@ function App({ migrationError = null }: AppProps) {
     setEditingCategoryId(null);
   }
 
+  async function handleCategoryTimeKindChange(cat: Category, timeKind: TimeKind) {
+    if (cat.time_kind === timeKind) return;
+    try {
+      const updated = await updateCategory(cat.id, cat.name, cat.color, timeKind);
+      setCategories((prev) =>
+        sortCategories(prev.map((c) => (c.id === updated.id ? updated : c)))
+      );
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
   async function handleDeleteCategory(id: number) {
     try {
       await deleteCategory(id);
       setCategories((prev) => prev.filter((c) => c.id !== id));
       setTodos((prev) => prev.map((t) => (t.category_id === id ? { ...t, category_id: null, category_name: null, category_color: null } : t)));
       if (categoryFilter === id) setCategoryFilter(null);
+      // Bliebe die Id in der Brett-Auswahl stehen, waere ihr Chip weg, "Alle"
+      // aber weiter inaktiv -- das Brett zeigte dann keine Karte mehr.
+      setBoardCategories((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -559,9 +606,21 @@ function App({ migrationError = null }: AppProps) {
     return true;
   });
 
+  // Gefiltert wird im State, nicht in der Datenbank: die Aufgaben liegen ohnehin
+  // vollstaendig vor, ein Nachladen je Klick waere nur traeger.
+  const boardTodos = useMemo(
+    () =>
+      boardCategories.size === 0
+        ? todos
+        : todos.filter((t) => boardCategories.has(t.category_id)),
+    [todos, boardCategories]
+  );
+
   const detailTodo = detailTodoId === null ? null : todos.find((t) => t.id === detailTodoId) ?? null;
 
-  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "all" || searchQuery || categoryFilter !== null;
+  // "Offen" ist die Voreinstellung und damit kein gesetzter Filter, ueber den
+  // das Band informieren muesste.
+  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "open" || searchQuery || categoryFilter !== null;
 
   return (
     <div className="app-shell">
@@ -629,14 +688,31 @@ function App({ migrationError = null }: AppProps) {
                 {filterLabels[key]}
               </FilterChip>
             ))}
-            <div className="status-filter">
-              <FilterChip variant="segment" active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
+            {/* Sprechende Beschriftungen, weil "Alle" sonst zweimal vorkommt --
+                einmal hier und einmal als Faelligkeitsfilter daneben. */}
+            <div className="status-filter" role="group" aria-label="Status filtern">
+              <FilterChip
+                variant="segment"
+                active={statusFilter === "all"}
+                onClick={() => changeStatusFilter("all")}
+                aria-label="Status Alle"
+              >
                 Alle
               </FilterChip>
-              <FilterChip variant="segment" active={statusFilter === "open"} onClick={() => setStatusFilter("open")}>
+              <FilterChip
+                variant="segment"
+                active={statusFilter === "open"}
+                onClick={() => changeStatusFilter("open")}
+                aria-label="Status Offen"
+              >
                 Offen
               </FilterChip>
-              <FilterChip variant="segment" active={statusFilter === "done"} onClick={() => setStatusFilter("done")}>
+              <FilterChip
+                variant="segment"
+                active={statusFilter === "done"}
+                onClick={() => changeStatusFilter("done")}
+                aria-label="Status Erledigt"
+              >
                 Erledigt
               </FilterChip>
             </div>
@@ -674,8 +750,8 @@ function App({ migrationError = null }: AppProps) {
           <div className="active-filters">
             <span className="filter-label">
               {filterLabels[dueDateFilter]}
-              {statusFilter !== "all"
-                ? ` • ${statusFilter === "open" ? "Offen" : "Erledigt"}`
+              {statusFilter !== "open"
+                ? ` • ${statusFilter === "all" ? "Alle Status" : "Erledigt"}`
                 : ""}
               {categoryFilter !== null
                 ? ` • ${categories.find((c) => c.id === categoryFilter)?.name || "Kategorie"}`
@@ -687,7 +763,7 @@ function App({ migrationError = null }: AppProps) {
               className="clear-filters"
               onClick={() => {
                 setDueDateFilter("all");
-                setStatusFilter("all");
+                changeStatusFilter("open");
                 setSearchQuery("");
                 setCategoryFilter(null);
               }}
@@ -823,9 +899,41 @@ function App({ migrationError = null }: AppProps) {
         )}
 
         {viewMode === "kanban" && (
+          <>
+          {/* Die Kategoriefarbe kommt als Inline-Style aus den Daten, wie bei
+              CategoryBadge auch -- hier als Rahmen, damit der aktive Chip
+              weiterhin die Tintenflaeche tragen kann. */}
+          <div className="board-filter" role="group" aria-label="Kategorien filtern">
+            <FilterChip
+              active={boardCategories.size === 0}
+              onClick={() => setBoardCategories(new Set())}
+              aria-label="Alle Kategorien"
+            >
+              Alle
+            </FilterChip>
+            {categories.map((category) => (
+              <FilterChip
+                key={category.id}
+                active={boardCategories.has(category.id)}
+                onClick={() => toggleBoardCategory(category.id)}
+                aria-label={`Kategorie ${category.name}`}
+                style={{ borderColor: category.color }}
+              >
+                {category.name}
+              </FilterChip>
+            ))}
+            <FilterChip
+              active={boardCategories.has(null)}
+              onClick={() => toggleBoardCategory(null)}
+              aria-label="Ohne Kategorie"
+            >
+              Ohne Kategorie
+            </FilterChip>
+          </div>
+
           <div className="kanban-wrapper">
             {kanbanLanes.map((lane) => {
-              const laneTodos = todos
+              const laneTodos = boardTodos
                 .filter((t) => t.status === lane.status)
                 .sort((a, b) => {
                   const priorityOrder = { high: 0, medium: 1, low: 2 };
@@ -924,6 +1032,7 @@ function App({ migrationError = null }: AppProps) {
               );
             })}
           </div>
+          </>
         )}
 
         {viewMode === "time" && (
@@ -1064,6 +1173,11 @@ function App({ migrationError = null }: AppProps) {
                 onSelect={setNewCategoryColor}
                 swatchLabel={(color) => `Farbe ${color} auswählen`}
               />
+              <TimeKindSelect
+                value={newCategoryTimeKind}
+                onValueChange={setNewCategoryTimeKind}
+                label="neue Kategorie"
+              />
               <button type="submit">Hinzufügen</button>
             </form>
 
@@ -1075,7 +1189,7 @@ function App({ migrationError = null }: AppProps) {
                       <InlineEditInput
                         value={editingCategoryName}
                         onValueChange={setEditingCategoryName}
-                        onCommit={() => commitEditCategory(cat.id)}
+                        onCommit={() => commitEditCategory(cat)}
                         onCancel={() => setEditingCategoryId(null)}
                       />
                       <ColorPicker
@@ -1095,11 +1209,17 @@ function App({ migrationError = null }: AppProps) {
                     </>
                   )}
 
+                  <TimeKindSelect
+                    value={cat.time_kind}
+                    onValueChange={(kind) => handleCategoryTimeKindChange(cat, kind)}
+                    label={cat.name}
+                  />
+
                   <div className="category-actions">
                     {editingCategoryId === cat.id ? (
                       <IconButton
                         variant="icon"
-                        onClick={() => commitEditCategory(cat.id)}
+                        onClick={() => commitEditCategory(cat)}
                         aria-label="Speichern"
                       >
                         <CheckIcon />

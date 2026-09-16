@@ -36,4 +36,11 @@ describe("sql migrations", () => {
     expect(source).toContain("add_deleted_at_to_todos");
     expect(source).toContain("ALTER TABLE todos ADD COLUMN deleted_at TEXT DEFAULT NULL;");
   });
+
+  it("gives categories a time_kind column defaulting to internal", () => {
+    expect(source).toContain("add_time_kind_to_categories");
+    expect(source).toContain(
+      "ALTER TABLE categories ADD COLUMN time_kind TEXT NOT NULL DEFAULT 'internal';"
+    );
+  });
 });

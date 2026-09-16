@@ -20,7 +20,7 @@
 
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Category } from "./types";
+import { Category, TimeKind } from "./types";
 import { DATA_CHANGED_EVENT } from "./events";
 import { isTauri } from "./sqlClient";
 import {
@@ -37,8 +37,10 @@ import {
   formatWeekLabel,
   isWeekend,
   slotToLabel,
+  splitByWorkTime,
   startOfWeek,
   sumByCategory,
+  sumSlots,
   timeToSlot,
   toDateKey,
   weekDays,
@@ -200,18 +202,34 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
     [days, week]
   );
 
+  // Eine Kategorie, die es nicht mehr gibt, gilt als Arbeitszeit: geloeschte
+  // Kategorien duerfen bereits gebuchte Zeit nicht aus der Summe fallen lassen.
+  const kindOf = useCallback(
+    (id: number): TimeKind => categoryById.get(id)?.time_kind ?? "internal",
+    [categoryById]
+  );
+
+  // Nur Arbeitszeit; Pausen und Privates stehen getrennt daneben.
   const daySums = useMemo(() => {
     const map = new Map<string, number>();
-    for (const day of days) map.set(day, (week[day] ?? []).length);
+    for (const day of days) {
+      const { work } = splitByWorkTime(sumByCategory(week[day] ?? []), kindOf);
+      map.set(day, sumSlots(work));
+    }
     return map;
-  }, [days, week]);
+  }, [days, week, kindOf]);
 
   const weekSlots = useMemo(() => days.flatMap((day) => week[day] ?? []), [days, week]);
   const weekSums = useMemo(() => sumByCategory(weekSlots), [weekSlots]);
-  const weekTotal = weekSlots.length;
+  const { work: workSums, nonWork: nonWorkSums } = useMemo(
+    () => splitByWorkTime(weekSums, kindOf),
+    [weekSums, kindOf]
+  );
+  const weekWorkTotal = useMemo(() => sumSlots(workSums), [workSums]);
+  const weekNonWorkTotal = useMemo(() => sumSlots(nonWorkSums), [nonWorkSums]);
   // Das Soll haengt an den regulaeren Arbeitstagen, nicht an den angezeigten Spalten.
   const weekTarget = settings.targetSlotsPerDay * WORKDAYS_PER_WEEK;
-  const difference = weekTotal - weekTarget;
+  const difference = weekWorkTotal - weekTarget;
 
   const categoryName = useCallback(
     (id: number) => categoryById.get(id)?.name ?? "Gelöschte Kategorie",
@@ -304,14 +322,14 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
   }, []);
 
   const exportCsv = useCallback(() => {
-    const csv = buildCsv(days, week, categoryName);
+    const csv = buildCsv(days, week, categoryName, kindOf);
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = csvFileName(monday);
     link.click();
     URL.revokeObjectURL(url);
-  }, [categoryName, days, monday, week]);
+  }, [categoryName, kindOf, days, monday, week]);
 
   const closeSettings = useCallback(() => setShowSettings(false), []);
 
@@ -347,8 +365,13 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
           <SlidersIcon />
         </IconButton>
         <span className="time-total">
-          Woche <strong>{formatDuration(weekTotal)}</strong>
+          Woche <strong>{formatDuration(weekWorkTotal)}</strong>
         </span>
+        {weekNonWorkTotal > 0 && (
+          <span className="time-non-work">
+            + {formatDuration(weekNonWorkTotal)} keine Arbeitszeit
+          </span>
+        )}
         <span
           className={`time-difference ${difference < 0 ? "behind" : difference > 0 ? "ahead" : ""}`}
           title={`Soll ${formatDuration(weekTarget)}`}
@@ -548,7 +571,11 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
                   {formatDuration(sum.slotCount)}
                 </span>
               ))}
-              <span className="time-sum-total">= {formatDuration(weekTotal)}</span>
+              {/* Das Band zeigt jede Kategorie, also summiert seine Abschlusszeile
+                  auch jede -- die Kopfzeile bleibt dagegen bei der Arbeitszeit. */}
+              <span className="time-sum-total">
+                = {formatDuration(weekWorkTotal + weekNonWorkTotal)}
+              </span>
             </div>
           )}
         </>

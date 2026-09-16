@@ -57,5 +57,8 @@ export type { ModalProps, ModalVariant } from "./Modal";
 export { ColorPicker } from "./ColorPicker";
 export type { ColorPickerProps } from "./ColorPicker";
 
+export { TimeKindSelect } from "./TimeKindSelect";
+export type { TimeKindSelectProps } from "./TimeKindSelect";
+
 export { InlineEditInput } from "./InlineEditInput";
 export type { InlineEditInputProps } from "./InlineEditInput";

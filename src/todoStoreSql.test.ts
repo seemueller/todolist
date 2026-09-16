@@ -184,7 +184,7 @@ describe("sqlTodoStore", () => {
       { id: 1, name: "ärzte", color: "#111111", created_at: "2026-09-03T08:00:00.000Z" },
     ]);
 
-    const updated = await sqlTodoStore.updateCategory(1, "ärzte", "#111111");
+    const updated = await sqlTodoStore.updateCategory(1, "ärzte", "#111111", "internal");
 
     expect(updated.name).toBe("ärzte");
     expect(execute).toHaveBeenCalledTimes(1);
@@ -196,7 +196,7 @@ describe("sqlTodoStore", () => {
       { id: 2, name: "Sport", color: "#111111", created_at: "2026-09-03T08:00:00.000Z" },
     ]);
 
-    await expect(sqlTodoStore.updateCategory(2, "ärzte", "#222222")).rejects.toThrow(
+    await expect(sqlTodoStore.updateCategory(2, "ärzte", "#222222", "internal")).rejects.toThrow(
       'Es gibt bereits eine Kategorie "Ärzte".'
     );
 
@@ -237,6 +237,81 @@ describe("sqlTodoStore", () => {
     await sqlTodoStore.addCategory(" A\u0308rzte ", "#000000");
 
     expect(execute.mock.calls[0][1][0]).toBe("Ärzte");
+  });
+
+  it("schreibt time_kind beim Anlegen", async () => {
+    select.mockResolvedValueOnce([]);
+    execute.mockResolvedValue({ lastInsertId: 1, rowsAffected: 1 });
+    select.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: "Kunde X",
+        color: "#7cc3f7",
+        created_at: "2026-09-16T08:00:00.000Z",
+        time_kind: "external",
+      },
+    ]);
+
+    await sqlTodoStore.addCategory("Kunde X", "#7cc3f7", "external");
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("time_kind");
+    expect(params).toContain("external");
+  });
+
+  it("legt ohne Angabe als internal an", async () => {
+    select.mockResolvedValueOnce([]);
+    execute.mockResolvedValue({ lastInsertId: 1, rowsAffected: 1 });
+    select.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: "Arbeit",
+        color: "#7cc3f7",
+        created_at: "2026-09-16T08:00:00.000Z",
+        time_kind: "internal",
+      },
+    ]);
+
+    await sqlTodoStore.addCategory("Arbeit", "#7cc3f7");
+
+    expect(execute.mock.calls[0][1]).toContain("internal");
+  });
+
+  it("schreibt time_kind beim Aendern", async () => {
+    select.mockResolvedValueOnce([]);
+    execute.mockResolvedValue({ rowsAffected: 1 });
+    select.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: "Arbeit",
+        color: "#7cc3f7",
+        created_at: "2026-09-16T08:00:00.000Z",
+        time_kind: "none",
+      },
+    ]);
+
+    await sqlTodoStore.updateCategory(1, "Arbeit", "#7cc3f7", "none");
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("time_kind = ");
+    expect(params).toContain("none");
+  });
+
+  it("liest time_kind aus der Zeile", async () => {
+    select.mockResolvedValue([
+      {
+        id: 1,
+        name: "Arbeit",
+        color: "#7cc3f7",
+        created_at: "2026-09-16T08:00:00.000Z",
+        time_kind: "external",
+      },
+    ]);
+
+    const [category] = await sqlTodoStore.listCategories();
+
+    expect(select.mock.calls[0][0]).toContain("time_kind");
+    expect(category.time_kind).toBe("external");
   });
 
   it("deletes a category and relies on the foreign key to clear it off todos", async () => {

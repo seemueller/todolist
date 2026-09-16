@@ -29,6 +29,13 @@ test.describe("Zeiterfassung", () => {
     await page.getByRole("button", { name: /Schließen/i }).click();
   }
 
+  /** Stellt die Zeitart einer bestehenden Kategorie im Kategorien-Fenster um. */
+  async function setTimeKind(page: Page, name: string, kind: "Keine" | "Intern" | "Extern") {
+    await page.getByRole("button", { name: /Kategorien verwalten/i }).click();
+    await page.getByRole("button", { name: `Zeitart ${name}: ${kind}` }).click();
+    await page.getByRole("button", { name: /Schließen/i }).click();
+  }
+
   /** Oeffnet das Einstellungs-Popup der Zeiterfassung. */
   async function openSettings(page: Page) {
     await page.getByRole("button", { name: /Einstellungen der Zeiterfassung/i }).click();
@@ -73,6 +80,42 @@ test.describe("Zeiterfassung", () => {
     await expect(page.locator(".time-block-duration")).toHaveText("0:15");
     await expect(page.locator(".time-total strong")).toHaveText("0:15");
     await expect(page.locator(".time-day-sum").nth(0)).toHaveText("0:15");
+    // Eine Kategorie ist von Haus aus Arbeitszeit, also kein Zusatz daneben.
+    await expect(page.locator(".time-non-work")).toHaveCount(0);
+  });
+
+  test("zählt eine Kategorie ohne Arbeitszeit nicht gegen das Soll", async ({ page }) => {
+    await addCategory(page, "Pause");
+    await setTimeKind(page, "Pause", "Keine");
+    await openTimeView(page);
+
+    await cell(page, 0, 9, 0).click();
+    await expect(page.locator(".time-block")).toHaveCount(1);
+
+    // Die Buchung steht als Block und als Tagessumme, zaehlt aber weder in der
+    // Wochensumme noch gegen das Soll — sie steht nur im Zusatz daneben.
+    await expect(page.locator(".time-block-duration")).toHaveText("0:15");
+    await expect(page.locator(".time-total strong")).toHaveText("0:00");
+    await expect(page.locator(".time-non-work")).toHaveText("+ 0:15 keine Arbeitszeit");
+    await expect(page.locator(".time-difference")).toHaveText("-40:00");
+    await expect(page.locator(".time-day-sum").nth(0)).toHaveText("0:00");
+  });
+
+  test("zählt eine wieder auf Arbeitszeit gestellte Kategorie mit", async ({ page }) => {
+    await addCategory(page, "Kunde");
+    await setTimeKind(page, "Kunde", "Keine");
+    await openTimeView(page);
+    await cell(page, 0, 9, 0).click();
+    await expect(page.locator(".time-total strong")).toHaveText("0:00");
+
+    // Das Kategorien-Fenster haengt an der Filterleiste der Liste, also zurueck.
+    await page.getByRole("button", { name: /Zur Ansicht Liste wechseln/i }).click();
+    await setTimeKind(page, "Kunde", "Extern");
+    await openTimeView(page);
+
+    await expect(page.locator(".time-total strong")).toHaveText("0:15");
+    await expect(page.locator(".time-non-work")).toHaveCount(0);
+    await expect(page.locator(".time-difference")).toHaveText("-39:45");
   });
 
   test("malt beim Ziehen den ganzen Bereich einer Spalte", async ({ page }) => {
@@ -295,8 +338,8 @@ test.describe("Zeiterfassung", () => {
     const chunks: Buffer[] = [];
     for await (const chunk of stream) chunks.push(chunk as Buffer);
     const csv = Buffer.concat(chunks).toString("utf8");
-    expect(csv).toContain("Datum;Von;Bis;Dauer;Minuten;Kategorie;Notiz");
-    expect(csv).toContain('09:00;09:15;0:15;15;Alpha;"Ticket 4711; Teil A"');
+    expect(csv).toContain("Datum;Von;Bis;Dauer;Minuten;Kategorie;Art;Notiz");
+    expect(csv).toContain('09:00;09:15;0:15;15;Alpha;intern;"Ticket 4711; Teil A"');
   });
 
   test("wechselt zwischen allen drei Ansichten", async ({ page }) => {

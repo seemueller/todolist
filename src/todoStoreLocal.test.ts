@@ -106,7 +106,7 @@ describe("localTodoStore", () => {
 
   it("allows renaming a category to its own current name in a different case", async () => {
     const cat = await localTodoStore.addCategory("Ärzte", "#000000");
-    const updated = await localTodoStore.updateCategory(cat.id, "ärzte", "#111111");
+    const updated = await localTodoStore.updateCategory(cat.id, "ärzte", "#111111", "internal");
     expect(updated.name).toBe("ärzte");
     expect(updated.color).toBe("#111111");
   });
@@ -115,7 +115,7 @@ describe("localTodoStore", () => {
     await localTodoStore.addCategory("Ärzte", "#000000");
     const sport = await localTodoStore.addCategory("Sport", "#111111");
 
-    await expect(localTodoStore.updateCategory(sport.id, "ärzte", "#222222")).rejects.toThrow(
+    await expect(localTodoStore.updateCategory(sport.id, "ärzte", "#222222", "internal")).rejects.toThrow(
       'Es gibt bereits eine Kategorie "Ärzte".'
     );
 
@@ -148,6 +148,34 @@ describe("localTodoStore", () => {
     expect(await localTodoStore.addCategory("Ärzte", "#111111").catch((e) => e.message)).toBe(
       'Es gibt bereits eine Kategorie "Ärzte".'
     );
+  });
+
+  it("legt mit time_kind an", async () => {
+    const cat = await localTodoStore.addCategory("Kunde X", "#7cc3f7", "external");
+    expect(cat.time_kind).toBe("external");
+    expect((await localTodoStore.listCategories())[0].time_kind).toBe("external");
+  });
+
+  it("legt ohne Angabe als internal an", async () => {
+    expect((await localTodoStore.addCategory("Arbeit", "#7cc3f7")).time_kind).toBe("internal");
+  });
+
+  it("aendert time_kind", async () => {
+    const cat = await localTodoStore.addCategory("Pause", "#7cc3f7");
+    const updated = await localTodoStore.updateCategory(cat.id, "Pause", "#7cc3f7", "none");
+    expect(updated.time_kind).toBe("none");
+    expect((await localTodoStore.listCategories())[0].time_kind).toBe("none");
+  });
+
+  it("liest Altbestand ohne time_kind als internal", async () => {
+    localStorage.setItem(
+      "todolist_categories",
+      JSON.stringify([
+        { id: 1, name: "Arbeit", color: "#7cc3f7", created_at: "2026-09-16T08:00:00.000Z" },
+      ])
+    );
+
+    expect((await localTodoStore.listCategories())[0].time_kind).toBe("internal");
   });
 
   it("creates a todo without a description by default", async () => {

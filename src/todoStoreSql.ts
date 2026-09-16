@@ -9,6 +9,7 @@ import {
   Todo,
   TodoRow,
   TodoStatus,
+  TimeKind,
   fromRow,
   fromCategoryRow,
   sortCategories,
@@ -194,7 +195,7 @@ async function purgeDeletedBefore(cutoff: string): Promise<number> {
 async function listCategories(): Promise<Category[]> {
   const db = await getDb();
   const rows = await db.select<CategoryRow[]>(
-    "SELECT id, name, color, created_at FROM categories"
+    "SELECT id, name, color, created_at, time_kind FROM categories"
   );
   // Sorted here, not in SQL: SQLite's NOCASE collation only case-folds ASCII,
   // so "Ärzte" would land after "Zebra". sortCategories is the one order the
@@ -206,7 +207,7 @@ async function listCategories(): Promise<Category[]> {
 async function selectCategory(id: number): Promise<Category> {
   const db = await getDb();
   const rows = await db.select<CategoryRow[]>(
-    "SELECT id, name, color, created_at FROM categories WHERE id = $1",
+    "SELECT id, name, color, created_at, time_kind FROM categories WHERE id = $1",
     [id]
   );
   if (rows.length === 0) throw new Error(`Category ${id} not found`);
@@ -221,7 +222,9 @@ async function selectCategory(id: number): Promise<Category> {
 // updateCategory allow a category to keep its own name.
 async function assertNameAvailable(name: string, excludeId?: number): Promise<void> {
   const db = await getDb();
-  const rows = await db.select<CategoryRow[]>("SELECT id, name, color, created_at FROM categories");
+  const rows = await db.select<CategoryRow[]>(
+    "SELECT id, name, color, created_at, time_kind FROM categories"
+  );
   const key = categoryNameKey(name);
   const collision = rows.find((r) => r.id !== excludeId && categoryNameKey(r.name) === key);
   if (collision) {
@@ -229,24 +232,32 @@ async function assertNameAvailable(name: string, excludeId?: number): Promise<vo
   }
 }
 
-async function addCategory(name: string, color: string): Promise<Category> {
+async function addCategory(
+  name: string,
+  color: string,
+  timeKind: TimeKind = "internal"
+): Promise<Category> {
   await assertNameAvailable(name);
   const db = await getDb();
   const result = await db.execute(
-    "INSERT INTO categories (name, color, created_at) VALUES ($1, $2, $3)",
-    [canonicalCategoryName(name), color, new Date().toISOString()]
+    "INSERT INTO categories (name, color, created_at, time_kind) VALUES ($1, $2, $3, $4)",
+    [canonicalCategoryName(name), color, new Date().toISOString(), timeKind]
   );
   return selectCategory(result.lastInsertId as number);
 }
 
-async function updateCategory(id: number, name: string, color: string): Promise<Category> {
+async function updateCategory(
+  id: number,
+  name: string,
+  color: string,
+  timeKind: TimeKind
+): Promise<Category> {
   await assertNameAvailable(name, id);
   const db = await getDb();
-  await db.execute("UPDATE categories SET name = $1, color = $2 WHERE id = $3", [
-    canonicalCategoryName(name),
-    color,
-    id,
-  ]);
+  await db.execute(
+    "UPDATE categories SET name = $1, color = $2, time_kind = $3 WHERE id = $4",
+    [canonicalCategoryName(name), color, timeKind, id]
+  );
   return selectCategory(id);
 }
 

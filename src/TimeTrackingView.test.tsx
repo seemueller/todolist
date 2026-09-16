@@ -74,8 +74,8 @@ function emit(name: string) {
 }
 
 const categories: Category[] = [
-  { id: 7, name: "Alpha", color: "#7cc3f7", created_at: "2026-09-01T08:00:00.000Z" },
-  { id: 9, name: "Daily", color: "#ffd43b", created_at: "2026-09-01T08:00:00.000Z" },
+  { id: 7, name: "Alpha", color: "#7cc3f7", created_at: "2026-09-01T08:00:00.000Z", time_kind: "internal" },
+  { id: 9, name: "Daily", color: "#ffd43b", created_at: "2026-09-01T08:00:00.000Z", time_kind: "internal" },
 ];
 
 // Die View zeigt immer die laufende Woche. Die erwarteten Beschriftungen werden
@@ -108,6 +108,16 @@ function blockDurations(): string[] {
 /** Die Tagessummen unter dem Raster, Montag bis Freitag. */
 function daySums(): string[] {
   return [...document.querySelectorAll(".time-day-sum")].map((el) => el.textContent ?? "");
+}
+
+/** Die Kategoriezeilen des Summenbandes, in Reihenfolge. */
+function sumRows(): string[] {
+  return [...document.querySelectorAll(".time-sum")].map((el) => el.textContent ?? "");
+}
+
+/** Die Abschlusszeile des Summenbandes. */
+function sumTotal(): string {
+  return document.querySelector(".time-sum-total")?.textContent ?? "";
 }
 
 /** Die Wochensumme aus der Kopfzeile. */
@@ -442,8 +452,8 @@ describe("TimeTrackingView", () => {
       reader.onload = () => resolve(String(reader.result));
       reader.readAsText(blob);
     });
-    expect(text).toContain("Datum;Von;Bis;Dauer;Minuten;Kategorie;Notiz");
-    expect(text).toContain(`${MO};09:00;09:15;0:15;15;Alpha;`);
+    expect(text).toContain("Datum;Von;Bis;Dauer;Minuten;Kategorie;Art;Notiz");
+    expect(text).toContain(`${MO};09:00;09:15;0:15;15;Alpha;intern;`);
     click.mockRestore();
   });
 
@@ -494,6 +504,77 @@ describe("TimeTrackingView", () => {
       await screen.findByRole("button", { name: at(MO, "06:00, frei") });
 
       expect(listenMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Arbeitszeit und Nicht-Arbeitszeit", () => {
+    // "Daily" ist hier keine Arbeitszeit; die vier Viertelstunden darauf duerfen
+    // weder gegen das Soll noch in die Tagessumme zaehlen.
+    const mixedCategories: Category[] = [
+      categories[0],
+      { ...categories[1], time_kind: "none" },
+    ];
+
+    /** Vier Viertelstunden Alpha und vier Viertelstunden Daily am Montag. */
+    function seedMixedMonday() {
+      store.set(MO, [
+        { slot: 36, category_id: 7, note: "" },
+        { slot: 37, category_id: 7, note: "" },
+        { slot: 38, category_id: 7, note: "" },
+        { slot: 39, category_id: 7, note: "" },
+        { slot: 44, category_id: 9, note: "" },
+        { slot: 45, category_id: 9, note: "" },
+        { slot: 46, category_id: 9, note: "" },
+        { slot: 47, category_id: 9, note: "" },
+      ]);
+    }
+
+    it("zaehlt 'keine Arbeitszeit' nicht gegen das Soll", async () => {
+      seedMixedMonday();
+      renderView({ categories: mixedCategories });
+
+      expect(await screen.findByText("= 2:00")).toBeInTheDocument();
+      expect(screen.getByText(/1:00 keine Arbeitszeit/)).toBeInTheDocument();
+      expect(weekTotal()).toBe("1:00");
+      expect(target().difference).toBe("-39:00");
+    });
+
+    // Das Band ist flach: es zeigt jede Kategorie, also muss seine
+    // Abschlusszeile auch alles aufaddieren, was ueber ihr steht.
+    it("summiert im Band alle gezeigten Zeilen, nicht nur die Arbeitszeit", async () => {
+      seedMixedMonday();
+      renderView({ categories: mixedCategories });
+
+      await screen.findByText("= 2:00");
+      expect(sumRows()).toEqual(["Alpha1:00", "Daily1:00"]);
+      expect(sumTotal()).toBe("= 2:00");
+      // Die Kopfzeile bleibt bei der Arbeitszeit.
+      expect(weekTotal()).toBe("1:00");
+    });
+
+    it("laesst die Tagessumme nur die Arbeitszeit zeigen", async () => {
+      seedMixedMonday();
+      renderView({ categories: mixedCategories });
+
+      await screen.findByText("= 2:00");
+      expect(daySums()).toEqual(["1:00", "0:00", "0:00", "0:00", "0:00"]);
+    });
+
+    it("weist ohne Nicht-Arbeitszeit keinen Zusatz aus", async () => {
+      seedMixedMonday();
+      renderView();
+
+      expect(await screen.findByText("= 2:00")).toBeInTheDocument();
+      expect(screen.queryByText(/keine Arbeitszeit/)).not.toBeInTheDocument();
+      expect(document.querySelector(".time-non-work")).toBeNull();
+    });
+
+    it("zaehlt eine geloeschte Kategorie als Arbeitszeit", async () => {
+      store.set(MO, [{ slot: 36, category_id: 99, note: "" }]);
+      renderView({ categories: mixedCategories });
+
+      expect(await screen.findByText("= 0:15")).toBeInTheDocument();
+      expect(document.querySelector(".time-non-work")).toBeNull();
     });
   });
 });

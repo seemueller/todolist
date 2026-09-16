@@ -20,9 +20,12 @@ import {
   timeToSlot,
   toDateKey,
   weekDays,
+  splitByWorkTime,
+  sumSlots,
   totalSlots,
   type DaySlot,
 } from "./timeSlots";
+import type { TimeKind } from "./types";
 
 function slot(s: number, categoryId: number, note = ""): DaySlot {
   return { slot: s, category_id: categoryId, note };
@@ -178,6 +181,51 @@ describe("Summen", () => {
 
   it("zaehlt die Slots des Tages", () => {
     expect(totalSlots([slot(36, 7), slot(37, 9)])).toBe(2);
+  });
+});
+
+describe("splitByWorkTime", () => {
+  const sums = [
+    { category_id: 1, slotCount: 8 },
+    { category_id: 2, slotCount: 4 },
+    { category_id: 3, slotCount: 2 },
+  ];
+  const kindOf = (id: number): TimeKind =>
+    id === 1 ? "internal" : id === 2 ? "external" : "none";
+
+  it("trennt Arbeitszeit von Nicht-Arbeitszeit", () => {
+    const { work, nonWork } = splitByWorkTime(sums, kindOf);
+    expect(work.map((s) => s.category_id)).toEqual([1, 2]);
+    expect(nonWork.map((s) => s.category_id)).toEqual([3]);
+  });
+
+  it("behaelt die Reihenfolge der Eingabe", () => {
+    expect(splitByWorkTime(sums, kindOf).work).toEqual([sums[0], sums[1]]);
+  });
+
+  it("zaehlt eine geloeschte Kategorie als Arbeitszeit", () => {
+    const { work, nonWork } = splitByWorkTime(sums, () => "internal");
+    expect(work).toHaveLength(3);
+    expect(nonWork).toHaveLength(0);
+  });
+
+  it("liefert zwei leere Haelften fuer eine leere Eingabe", () => {
+    expect(splitByWorkTime([], kindOf)).toEqual({ work: [], nonWork: [] });
+  });
+});
+
+describe("sumSlots", () => {
+  it("summiert die Viertelstunden", () => {
+    expect(
+      sumSlots([
+        { category_id: 1, slotCount: 8 },
+        { category_id: 2, slotCount: 4 },
+      ])
+    ).toBe(12);
+  });
+
+  it("liefert 0 fuer eine leere Liste", () => {
+    expect(sumSlots([])).toBe(0);
   });
 });
 
