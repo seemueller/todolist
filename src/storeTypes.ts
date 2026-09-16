@@ -63,6 +63,23 @@ export interface TodoStore {
   updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Todo>;
   /** Haelt `done` konsistent zu `status` ("done" <=> done === true); lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoStatus(id: number, status: TodoStatus): Promise<Todo>;
+  /**
+   * Setzt nur den Platz der Karte in ihrer Brett-Spalte. Kleiner Wert heisst
+   * weiter oben; den Wert selbst rechnet `computeBoardOrder` in types.ts aus.
+   * Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo
+   * referenziert — als Promise-Rejection, nie als synchroner throw.
+   */
+  updateTodoBoardOrder(id: number, order: number): Promise<Todo>;
+  /**
+   * Setzt Status und Platz in einem Schreibvorgang -- was ein Zug in eine
+   * andere Spalte des Bretts ist. Kein Wrapper um `updateTodoStatus`: zwei
+   * getrennte Schreibvorgaenge liessen die Karte sichtbar an der falschen
+   * Stelle aufblitzen, und ein Fehler dazwischen liesse sie halb verschoben
+   * zurueck. Haelt `done` konsistent zu `status` ("done" <=> done === true);
+   * lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo
+   * referenziert — als Promise-Rejection, nie als synchroner throw.
+   */
+  updateTodoStatusAndOrder(id: number, status: TodoStatus, order: number): Promise<Todo>;
   /** Haelt `status` konsistent zu `done`; lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   toggleTodoDone(id: number, done: boolean): Promise<Todo>;
   /** Legt die Aufgabe in den Papierkorb (setzt `deleted_at`); eine unbekannte oder bereits abgelegte Id bleibt folgenlos. Endgueltig entfernt erst `purgeTodo`. */
