@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.10.0";
+export const APP_VERSION = "0.11.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.11.0",
+    date: "2026-09-16",
+    changes: [
+      "Das Brett filtert nach Kategorien: Die Chipleiste über den Spalten blendet ein, was gerade zählt — mehrere Kategorien zusammenschaltbar, „Ohne Kategorie“ für alles Unsortierte",
+      "Eine Kategorie trägt jetzt eine Zeitart: „Keine“ für Pause oder Privates, sonst „Intern“ oder „Extern“; eingestellt wird sie im Kategorien-Fenster",
+      "Die Wochensumme der Zeiterfassung zählt nur noch Arbeitszeit gegen das Soll; gebuchte Zeit auf einer Kategorie ohne Arbeitszeit steht daneben als eigener Ausweis",
+      "Der CSV-Export der Woche nennt in der neuen Spalte „Art“, ob eine Buchung intern, extern oder keine Arbeitszeit ist",
+      "Die Liste startet auf „Offen“ und merkt sich, was zuletzt gewählt war — der erledigte Altbestand steht nicht mehr bei jedem Start zwischen den offenen Aufgaben",
+    ],
+  },
   {
     version: "0.10.0",
     date: "2026-09-14",
