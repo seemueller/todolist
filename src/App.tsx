@@ -494,6 +494,21 @@ function App({ migrationError = null }: AppProps) {
     const before = beforeTodo?.board_order ?? null;
     const after = afterTodo?.board_order ?? null;
 
+    // Wer die Karte auf ihren eigenen Platz zieht, meint keine Aenderung --
+    // dafuer muss die Datenbank nicht angefasst werden. `place` zaehlt ohne
+    // die gezogene Karte, ihr alter Index in der Spalte MIT ihr ist derselbe
+    // Einfuegepunkt.
+    const currentPlace = sortBoardTodos(
+      boardTodos.filter((t) => t.status === dragged.status)
+    ).findIndex((t) => t.id === todoId);
+    if (dragged.status === targetStatus && place === currentPlace) {
+      console.log(`drag: Aufgabe ${todoId} auf ihren eigenen Platz gezogen, nichts zu tun`);
+      setDraggedTodoId(null);
+      setDragOverLane(null);
+      setDropTarget(null);
+      return;
+    }
+
     // Was der Rebalance-Pfad schon weggeschrieben hat. Steht ausserhalb des
     // try, weil es auch der Fehlerzweig braucht.
     const written: Todo[] = [];

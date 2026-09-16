@@ -853,6 +853,29 @@ describe("App", () => {
     });
   });
 
+  it("writes nothing when a card is dropped on its own place", async () => {
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Erste", board_order: 0 }),
+      makeTodo({ id: 2, title: "Zweite", board_order: 1 }),
+    ]);
+
+    const [, second] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(second);
+    const dataTransfer = makeDataTransfer();
+
+    // Obere Haelfte der eigenen Karte: genau die Stelle, an der sie steht.
+    fireDrag("dragstart", second, dataTransfer);
+    fireDrag("dragover", second, dataTransfer, 10);
+    fireDrag("drop", second, dataTransfer, 10);
+
+    // Die Einfuegelinie verschwindet, aber geschrieben wird nichts.
+    await waitFor(() => {
+      expect(container.querySelector(".kanban-drop-indicator")).toBeNull();
+    });
+    expect(db.updateTodoBoardOrder).not.toHaveBeenCalled();
+    expect(db.updateTodoStatusAndOrder).not.toHaveBeenCalled();
+  });
+
   it("renumbers the hidden cards of the lane too when a filter is active", async () => {
     // Beim Umnummerieren duerfen die ausgeblendeten Karten nicht auf ihren
     // alten Werten stehenbleiben -- sonst tauchen sie zwischen den sichtbaren
