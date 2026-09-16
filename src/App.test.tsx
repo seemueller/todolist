@@ -853,6 +853,55 @@ describe("App", () => {
     });
   });
 
+  it("keeps a half-written rebalance on screen and reports the failure", async () => {
+    // Die Spalte wird Karte fuer Karte umnummeriert; bricht das in der Mitte
+    // ab, steht die Haelfte schon in der Datenbank. Die Werte sind so gewaehlt,
+    // dass die halbe Stellung eine andere Titelreihenfolge ergibt als die alte
+    // -- sonst wuerde der Test den Unterschied gar nicht sehen.
+    const lane = [
+      makeTodo({ id: 1, title: "Karte A", board_order: 0, due_date: "2026-01-01" }),
+      makeTodo({ id: 2, title: "Karte B", board_order: 0, due_date: "2026-02-01" }),
+      makeTodo({ id: 3, title: "Karte C", board_order: -5, due_date: "2026-03-01" }),
+    ];
+    const container = await renderBoard(lane);
+
+    const titlesNow = () =>
+      Array.from(container.querySelectorAll<HTMLElement>(".kanban-card-title")).map(
+        (el) => el.textContent,
+      );
+    expect(titlesNow()).toEqual(["Karte C", "Karte A", "Karte B"]);
+
+    // Geschrieben wird in der neuen Reihenfolge: A auf 0, C auf 1, B auf 2.
+    // Der dritte Aufruf scheitert.
+    vi.mocked(db.updateTodoBoardOrder).mockImplementation((id, order) => {
+      if (id === 2) return Promise.reject("Datenbank weg");
+      const base = lane.find((t) => t.id === id)!;
+      return Promise.resolve({ ...base, board_order: order });
+    });
+
+    const cards = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(cards[2]);
+    const dataTransfer = makeDataTransfer();
+
+    // "Karte C" zwischen A und B ziehen: dort stossen zwei Karten auf
+    // derselben Position aneinander, also wird umnummeriert.
+    fireDrag("dragstart", cards[0], dataTransfer);
+    fireDrag("dragover", cards[2], dataTransfer, 10);
+    fireDrag("drop", cards[2], dataTransfer, 10);
+
+    // A steht auf 0 und C auf 1, B ist nie geschrieben worden -- weder die
+    // alte Reihenfolge ("Karte C" vorn) noch die fertige ("Karte C" in der
+    // Mitte), sondern genau die halbe.
+    await waitFor(() => {
+      expect(titlesNow()).toEqual(["Karte A", "Karte B", "Karte C"]);
+    });
+
+    // Das Fehler-Banner zeichnet nur die Listenansicht, also dort nachsehen,
+    // ob der Fehlschlag gemeldet und nicht verschluckt wurde.
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Liste wechseln/i }));
+    expect(screen.getByText(/Datenbank weg/i)).toBeInTheDocument();
+  });
+
   it("keeps a reorder inside the done lane a plain position write", async () => {
     // Das Feuerwerk (`burstId`/`.done-flash`) zeichnet nur die Listenansicht;
     // im Brett ist es nicht sichtbar. Pruefbar ist deshalb der Schreibpfad:
