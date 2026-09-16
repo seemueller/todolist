@@ -322,14 +322,14 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
   }, []);
 
   const exportCsv = useCallback(() => {
-    const csv = buildCsv(days, week, categoryName);
+    const csv = buildCsv(days, week, categoryName, kindOf);
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = csvFileName(monday);
     link.click();
     URL.revokeObjectURL(url);
-  }, [categoryName, days, monday, week]);
+  }, [categoryName, kindOf, days, monday, week]);
 
   const closeSettings = useCallback(() => setShowSettings(false), []);
 

@@ -442,8 +442,8 @@ describe("TimeTrackingView", () => {
       reader.onload = () => resolve(String(reader.result));
       reader.readAsText(blob);
     });
-    expect(text).toContain("Datum;Von;Bis;Dauer;Minuten;Kategorie;Notiz");
-    expect(text).toContain(`${MO};09:00;09:15;0:15;15;Alpha;`);
+    expect(text).toContain("Datum;Von;Bis;Dauer;Minuten;Kategorie;Art;Notiz");
+    expect(text).toContain(`${MO};09:00;09:15;0:15;15;Alpha;intern;`);
     click.mockRestore();
   });
 

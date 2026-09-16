@@ -5,6 +5,7 @@
 // in deutscher Einstellung die Spalten trennt und Umlaute richtig liest.
 
 import { DaySlot, TimeBlock, buildBlocks, formatDuration, slotToLabel } from "./timeSlots";
+import type { TimeKind } from "./types";
 
 /** Spaltenkoepfe in der Reihenfolge der Zeilen. */
 export const CSV_HEADER = [
@@ -14,8 +15,17 @@ export const CSV_HEADER = [
   "Dauer",
   "Minuten",
   "Kategorie",
+  "Art",
   "Notiz",
 ] as const;
+
+// Deutsche Werte, weil die Datei fuer Excel in deutscher Einstellung gebaut ist
+// -- Semikolon als Trennzeichen und BOM voran.
+const KIND_LABELS: Record<TimeKind, string> = {
+  none: "keine",
+  internal: "intern",
+  external: "extern",
+};
 
 const SEPARATOR = ";";
 const NEWLINE = "\r\n";
@@ -31,7 +41,8 @@ function escapeField(value: string): string {
 function blockRow(
   date: string,
   block: TimeBlock,
-  categoryName: (id: number) => string
+  categoryName: (id: number) => string,
+  kindOf: (id: number) => TimeKind
 ): string[] {
   return [
     date,
@@ -40,6 +51,7 @@ function blockRow(
     formatDuration(block.slotCount),
     String(block.slotCount * 15),
     categoryName(block.category_id),
+    KIND_LABELS[kindOf(block.category_id)],
     block.note,
   ];
 }
@@ -51,12 +63,13 @@ function blockRow(
 export function buildCsv(
   days: string[],
   slotsByDay: Record<string, DaySlot[]>,
-  categoryName: (id: number) => string
+  categoryName: (id: number) => string,
+  kindOf: (id: number) => TimeKind
 ): string {
   const rows: string[][] = [[...CSV_HEADER]];
   for (const day of days) {
     for (const block of buildBlocks(slotsByDay[day] ?? [])) {
-      rows.push(blockRow(day, block, categoryName));
+      rows.push(blockRow(day, block, categoryName, kindOf));
     }
   }
   return CSV_BOM + rows.map((row) => row.map(escapeField).join(SEPARATOR)).join(NEWLINE) + NEWLINE;
