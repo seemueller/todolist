@@ -184,7 +184,7 @@ describe("sqlTodoStore", () => {
       { id: 1, name: "ärzte", color: "#111111", created_at: "2026-09-03T08:00:00.000Z" },
     ]);
 
-    const updated = await sqlTodoStore.updateCategory(1, "ärzte", "#111111");
+    const updated = await sqlTodoStore.updateCategory(1, "ärzte", "#111111", "internal");
 
     expect(updated.name).toBe("ärzte");
     expect(execute).toHaveBeenCalledTimes(1);
@@ -196,7 +196,7 @@ describe("sqlTodoStore", () => {
       { id: 2, name: "Sport", color: "#111111", created_at: "2026-09-03T08:00:00.000Z" },
     ]);
 
-    await expect(sqlTodoStore.updateCategory(2, "ärzte", "#222222")).rejects.toThrow(
+    await expect(sqlTodoStore.updateCategory(2, "ärzte", "#222222", "internal")).rejects.toThrow(
       'Es gibt bereits eine Kategorie "Ärzte".'
     );
 

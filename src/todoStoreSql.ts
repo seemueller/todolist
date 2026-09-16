@@ -250,7 +250,7 @@ async function updateCategory(
   id: number,
   name: string,
   color: string,
-  timeKind: TimeKind = "internal"
+  timeKind: TimeKind
 ): Promise<Category> {
   await assertNameAvailable(name, id);
   const db = await getDb();

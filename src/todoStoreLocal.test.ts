@@ -106,7 +106,7 @@ describe("localTodoStore", () => {
 
   it("allows renaming a category to its own current name in a different case", async () => {
     const cat = await localTodoStore.addCategory("Ärzte", "#000000");
-    const updated = await localTodoStore.updateCategory(cat.id, "ärzte", "#111111");
+    const updated = await localTodoStore.updateCategory(cat.id, "ärzte", "#111111", "internal");
     expect(updated.name).toBe("ärzte");
     expect(updated.color).toBe("#111111");
   });
@@ -115,7 +115,7 @@ describe("localTodoStore", () => {
     await localTodoStore.addCategory("Ärzte", "#000000");
     const sport = await localTodoStore.addCategory("Sport", "#111111");
 
-    await expect(localTodoStore.updateCategory(sport.id, "ärzte", "#222222")).rejects.toThrow(
+    await expect(localTodoStore.updateCategory(sport.id, "ärzte", "#222222", "internal")).rejects.toThrow(
       'Es gibt bereits eine Kategorie "Ärzte".'
     );
 

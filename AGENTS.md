@@ -106,11 +106,16 @@ Vier Fallen, in die dieses Projekt schon getreten ist:
   Transaktion. Wo Atomarität nötig ist, gehört die Operation als Tauri-Command nach
   `src-tauri/src/lib.rs` — siehe `replace_time_day`.
 - **Ein optionaler Parameter mit Vorgabewert schluckt bestehende Werte.**
-  `updateCategory(id, name, color, timeKind = "internal")` schreibt die Spalte
-  jedes Mal mit; wer beim Umbenennen die Zeitart weglässt, stuft die Kategorie
-  still auf Arbeitszeit zurück. `commitEditCategory` in `App.tsx` reicht
-  `cat.time_kind` deshalb ausdrücklich mit durch. Aus demselben Grund sind
-  `kindOf` in `buildCsv`/`blockRow` (`src/timeCsv.ts`) Pflichtparameter und kein
+  `updateCategory(id, name, color, timeKind = "internal")` schrieb die Spalte
+  jedes Mal mit; wer beim Umbenennen die Zeitart wegließ, stufte die Kategorie
+  still auf Arbeitszeit zurück. Nichts brach sichtbar, nur eine Zahl wurde leise
+  falsch — deshalb ist `timeKind` bei `updateCategory` inzwischen **Pflicht**,
+  in `storeTypes.ts`, `db.ts` und beiden Implementierungen. Der Compiler fängt
+  jeden neuen Aufrufer; wer nur Name oder Farbe ändert, reicht die vorhandene
+  Zeitart mit durch, wie `commitEditCategory` in `App.tsx`. Bei `addCategory`
+  bleibt der Parameter optional: dort ist „intern" als Vorgabe unkritisch, und
+  der MCP-Pfad verlässt sich darauf. Aus demselben Grund sind `kindOf` in
+  `buildCsv`/`blockRow` (`src/timeCsv.ts`) Pflichtparameter und kein
   Vorgabewert: eine still auf „intern" gesetzte Spalte fällt in keinem Test auf.
 
 ## MCP-Server

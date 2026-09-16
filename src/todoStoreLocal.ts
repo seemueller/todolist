@@ -327,7 +327,7 @@ async function updateCategory(
   id: number,
   name: string,
   color: string,
-  timeKind: TimeKind = "internal"
+  timeKind: TimeKind
 ): Promise<Category> {
   const categories = loadCategories();
   const idx = categories.findIndex((c) => c.id === id);
