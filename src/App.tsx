@@ -27,6 +27,7 @@ import {
   updateTodoStatus,
 } from "./db";
 import { DATA_CHANGED_EVENT } from "./events";
+import { loadStatusFilter, saveStatusFilter, type StatusFilter } from "./listPrefs";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
 import { CATEGORY_COLORS, Category, Priority, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus } from "./types";
@@ -169,7 +170,7 @@ function App({ migrationError = null }: AppProps) {
     null,
   );
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "done">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(loadStatusFilter);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Category state
@@ -204,6 +205,13 @@ function App({ migrationError = null }: AppProps) {
   const [showDebug, setShowDebug] = useState(false);
   const [showMcp, setShowMcp] = useState(false);
   const closeDebug = useCallback(() => setShowDebug(false), []);
+
+  // Jede Aenderung der Statusleiste wird gemerkt -- die Liste soll beim
+  // naechsten Start dort stehen, wo man sie verlassen hat.
+  const changeStatusFilter = useCallback((value: StatusFilter) => {
+    setStatusFilter(value);
+    saveStatusFilter(value);
+  }, []);
 
   /**
    * Laedt Aufgaben und Kategorien neu.
@@ -602,7 +610,9 @@ function App({ migrationError = null }: AppProps) {
 
   const detailTodo = detailTodoId === null ? null : todos.find((t) => t.id === detailTodoId) ?? null;
 
-  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "all" || searchQuery || categoryFilter !== null;
+  // "Offen" ist die Voreinstellung und damit kein gesetzter Filter, ueber den
+  // das Band informieren muesste.
+  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "open" || searchQuery || categoryFilter !== null;
 
   return (
     <div className="app-shell">
@@ -670,14 +680,31 @@ function App({ migrationError = null }: AppProps) {
                 {filterLabels[key]}
               </FilterChip>
             ))}
-            <div className="status-filter">
-              <FilterChip variant="segment" active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
+            {/* Sprechende Beschriftungen, weil "Alle" sonst zweimal vorkommt --
+                einmal hier und einmal als Faelligkeitsfilter daneben. */}
+            <div className="status-filter" role="group" aria-label="Status filtern">
+              <FilterChip
+                variant="segment"
+                active={statusFilter === "all"}
+                onClick={() => changeStatusFilter("all")}
+                aria-label="Status Alle"
+              >
                 Alle
               </FilterChip>
-              <FilterChip variant="segment" active={statusFilter === "open"} onClick={() => setStatusFilter("open")}>
+              <FilterChip
+                variant="segment"
+                active={statusFilter === "open"}
+                onClick={() => changeStatusFilter("open")}
+                aria-label="Status Offen"
+              >
                 Offen
               </FilterChip>
-              <FilterChip variant="segment" active={statusFilter === "done"} onClick={() => setStatusFilter("done")}>
+              <FilterChip
+                variant="segment"
+                active={statusFilter === "done"}
+                onClick={() => changeStatusFilter("done")}
+                aria-label="Status Erledigt"
+              >
                 Erledigt
               </FilterChip>
             </div>
@@ -715,8 +742,8 @@ function App({ migrationError = null }: AppProps) {
           <div className="active-filters">
             <span className="filter-label">
               {filterLabels[dueDateFilter]}
-              {statusFilter !== "all"
-                ? ` • ${statusFilter === "open" ? "Offen" : "Erledigt"}`
+              {statusFilter !== "open"
+                ? ` • ${statusFilter === "all" ? "Alle Status" : "Erledigt"}`
                 : ""}
               {categoryFilter !== null
                 ? ` • ${categories.find((c) => c.id === categoryFilter)?.name || "Kategorie"}`
@@ -728,7 +755,7 @@ function App({ migrationError = null }: AppProps) {
               className="clear-filters"
               onClick={() => {
                 setDueDateFilter("all");
-                setStatusFilter("all");
+                changeStatusFilter("open");
                 setSearchQuery("");
                 setCategoryFilter(null);
               }}
