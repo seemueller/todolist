@@ -8,6 +8,8 @@
 // Slots des Blocks. Dadurch erbt ein neu gemalter Nachbar-Slot die Notiz seines
 // Blocks, und Teilen wie Verschmelzen braucht keine Sonderbehandlung.
 
+import type { TimeKind } from "./types";
+
 /** Minuten je Slot. */
 export const SLOT_MINUTES = 15;
 /** Slots je Stunde. */
@@ -183,6 +185,31 @@ export function sumByCategory(slots: DaySlot[]): CategorySum[] {
   return [...counts.entries()]
     .map(([category_id, slotCount]) => ({ category_id, slotCount }))
     .sort((a, b) => b.slotCount - a.slotCount || a.category_id - b.category_id);
+}
+
+/**
+ * Teilt Kategoriesummen in Arbeitszeit und Nicht-Arbeitszeit. Reine Funktion,
+ * die Reihenfolge der Eingabe bleibt in beiden Haelften erhalten.
+ *
+ * Eine Kategorie, die es nicht mehr gibt, liefert `kindOf` als "internal" —
+ * geloeschte Kategorien duerfen bereits gebuchte Arbeitszeit nicht aus der
+ * Summe fallen lassen.
+ */
+export function splitByWorkTime(
+  sums: CategorySum[],
+  kindOf: (categoryId: number) => TimeKind
+): { work: CategorySum[]; nonWork: CategorySum[] } {
+  const work: CategorySum[] = [];
+  const nonWork: CategorySum[] = [];
+  for (const sum of sums) {
+    (kindOf(sum.category_id) === "none" ? nonWork : work).push(sum);
+  }
+  return { work, nonWork };
+}
+
+/** Summe der Viertelstunden einer Liste von Kategoriesummen. */
+export function sumSlots(sums: CategorySum[]): number {
+  return sums.reduce((total, sum) => total + sum.slotCount, 0);
 }
 
 /** Gebuchte Viertelstunden des Tages. */
