@@ -715,6 +715,50 @@ test.describe("Brett-Filter", () => {
   });
 });
 
+test.describe("Brett-Sortierung", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "TodoList" })).toBeVisible();
+  });
+
+  test("haelt die gezogene Reihenfolge einer Spalte ueber einen Reload", async ({ page }) => {
+    const input = page.getByPlaceholder(/Was steht an/i);
+    const addButton = page.getByRole("button", { name: /Aufgabe hinzufügen/i });
+
+    await input.fill("Zuerst");
+    await addButton.click();
+    await input.fill("Danach");
+    await addButton.click();
+
+    await page.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }).click();
+    const titles = page.locator(".kanban-card-title");
+    // Ohne Faelligkeit und ohne bisherigen Drag entscheidet der Tie-Breaker
+    // in sortBoardTodos ueber created_at absteigend -- die zuletzt angelegte
+    // Aufgabe ("Danach") steht also zuerst.
+    await expect(titles).toHaveText(["Danach", "Zuerst"]);
+
+    // HTML5-Drag von Hand: dragstart auf der zweiten Karte, dragover und drop
+    // auf der oberen Haelfte der ersten.
+    await page.evaluate(() => {
+      const cards = document.querySelectorAll<HTMLElement>(".kanban-card");
+      const source = cards[1];
+      const target = cards[0];
+      const dataTransfer = new DataTransfer();
+      source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer }));
+      const rect = target.getBoundingClientRect();
+      const clientY = rect.top + 2;
+      target.dispatchEvent(new DragEvent("dragover", { bubbles: true, dataTransfer, clientY }));
+      target.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer, clientY }));
+    });
+
+    await expect(titles).toHaveText(["Zuerst", "Danach"]);
+
+    await page.reload();
+    await page.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }).click();
+    await expect(titles).toHaveText(["Zuerst", "Danach"]);
+  });
+});
+
 test.describe("Papierkorb", () => {
   test("holt eine gelöschte Aufgabe über Rückgängig zurück", async ({ page }) => {
     await page.goto("/");

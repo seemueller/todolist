@@ -104,8 +104,12 @@ updateTodoStatusAndOrder(id: number, status: TodoStatus, order: number): Promise
 
 `updateTodoStatusAndOrder` ist kein Wrapper um `updateTodoStatus`, sondern ein
 eigenes UPDATE über beide Spalten — das ist der ganze Punkt der Entscheidung
-oben. `updateTodoStatus` bleibt bestehen: die Listenansicht und die MCP-Seite
-ändern den Status ohne Brett-Kontext.
+oben. `updateTodoStatus` bleibt bestehen: `toggleTodoDone` setzt den Status in
+beiden Implementierungen darüber. Die Oberfläche ruft sie nach dieser Änderung
+nicht mehr direkt — die Listenansicht geht über `toggleTodoDone`, die MCP-Seite
+schreibt in Rust am Dispatcher vorbei. Die Fassade in `db.ts` bleibt trotzdem
+stehen, damit `db.ts` den Store-Vertrag vollständig spiegelt; eine Lücke genau
+bei einer Methode wäre die Abweichung, die später jemand übersieht.
 
 `listTodos` behält seine Zusicherung "neueste zuerst". Die Brett-Reihenfolge
 entsteht in der Ansicht, nicht im Speicher — wie schon heute.

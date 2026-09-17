@@ -43,4 +43,11 @@ describe("sql migrations", () => {
       "ALTER TABLE categories ADD COLUMN time_kind TEXT NOT NULL DEFAULT 'internal';"
     );
   });
+
+  it("gives todos a board_order column defaulting to zero", () => {
+    expect(source).toContain("add_board_order_to_todos");
+    expect(source).toContain(
+      "ALTER TABLE todos ADD COLUMN board_order REAL NOT NULL DEFAULT 0;"
+    );
+  });
 });

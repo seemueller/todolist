@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   DragEvent,
   FormEvent,
+  Fragment,
   ReactNode,
   Suspense,
   lazy,
@@ -24,13 +25,14 @@ import {
   updateTodoCategory,
   updateTodoFields,
   updateTodoPriority,
-  updateTodoStatus,
+  updateTodoBoardOrder,
+  updateTodoStatusAndOrder,
 } from "./db";
 import { DATA_CHANGED_EVENT } from "./events";
 import { loadStatusFilter, saveStatusFilter, type StatusFilter } from "./listPrefs";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, Priority, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus } from "./types";
+import { CATEGORY_COLORS, Category, Priority, computeBoardOrder, needsRebalance, rebalanceBoardOrders, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
@@ -189,6 +191,8 @@ function App({ migrationError = null }: AppProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [draggedTodoId, setDraggedTodoId] = useState<number | null>(null);
   const [dragOverLane, setDragOverLane] = useState<TodoStatus | null>(null);
+  /** Wohin der laufende Zug einfuegt: Spalte und Index in der sortierten Spalte. */
+  const [dropTarget, setDropTarget] = useState<{ status: TodoStatus; index: number } | null>(null);
   // Leere Menge heisst "alles zeigen" -- kein Sonderwert, kein null-fuer-alle.
   // null als Element steht fuer Aufgaben ohne Kategorie.
   const [boardCategories, setBoardCategories] = useState<Set<number | null>>(new Set());
@@ -451,29 +455,176 @@ function App({ migrationError = null }: AppProps) {
 
   // ── Kanban drag-and-drop ──────────────────────────────────────────────
 
+  // Gefiltert wird im State, nicht in der Datenbank: die Aufgaben liegen ohnehin
+  // vollstaendig vor, ein Nachladen je Klick waere nur traeger.
+  const boardTodos = useMemo(
+    () =>
+      boardCategories.size === 0
+        ? todos
+        : todos.filter((t) => boardCategories.has(t.category_id)),
+    [todos, boardCategories]
+  );
+
   const kanbanLanes: { status: TodoStatus; label: string; icon: ReactNode; color: string }[] = [
     { status: "todo", label: "Zu tun", icon: <LaneTodoIcon />, color: "#7cc3f7" },
     { status: "in_progress", label: "In Bearbeitung", icon: <LaneProgressIcon />, color: "#ffd43b" },
     { status: "done", label: "Erledigt", icon: <LaneDoneIcon />, color: "#6fcf7f" },
   ];
 
-  async function handleDropOnLane(todoId: number, targetStatus: TodoStatus) {
+  /**
+   * Schreibt den Zug weg: Position allein, wenn die Karte in ihrer Spalte
+   * bleibt, sonst Status und Position in einem Schreibvorgang.
+   *
+   * `laneTodos` ist die sortierte Zielspalte *ohne* die gezogene Karte --
+   * sonst waere die Karte ihr eigener Nachbar und ein Zug um eine Position
+   * bliebe wirkungslos.
+   */
+  async function moveCard(todoId: number, targetStatus: TodoStatus, index: number) {
+    const dragged = todos.find((t) => t.id === todoId);
+    if (!dragged) return;
+
+    // Die Nachbarschaft kommt aus dem, was der Mensch sieht: er legt die Karte
+    // zwischen zwei sichtbare Karten, nicht zwischen zwei Datensaetze.
+    const laneTodos = sortBoardTodos(
+      boardTodos.filter((t) => t.status === targetStatus && t.id !== todoId)
+    );
+    const place = Math.max(0, Math.min(index, laneTodos.length));
+    const beforeTodo = place > 0 ? laneTodos[place - 1] : null;
+    const afterTodo = place < laneTodos.length ? laneTodos[place] : null;
+    const before = beforeTodo?.board_order ?? null;
+    const after = afterTodo?.board_order ?? null;
+
+    // Wer die Karte auf ihren eigenen Platz zieht, meint keine Aenderung --
+    // dafuer muss die Datenbank nicht angefasst werden. `place` zaehlt ohne
+    // die gezogene Karte, ihr alter Index in der Spalte MIT ihr ist derselbe
+    // Einfuegepunkt.
+    const currentPlace = sortBoardTodos(
+      boardTodos.filter((t) => t.status === dragged.status)
+    ).findIndex((t) => t.id === todoId);
+    if (dragged.status === targetStatus && place === currentPlace) {
+      console.log(`drag: Aufgabe ${todoId} auf ihren eigenen Platz gezogen, nichts zu tun`);
+      setDraggedTodoId(null);
+      setDragOverLane(null);
+      setDropTarget(null);
+      return;
+    }
+
+    // Was der Rebalance-Pfad schon weggeschrieben hat. Steht ausserhalb des
+    // try, weil es auch der Fehlerzweig braucht.
+    const written: Todo[] = [];
+
     try {
-      const updated = await updateTodoStatus(todoId, targetStatus);
-      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      if (targetStatus === "done") {
+      if (needsRebalance(before, after)) {
+        // Kein Platz zwischen den Nachbarn: die Spalte einmal neu
+        // durchnummerieren -- und zwar ganz, auch was der Kategorie-Filter
+        // gerade ausblendet. Bekaemen nur die sichtbaren Karten neue Werte,
+        // stuenden die ausgeblendeten weiter auf ihren alten und tauchten
+        // zwischen ihnen auf, sobald der Filter faellt.
+        const fullLane = sortBoardTodos(
+          todos.filter((t) => t.status === targetStatus && t.id !== todoId)
+        );
+        // Die gezogene Karte kommt dorthin, wo sie zwischen ihren sichtbaren
+        // Nachbarn liegt; ausgeblendete behalten ihre Lage zu diesen beiden.
+        const fullPlace = beforeTodo
+          ? fullLane.findIndex((t) => t.id === beforeTodo.id) + 1
+          : afterTodo
+            ? fullLane.findIndex((t) => t.id === afterTodo.id)
+            : fullLane.length;
+        const ordered = [...fullLane];
+        ordered.splice(fullPlace, 0, dragged);
+        const positions = rebalanceBoardOrders(ordered);
+        for (const { id, board_order } of positions) {
+          written.push(
+            id === todoId && dragged.status !== targetStatus
+              ? await updateTodoStatusAndOrder(id, targetStatus, board_order)
+              : await updateTodoBoardOrder(id, board_order)
+          );
+        }
+        setTodos((prev) => prev.map((t) => written.find((w) => w.id === t.id) ?? t));
+      } else {
+        const order = computeBoardOrder(before, after);
+        const updated =
+          dragged.status === targetStatus
+            ? await updateTodoBoardOrder(todoId, order)
+            : await updateTodoStatusAndOrder(todoId, targetStatus, order);
+        setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      }
+
+      // Das Feuerwerk gehoert an den Wechsel nach "erledigt", nicht an jedes
+      // Umsortieren innerhalb der Spalte.
+      if (targetStatus === "done" && dragged.status !== "done") {
         setBurstId(todoId);
         setTimeout(() => setBurstId(null), 800);
       }
       setError(null);
-      console.log(`drag: Aufgabe ${todoId} nach "${targetStatus}" verschoben`);
+      console.log(`drag: Aufgabe ${todoId} nach "${targetStatus}" an Platz ${place} verschoben`);
     } catch (err) {
+      // Der Rebalance-Pfad schreibt die Spalte bewusst Karte fuer Karte --
+      // tauri-plugin-sql kennt keine Transaktion ueber mehrere Aufrufe (siehe
+      // Spec). Bricht er in der Mitte ab, steht die Haelfte schon in der
+      // Datenbank; die muss auch auf den Schirm, sonst zeigt das Brett bis zum
+      // naechsten Laden eine Reihenfolge, die es so nicht mehr gibt.
+      if (written.length > 0) {
+        setTodos((prev) => prev.map((t) => written.find((w) => w.id === t.id) ?? t));
+      }
       console.error(`drag: Verschieben von Aufgabe ${todoId} fehlgeschlagen:`, String(err));
       setError(String(err));
     } finally {
       setDraggedTodoId(null);
       setDragOverLane(null);
+      setDropTarget(null);
     }
+  }
+
+  /** Drop auf die freie Flaeche der Spalte: ans Ende, wenn keine Karte im Spiel war. */
+  function handleDropOnLane(todoId: number, targetStatus: TodoStatus) {
+    const laneLength = boardTodos.filter(
+      (t) => t.status === targetStatus && t.id !== todoId
+    ).length;
+    return moveCard(
+      todoId,
+      targetStatus,
+      dropTarget?.status === targetStatus ? dropTarget.index : laneLength
+    );
+  }
+
+  /** Obere Haelfte der Karte heisst davor, untere dahinter. */
+  function handleCardDragOver(e: DragEvent, status: TodoStatus, index: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    const next = after ? index + 1 : index;
+    setDragOverLane(status);
+    // dragover feuert waehrend des Ziehens laufend. Ein neues Objekt bei
+    // jedem Ereignis wuerde die ganze Ansicht neu zeichnen, obwohl sich das
+    // Ziel gar nicht bewegt hat.
+    setDropTarget((prev) =>
+      prev && prev.status === status && prev.index === next ? prev : { status, index: next }
+    );
+  }
+
+  function handleCardDrop(e: DragEvent, status: TodoStatus, index: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    const raw = e.dataTransfer.getData("text/plain");
+    const todoId = Number(raw);
+    console.log(`drag: drop auf "${status}", dataTransfer="${raw}"`);
+    if (!todoId) {
+      console.warn(`drag: drop ohne verwertbare Aufgaben-ID (dataTransfer="${raw}")`);
+      return;
+    }
+    moveCard(todoId, status, after ? index + 1 : index);
+  }
+
+  /** Ein abgebrochener Zug darf keine Einfuegelinie stehen lassen. */
+  function handleDragEnd() {
+    setDraggedTodoId(null);
+    setDragOverLane(null);
+    setDropTarget(null);
   }
 
   function handleDragStart(e: DragEvent, todoId: number) {
@@ -487,14 +638,23 @@ function App({ migrationError = null }: AppProps) {
     e.stopPropagation();
   }
 
-  function handleLaneDragOver(e: DragEvent) {
+  /**
+   * Die freie Flaeche der Spalte -- Karten stoppen das Ereignis, hier kommt es
+   * also nur an, wenn der Zeiger neben ihnen steht. Gesetzt wird nur, wenn fuer
+   * diese Spalte noch kein Ziel feststeht: sonst spraenge die Linie ans Ende,
+   * sobald der Zeiger durch die Luecke zwischen zwei Karten faehrt.
+   */
+  function handleLaneDragOver(e: DragEvent, status: TodoStatus, count: number) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
+    setDragOverLane(status);
+    setDropTarget((prev) => (prev && prev.status === status ? prev : { status, index: count }));
   }
 
   function handleLaneDragLeave(e: DragEvent) {
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setDragOverLane(null);
+    setDropTarget(null);
   }
 
   function handleLaneDrop(e: DragEvent, targetStatus: TodoStatus) {
@@ -606,21 +766,15 @@ function App({ migrationError = null }: AppProps) {
     return true;
   });
 
-  // Gefiltert wird im State, nicht in der Datenbank: die Aufgaben liegen ohnehin
-  // vollstaendig vor, ein Nachladen je Klick waere nur traeger.
-  const boardTodos = useMemo(
-    () =>
-      boardCategories.size === 0
-        ? todos
-        : todos.filter((t) => boardCategories.has(t.category_id)),
-    [todos, boardCategories]
-  );
-
   const detailTodo = detailTodoId === null ? null : todos.find((t) => t.id === detailTodoId) ?? null;
 
   // "Offen" ist die Voreinstellung und damit kein gesetzter Filter, ueber den
   // das Band informieren muesste.
   const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "open" || searchQuery || categoryFilter !== null;
+
+  // Beide Ansichten teilen sich diese eine Fehlermeldung -- die Liste zeigt
+  // sie an ihrer angestammten Stelle, das Brett hat sonst keine.
+  const errorBanner = error && <p className="error">Fehler: {error}</p>;
 
   return (
     <div className="app-shell">
@@ -787,7 +941,7 @@ function App({ migrationError = null }: AppProps) {
             </IconButton>
           </div>
         )}
-        {error && <p className="error">Fehler: {error}</p>}
+        {errorBanner}
         {loading && <p className="muted">Lade Aufgaben …</p>}
 
         {!loading && todos.length === 0 && !error && (
@@ -900,6 +1054,7 @@ function App({ migrationError = null }: AppProps) {
 
         {viewMode === "kanban" && (
           <>
+          {errorBanner}
           {/* Die Kategoriefarbe kommt als Inline-Style aus den Daten, wie bei
               CategoryBadge auch -- hier als Rahmen, damit der aktive Chip
               weiterhin die Tintenflaeche tragen kann. */}
@@ -933,29 +1088,21 @@ function App({ migrationError = null }: AppProps) {
 
           <div className="kanban-wrapper">
             {kanbanLanes.map((lane) => {
-              const laneTodos = boardTodos
-                .filter((t) => t.status === lane.status)
-                .sort((a, b) => {
-                  // Earliest due date on top, tickets without a date at the bottom.
-                  if (a.due_date !== b.due_date) {
-                    if (!a.due_date) return 1;
-                    if (!b.due_date) return -1;
-                    return a.due_date.localeCompare(b.due_date);
-                  }
-                  const priorityOrder = { high: 0, medium: 1, low: 2 };
-                  const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-                  if (pDiff !== 0) return pDiff;
-                  return b.created_at.localeCompare(a.created_at);
-                });
+              const laneTodos = sortBoardTodos(
+                boardTodos.filter((t) => t.status === lane.status)
+              );
+              // Wo die gezogene Karte in dieser Spalte steht -- -1, wenn sie
+              // aus einer anderen kommt.
+              const draggedPosition = laneTodos.findIndex((t) => t.id === draggedTodoId);
+              // In dem Massstab, in dem moveCard rechnet, zaehlt die Spalte
+              // ohne die gezogene Karte.
+              const dropCount = laneTodos.length - (draggedPosition === -1 ? 0 : 1);
 
               return (
                 <div
                   key={lane.status}
                   className={`kanban-lane ${dragOverLane === lane.status ? "drag-over" : ""}`}
-                  onDragOver={(e) => {
-                    handleLaneDragOver(e);
-                    setDragOverLane(lane.status);
-                  }}
+                  onDragOver={(e) => handleLaneDragOver(e, lane.status, dropCount)}
                   onDragLeave={handleLaneDragLeave}
                   onDrop={(e) => handleLaneDrop(e, lane.status)}
                 >
@@ -966,18 +1113,30 @@ function App({ migrationError = null }: AppProps) {
                   </div>
 
                   <div className="kanban-lane-body">
-                    {laneTodos.map((todo) => {
+                    {laneTodos.map((todo, position) => {
+                      const index =
+                        draggedPosition !== -1 && draggedPosition < position ? position - 1 : position;
+                      // Die gezogene Karte ist kein Anker: ihr Index faellt mit
+                      // dem der Karte darunter zusammen, das gaebe zwei Linien.
+                      const showIndicator =
+                        dropTarget?.status === lane.status &&
+                        dropTarget.index === index &&
+                        position !== draggedPosition;
                       const overdue = !todo.done && isOverdue(todo.due_date);
                       const today = isDueToday(todo.due_date);
 
                       return (
+                        <Fragment key={todo.id}>
+                        {showIndicator && <div className="kanban-drop-indicator" />}
                         <div
-                          key={todo.id}
                           className={`kanban-card priority-${todo.priority} ${todo.done ? "done" : ""} ${overdue ? "overdue" : ""} ${today && !todo.done ? "due-today" : ""} ${
                             draggedTodoId === todo.id ? "dragging" : ""
                           }`}
                           draggable
                           onDragStart={(e) => handleDragStart(e, todo.id)}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={(e) => handleCardDragOver(e, lane.status, index)}
+                          onDrop={(e) => handleCardDrop(e, lane.status, index)}
                           onDoubleClick={() => setDetailTodoId(todo.id)}
                         >
                           <span className="kanban-card-title">{todo.title}</span>
@@ -1025,8 +1184,15 @@ function App({ migrationError = null }: AppProps) {
                               </IconButton>
                             </div>
                         </div>
+                        </Fragment>
                       );
                     })}
+
+                    {/* Die Linie hinter der letzten Karte: dafuer gibt es keine
+                        Karte mehr, vor der sie stehen koennte. */}
+                    {dropTarget?.status === lane.status && dropTarget.index >= dropCount && (
+                      <div className="kanban-drop-indicator" />
+                    )}
 
                     {laneTodos.length === 0 && (
                       <div className="kanban-lane-empty">

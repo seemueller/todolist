@@ -10,6 +10,10 @@ import {
   sortCategories,
   sortTodos,
   Category,
+  computeBoardOrder,
+  needsRebalance,
+  rebalanceBoardOrders,
+  sortBoardTodos,
 } from "./types";
 
 /** "Ärzte" zerlegt: A plus kombinierendes Trema (NFD). */
@@ -45,6 +49,7 @@ describe("fromRow", () => {
       category_id: null,
       category_name: null,
       category_color: null,
+      board_order: 0,
     });
   });
 
@@ -138,6 +143,21 @@ describe("fromRow", () => {
 
     expect(todo.description).toBe("Zeile eins\nZeile zwei");
   });
+
+  it("defaults board_order to zero for rows written before the column", () => {
+    const todo = fromRow({
+      id: 1,
+      title: "Alt",
+      done: 0,
+      priority: "medium",
+      created_at: "2026-01-01T00:00:00.000Z",
+      due_date: null,
+      category_id: null,
+      category_name: null,
+      category_color: null,
+    });
+    expect(todo.board_order).toBe(0);
+  });
 });
 
 describe("compareCategoryNames", () => {
@@ -226,6 +246,7 @@ describe("sortTodos", () => {
     category_id: null,
     category_name: null,
     category_color: null,
+    board_order: 0,
   });
 
   it("orders by created_at, newest first", () => {
@@ -256,6 +277,114 @@ describe("sortTodos", () => {
     sortTodos(original);
 
     expect(original.map((t) => t.id)).toEqual([1, 2]);
+  });
+});
+
+describe("computeBoardOrder", () => {
+  it("puts a card between its two neighbours", () => {
+    expect(computeBoardOrder(2, 4)).toBe(3);
+  });
+
+  it("puts a card dropped at the top below nothing", () => {
+    expect(computeBoardOrder(null, 4)).toBe(3);
+  });
+
+  it("puts a card dropped at the bottom above nothing", () => {
+    expect(computeBoardOrder(2, null)).toBe(3);
+  });
+
+  it("starts an empty lane at zero", () => {
+    expect(computeBoardOrder(null, null)).toBe(0);
+  });
+
+  it("keeps splitting equal neighbours apart", () => {
+    // Zwei Karten mit demselben Wert -- der Normalfall, solange niemand
+    // gezogen hat: DEFAULT 0. Der Drop dazwischen muss trotzdem einen Wert
+    // liefern, der strikt zwischen beiden liegt, sonst haengt die Reihenfolge
+    // am Tie-Breaker statt am Ziehen.
+    expect(computeBoardOrder(0, 0)).toBe(0);
+    expect(needsRebalance(0, 0)).toBe(true);
+  });
+});
+
+describe("needsRebalance", () => {
+  it("is false for neighbours far enough apart", () => {
+    expect(needsRebalance(1, 2)).toBe(false);
+  });
+
+  it("is false at the ends of a lane", () => {
+    expect(needsRebalance(null, 1)).toBe(false);
+    expect(needsRebalance(1, null)).toBe(false);
+    expect(needsRebalance(null, null)).toBe(false);
+  });
+
+  it("is true once the gap falls below the threshold", () => {
+    expect(needsRebalance(1, 1 + 1e-7)).toBe(true);
+  });
+});
+
+describe("rebalanceBoardOrders", () => {
+  it("numbers the lane in its current order", () => {
+    const lane = [
+      { id: 5, board_order: 0 },
+      { id: 6, board_order: 0 },
+      { id: 7, board_order: 0.5 },
+    ];
+    expect(rebalanceBoardOrders(lane)).toEqual([
+      { id: 5, board_order: 0 },
+      { id: 6, board_order: 1 },
+      { id: 7, board_order: 2 },
+    ]);
+  });
+});
+
+describe("sortBoardTodos", () => {
+  const card = (over: Partial<Todo>): Todo => ({
+    id: 1,
+    title: "T",
+    description: "",
+    done: false,
+    status: "todo",
+    priority: "medium",
+    created_at: "2026-01-01T00:00:00.000Z",
+    due_date: null,
+    category_id: null,
+    category_name: null,
+    category_color: null,
+    board_order: 0,
+    ...over,
+  });
+
+  it("sorts by board_order, smallest first", () => {
+    const sorted = sortBoardTodos([
+      card({ id: 1, board_order: 2 }),
+      card({ id: 2, board_order: -1 }),
+      card({ id: 3, board_order: 0.5 }),
+    ]);
+    expect(sorted.map((t) => t.id)).toEqual([2, 3, 1]);
+  });
+
+  it("falls back to the due date rule when the position is equal", () => {
+    const sorted = sortBoardTodos([
+      card({ id: 1, title: "Ohne Datum", priority: "high" }),
+      card({ id: 2, title: "Spaet", due_date: "2026-12-01" }),
+      card({ id: 3, title: "Frueh", due_date: "2026-01-15", priority: "low" }),
+    ]);
+    expect(sorted.map((t) => t.title)).toEqual(["Frueh", "Spaet", "Ohne Datum"]);
+  });
+
+  it("lets a dragged card beat the due date rule", () => {
+    const sorted = sortBoardTodos([
+      card({ id: 1, title: "Frueh", due_date: "2026-01-15" }),
+      card({ id: 2, title: "Hochgezogen", due_date: "2026-12-01", board_order: -1 }),
+    ]);
+    expect(sorted.map((t) => t.title)).toEqual(["Hochgezogen", "Frueh"]);
+  });
+
+  it("does not sort the array it was given", () => {
+    const lane = [card({ id: 1, board_order: 2 }), card({ id: 2, board_order: 1 })];
+    sortBoardTodos(lane);
+    expect(lane.map((t) => t.id)).toEqual([1, 2]);
   });
 });
 
