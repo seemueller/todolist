@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.11.0";
+export const APP_VERSION = "0.12.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.12.0",
+    date: "2026-09-17",
+    changes: [
+      "Karten lassen sich im Brett innerhalb einer Spalte an jede Stelle ziehen: eine Linie zeigt beim Ziehen, wo die Karte landet, und die Reihenfolge bleibt über den Neustart hinweg erhalten",
+      "Wer nichts zieht, sieht die Spalte weiterhin nach Fälligkeit sortiert — die gezogene Reihenfolge hat nur dort Vorrang, wo jemand sie gesetzt hat",
+      "Fehlermeldungen erscheinen jetzt auch im Brett; bisher standen sie nur in der Liste, ein fehlgeschlagener Schreibvorgang blieb im Brett also stumm",
+    ],
+  },
   {
     version: "0.11.0",
     date: "2026-09-16",
