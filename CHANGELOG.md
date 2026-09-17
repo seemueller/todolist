@@ -5,6 +5,7 @@ Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokume
 ## [Unreleased]
 
 ### Hinzugefügt
+- Die Notiz eines Zeitblocks steht jetzt im Raster, mitten in der Buchung. Sie sitzt in der breitesten Stundenzeile des Blocks und rückt von selbst mit, wenn der Block wächst, schrumpft oder verschoben wird. Die Schriftfarbe richtet sich nach dem Kontrast zur Kategoriefarbe. Eine einzelne Viertelstunde bleibt unbeschriftet — dort passt kein Text.
 - Die Zeiterfassung hat eine Auswertung: ein Knopf in der Kopfzeile öffnet ein Fenster, das je Kategorie zeigt, welcher Anteil der Arbeitszeit auf sie entfällt — als Balken, Dauer und Prozentwert. Oben die angezeigte Woche, darunter ein Kalendermonat mit eigener Navigation. Gezählt wird nur Arbeitszeit; Pausen und Privates bleiben außen vor.
 
 ## [0.12.0] - 2026-09-17

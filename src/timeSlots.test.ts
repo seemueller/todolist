@@ -18,6 +18,7 @@ import {
   endOfMonth,
   isWeekend,
   monthDays,
+  noteLabels,
   setBlockNote,
   shareByCategory,
   startOfMonth,
@@ -399,5 +400,68 @@ describe("formatPercent", () => {
     expect(formatPercent(48.375)).toBe("48,4 %");
     expect(formatPercent(100)).toBe("100,0 %");
     expect(formatPercent(0)).toBe("0,0 %");
+  });
+});
+
+describe("noteLabels", () => {
+  function slots(from: number, to: number, categoryId: number, note: string): DaySlot[] {
+    const result: DaySlot[] = [];
+    for (let index = from; index < to; index++) {
+      result.push({ slot: index, category_id: categoryId, note });
+    }
+    return result;
+  }
+
+  it("beschriftet einen Block innerhalb einer Stunde", () => {
+    // 09:00-10:00, ganz in einer Stundenzeile.
+    expect(noteLabels(slots(36, 40, 1, "Ticket 4711"))).toEqual([
+      { startSlot: 36, endSlot: 40, note: "Ticket 4711" },
+    ]);
+  });
+
+  it("nimmt bei mehreren Stundenzeilen die breiteste", () => {
+    // 09:30-11:30: zwei Viertel, dann vier, dann zwei.
+    expect(noteLabels(slots(38, 46, 1, "Workshop"))).toEqual([
+      { startSlot: 40, endSlot: 44, note: "Workshop" },
+    ]);
+  });
+
+  it("nimmt bei gleich breiten Stundenzeilen die mit der Blockmitte", () => {
+    // 09:30-10:30: zwei Viertel in jeder Stunde, die Mitte liegt bei 10:00.
+    expect(noteLabels(slots(38, 42, 1, "Jour fixe"))).toEqual([
+      { startSlot: 40, endSlot: 42, note: "Jour fixe" },
+    ]);
+  });
+
+  it("laesst einen Block ohne Notiz aus", () => {
+    expect(noteLabels(slots(36, 40, 1, ""))).toEqual([]);
+  });
+
+  it("laesst eine einzelne Viertelstunde aus, dort passt kein Text", () => {
+    expect(noteLabels(slots(36, 37, 1, "Kurz"))).toEqual([]);
+  });
+
+  it("laesst einen Block aus, dessen breitestes Stueck nur ein Viertel ist", () => {
+    // 09:45-10:15 -- zwei Viertelstunden, aber je eine pro Stundenzeile.
+    expect(noteLabels(slots(39, 41, 1, "Uebergang"))).toEqual([]);
+  });
+
+  it("beschriftet jeden Block eines Tages einzeln", () => {
+    const day = [
+      ...slots(36, 38, 1, "Erstes"),
+      ...slots(40, 42, 2, "Zweites"),
+    ];
+    expect(noteLabels(day)).toEqual([
+      { startSlot: 36, endSlot: 38, note: "Erstes" },
+      { startSlot: 40, endSlot: 42, note: "Zweites" },
+    ]);
+  });
+
+  it("trennt zwei gleiche Kategorien mit einer Luecke dazwischen", () => {
+    const day = [...slots(36, 38, 1, "Vormittag"), ...slots(40, 42, 1, "Vormittag")];
+    expect(noteLabels(day)).toEqual([
+      { startSlot: 36, endSlot: 38, note: "Vormittag" },
+      { startSlot: 40, endSlot: 42, note: "Vormittag" },
+    ]);
   });
 });

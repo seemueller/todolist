@@ -342,6 +342,44 @@ test.describe("Zeiterfassung", () => {
     expect(csv).toContain('09:00;09:15;0:15;15;Alpha;intern;"Ticket 4711; Teil A"');
   });
 
+  test("zeigt die Notiz mitten im Block und zieht sie mit", async ({ page }) => {
+    await addCategory(page, "Alpha");
+    await openTimeView(page);
+
+    // 09:00-10:00 buchen und eine Notiz an den Block schreiben.
+    await cell(page, 0, 9, 0).hover();
+    await page.mouse.down();
+    await cell(page, 0, 9, 3).hover();
+    await page.mouse.up();
+    const note = page.getByRole("textbox", { name: /Notiz für .* 09:00/ });
+    await note.fill("Ticket 4711");
+    await note.press("Enter");
+
+    const label = page.locator(".time-note-label");
+    await expect(label).toHaveCount(1);
+    await expect(label).toHaveText("Ticket 4711");
+    await expect(label).toHaveCSS("pointer-events", "none");
+
+    // Der Block waechst bis 10:30; die Beschriftung sitzt danach in der
+    // breitesten Stundenzeile, also weiterhin in der ersten.
+    await cell(page, 0, 10, 0).hover();
+    await page.mouse.down();
+    await cell(page, 0, 10, 1).hover();
+    await page.mouse.up();
+
+    await expect(page.locator(".time-block-duration")).toHaveText("1:30");
+    await expect(label).toHaveCount(1);
+    await expect(label).toHaveText("Ticket 4711");
+
+    // Eine einzelne Viertelstunde traegt keine Beschriftung.
+    await cell(page, 1, 9, 0).click();
+    const short = page.getByRole("textbox", { name: /Notiz für .* 09:00/ }).last();
+    await short.fill("Zu kurz");
+    await short.press("Enter");
+
+    await expect(page.locator(".time-note-label")).toHaveCount(1);
+  });
+
   test("zeigt die Auswertung als Prozentanteile der Arbeitszeit", async ({ page }) => {
     await addCategory(page, "Alpha");
     await addCategory(page, "Pause");

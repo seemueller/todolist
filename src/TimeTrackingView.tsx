@@ -25,6 +25,7 @@ import { DATA_CHANGED_EVENT } from "./events";
 import { isTauri } from "./sqlClient";
 import {
   DaySlot,
+  NoteLabel,
   SLOTS_PER_HOUR,
   addDays,
   applyPaint,
@@ -36,6 +37,7 @@ import {
   formatSignedDuration,
   formatWeekLabel,
   isWeekend,
+  noteLabels,
   slotToLabel,
   splitByWorkTime,
   startOfWeek,
@@ -48,6 +50,7 @@ import {
 import * as timeDb from "./timeDb";
 import { DEFAULT_SETTINGS, type TimeSettings } from "./timeDb";
 import { buildCsv, csvFileName } from "./timeCsv";
+import { readableInk } from "./contrast";
 import { TimeStatsModal } from "./TimeStatsModal";
 import {
   CategoryBadge,
@@ -73,6 +76,14 @@ export interface TimeTrackingViewProps {
 
 /** Was ein Zug mit den Zellen tut. */
 type PaintAction = { kind: "fill"; categoryId: number } | { kind: "clear" };
+
+/**
+ * Rasterspalte einer Viertelstunde: Spalte 1 traegt die Stundenbeschriftung,
+ * danach folgen je Tag vier Spalten.
+ */
+function gridColumnOf(dayIndex: number, quarter: number): number {
+  return 2 + dayIndex * SLOTS_PER_HOUR + quarter;
+}
 
 /** Buchungen der Woche, je Datumsschluessel. */
 type WeekSlots = Record<string, DaySlot[]>;
@@ -204,6 +215,22 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
     () => days.map((day) => ({ day, blocks: buildBlocks(week[day] ?? []) })),
     [days, week]
   );
+
+  // Die Notiz-Beschriftungen des Rasters, je Tag und je Stundenzeile. Sie haengen
+  // allein an den Buchungen, ruecken also von selbst mit, wenn ein Block waechst,
+  // schrumpft oder verschoben wird -- auch waehrend eines Zuges, weil die
+  // Vorschau in `week` steht.
+  const noteLabelRows = useMemo(() => {
+    const map = new Map<string, NoteLabel[]>();
+    for (const day of days) {
+      for (const label of noteLabels(week[day] ?? [])) {
+        const hour = Math.floor(label.startSlot / SLOTS_PER_HOUR);
+        const key = `${day}#${hour}`;
+        map.set(key, [...(map.get(key) ?? []), label]);
+      }
+    }
+    return map;
+  }, [days, week]);
 
   // Eine Kategorie, die es nicht mehr gibt, gilt als Arbeitszeit: geloeschte
   // Kategorien duerfen bereits gebuchte Zeit nicht aus der Summe fallen lassen.
@@ -453,8 +480,10 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
 
             {dayHours().map((hour) => (
               <div key={hour} className="time-grid-row">
-                <span className="time-hour-label">{String(hour).padStart(2, "0")}</span>
-                {days.map((day) =>
+                <span className="time-hour-label" style={{ gridRow: 1, gridColumn: 1 }}>
+                  {String(hour).padStart(2, "0")}
+                </span>
+                {days.map((day, dayIndex) =>
                   Array.from({ length: SLOTS_PER_HOUR }, (_, quarter) => {
                     const slot = timeToSlot(hour, quarter * 15);
                     const booked = slotLookup.get(`${day}#${slot}`);
@@ -466,7 +495,16 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
                         className={`time-cell ${booked ? "booked" : ""} ${
                           quarter === 0 ? "day-start" : ""
                         } ${isWeekend(day) ? "weekend" : ""}`}
-                        style={color ? { background: color } : undefined}
+                        // Jede Zelle steht explizit in ihrem Rasterfeld. Ein
+                        // automatisch platziertes Feld weicht einem belegten
+                        // Bereich aus -- die Notiz-Beschriftung darueber wuerde
+                        // die Zellen unter ihr sonst in eine zweite Rasterzeile
+                        // schieben, statt von ihnen ueberdeckt zu werden.
+                        style={{
+                          gridRow: 1,
+                          gridColumn: gridColumnOf(dayIndex, quarter),
+                          ...(color ? { background: color } : {}),
+                        }}
                         draggable={false}
                         onPointerDown={() => startPaint(day, slot)}
                         onPointerEnter={() => extendPaint(day, slot)}
@@ -474,6 +512,32 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
                           booked ? categoryName(booked.category_id) : "frei"
                         }`}
                       />
+                    );
+                  })
+                )}
+                {/* Die Beschriftungen liegen als eigene Rasterfelder ueber den
+                    Zellen derselben Zeile (grid-row 1) und lassen Zeigerereignisse
+                    durch, damit das Malen darunter weiterlaeuft. */}
+                {days.map((day, dayIndex) =>
+                  (noteLabelRows.get(`${day}#${hour}`) ?? []).map((label) => {
+                    const color = categoryById.get(
+                      slotLookup.get(`${day}#${label.startSlot}`)?.category_id ?? -1
+                    )?.color;
+                    return (
+                      <span
+                        key={`${day}-note-${label.startSlot}`}
+                        className="time-note-label"
+                        style={{
+                          gridRow: 1,
+                          gridColumn: `${gridColumnOf(
+                            dayIndex,
+                            label.startSlot % SLOTS_PER_HOUR
+                          )} / span ${label.endSlot - label.startSlot}`,
+                          color: readableInk(color),
+                        }}
+                      >
+                        {label.note}
+                      </span>
                     );
                   })
                 )}

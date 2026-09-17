@@ -51,6 +51,7 @@ Beschriftung umbenennt, zieht den Test mit.
 - `src/types.test.ts` — unit tests for type utilities (`fromRow`, `compareCategoryNames`)
 - `src/timeSlots.test.ts` — unit tests for the time-tracking domain logic
 - `src/timeCsv.test.ts` — unit tests for the CSV export
+- `src/contrast.test.ts` — readable text colour on a category colour; guards the hex values against the tokens in `App.css`
 - `src/TimeTrackingView.test.tsx` — time-tracking view (`timeDb` is mocked)
 - `src/TimeStatsModal.test.tsx` — the time-tracking breakdown per category (`timeDb` is mocked)
 - `src/App.test.tsx` — React component tests (db layer is mocked)

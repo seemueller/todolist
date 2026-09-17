@@ -577,4 +577,117 @@ describe("TimeTrackingView", () => {
       expect(document.querySelector(".time-non-work")).toBeNull();
     });
   });
+
+  describe("Notiz im Raster", () => {
+    /** Beschriftungen im Raster als Text plus belegtem Rasterbereich. */
+    function gridNotes(): { text: string; column: string; color: string }[] {
+      return [...document.querySelectorAll<HTMLElement>(".time-note-label")].map((el) => ({
+        text: el.textContent ?? "",
+        column: el.style.gridColumn,
+        color: el.style.color,
+      }));
+    }
+
+    /** Bucht einen Bereich eines Tages mit Notiz. */
+    function seedBlock(day: string, from: number, to: number, note: string, categoryId = 7) {
+      const slots: DaySlot[] = [];
+      for (let index = from; index < to; index++) {
+        slots.push({ slot: index, category_id: categoryId, note });
+      }
+      store.set(day, slots);
+    }
+
+    it("schreibt die Notiz ueber die Viertelstunden ihres Blocks", async () => {
+      seedBlock(MO, 36, 40, "Ticket 4711"); // 09:00-10:00, Montag
+
+      renderView();
+
+      await waitFor(() => expect(gridNotes()).toHaveLength(1));
+      // Montag ist die erste Tagesspalte: Spalte 1 ist die Stundenbeschriftung,
+      // die vier Viertelstunden des Tages folgen ab Spalte 2.
+      expect(gridNotes()[0]).toEqual({
+        text: "Ticket 4711",
+        column: "2 / span 4",
+        color: "var(--ink)",
+      });
+    });
+
+    it("setzt die Beschriftung in die Spalte ihres Tages", async () => {
+      seedBlock(DI, 38, 40, "Dienstag"); // 09:30-10:00
+
+      renderView();
+
+      await waitFor(() => expect(gridNotes()).toHaveLength(1));
+      // Zweiter Tag, dritte Viertelstunde: 2 + 1*4 + 2.
+      expect(gridNotes()[0].column).toBe("8 / span 2");
+    });
+
+    it("nimmt bei einem Block ueber mehrere Stunden die breiteste Zeile", async () => {
+      seedBlock(MO, 38, 46, "Workshop"); // 09:30-11:30
+
+      renderView();
+
+      await waitFor(() => expect(gridNotes()).toHaveLength(1));
+      expect(gridNotes()[0]).toMatchObject({ text: "Workshop", column: "2 / span 4" });
+    });
+
+    it("zeigt in einer einzelnen Viertelstunde keine Notiz", async () => {
+      seedBlock(MO, 36, 37, "Zu kurz");
+
+      renderView();
+
+      await screen.findByText("09:00–09:15");
+      expect(gridNotes()).toEqual([]);
+    });
+
+    it("zeigt ohne Notiz nichts an", async () => {
+      seedBlock(MO, 36, 40, "");
+
+      renderView();
+
+      await screen.findByText("09:00–10:00");
+      expect(gridNotes()).toEqual([]);
+    });
+
+    it("waehlt die Schriftfarbe nach der Kategoriefarbe", async () => {
+      const dark: Category[] = [
+        { ...categories[0], color: "#14100c" },
+      ];
+      seedBlock(MO, 36, 40, "Dunkel");
+
+      renderView({ categories: dark });
+
+      await waitFor(() => expect(gridNotes()).toHaveLength(1));
+      expect(gridNotes()[0].color).toBe("var(--canvas)");
+    });
+
+    it("zieht die Beschriftung mit, wenn der Block waechst", async () => {
+      seedBlock(MO, 36, 38, "Ticket 4711"); // 09:00-09:30
+
+      renderView();
+
+      await waitFor(() => expect(gridNotes()[0]?.column).toBe("2 / span 2"));
+
+      // Zwei Viertelstunden anmalen: der Block reicht danach bis 10:00.
+      fireEvent.pointerDown(screen.getByRole("button", { name: at(MO, "09:30, frei") }));
+      fireEvent.pointerEnter(screen.getByRole("button", { name: at(MO, "09:45, frei") }));
+      fireEvent.pointerUp(window);
+
+      await waitFor(() => expect(gridNotes()[0]?.column).toBe("2 / span 4"));
+      expect(gridNotes()[0].text).toBe("Ticket 4711");
+    });
+
+    it("nimmt die Beschriftung weg, wenn der Block geleert wird", async () => {
+      seedBlock(MO, 36, 40, "Ticket 4711");
+
+      renderView();
+      await waitFor(() => expect(gridNotes()).toHaveLength(1));
+
+      fireEvent.click(
+        screen.getByRole("button", { name: `Block ${at(MO, "09:00")} löschen` })
+      );
+
+      await waitFor(() => expect(gridNotes()).toEqual([]));
+    });
+  });
 });
