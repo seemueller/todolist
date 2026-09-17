@@ -527,4 +527,48 @@ describe("sqlTodoStore", () => {
       expect(removed).toBe(3);
     });
   });
+
+  it("reads the board position back with the row", async () => {
+    select.mockResolvedValue([{ ...ROW, board_order: 2.5 }]);
+    const todos = await sqlTodoStore.listTodos();
+
+    expect(select.mock.calls[0][0]).toContain("t.board_order");
+    expect(todos[0].board_order).toBe(2.5);
+  });
+
+  it("writes only the board position when a card moves inside its lane", async () => {
+    execute.mockResolvedValue({ rowsAffected: 1 });
+    select.mockResolvedValue([{ ...ROW, board_order: 1.5 }]);
+
+    const updated = await sqlTodoStore.updateTodoBoardOrder(7, 1.5);
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("UPDATE todos SET board_order = $1 WHERE id = $2");
+    expect(sql).toContain("deleted_at IS NULL");
+    expect(params).toEqual([1.5, 7]);
+    expect(updated.board_order).toBe(1.5);
+  });
+
+  it("writes status, done and position in a single statement", async () => {
+    execute.mockResolvedValue({ rowsAffected: 1 });
+    select.mockResolvedValue([{ ...ROW, status: "done", done: 1, board_order: 3 }]);
+
+    const updated = await sqlTodoStore.updateTodoStatusAndOrder(7, "done", 3);
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(sql).toContain("SET status = $1, done = $2, board_order = $3");
+    expect(params).toEqual(["done", 1, 3, 7]);
+    expect(updated.done).toBe(true);
+  });
+
+  it("rejects an unknown id on both new writes", async () => {
+    execute.mockResolvedValue({ rowsAffected: 0 });
+    select.mockResolvedValue([]);
+
+    await expect(sqlTodoStore.updateTodoBoardOrder(99, 1)).rejects.toThrow("Todo 99 not found");
+    await expect(sqlTodoStore.updateTodoStatusAndOrder(99, "todo", 1)).rejects.toThrow(
+      "Todo 99 not found"
+    );
+  });
 });

@@ -14,6 +14,10 @@ export interface Todo {
   category_id: number | null;
   category_name: string | null;
   category_color: string | null;
+  /** Platz der Karte in ihrer Brett-Spalte; kleiner Wert heisst weiter oben.
+   *  0 heisst "noch nie gezogen" -- alle unberuehrten Karten teilen sich den
+   *  Wert und sortieren sich untereinander nach der Faelligkeitsregel. */
+  board_order: number;
 }
 
 export interface TodoRow {
@@ -30,6 +34,7 @@ export interface TodoRow {
   category_name: string | null;
   category_color: string | null;
   status?: TodoStatus;
+  board_order?: number;
 }
 
 export function fromRow(row: TodoRow): Todo {
@@ -46,6 +51,7 @@ export function fromRow(row: TodoRow): Todo {
     category_id: row.category_id,
     category_name: row.category_name,
     category_color: row.category_color,
+    board_order: row.board_order ?? 0,
   };
 }
 
@@ -198,5 +204,78 @@ export function sortTodos(todos: Todo[]): Todo[] {
   return todos.slice().sort((a, b) => {
     const dateCmp = b.created_at.localeCompare(a.created_at);
     return dateCmp !== 0 ? dateCmp : b.id - a.id;
+  });
+}
+
+/**
+ * Ab welchem Abstand zweier Nachbarn eine Bruchzahl dazwischen nicht mehr
+ * verlaesslich ist. Doubles halten rund fuenfzig Halbierungen an derselben
+ * Stelle aus; diese Schwelle greift lange davor.
+ */
+const BOARD_ORDER_EPSILON = 1e-6;
+
+/**
+ * Der Platz, den eine Karte zwischen ihren beiden kuenftigen Nachbarn bekommt.
+ * `null` heisst "kein Nachbar auf dieser Seite", also Anfang bzw. Ende der
+ * Spalte.
+ *
+ * Eine Bruchzahl statt einer Durchnummerierung, weil ein Drop genau ein UPDATE
+ * ausloesen darf: `tauri-plugin-sql` kennt keine Transaktion ueber mehrere
+ * Aufrufe (siehe AGENTS.md), eine halb geschriebene Neunummerierung liesse die
+ * Spalte in einem Zustand zurueck, den niemand gewollt hat.
+ *
+ * Liegen beide Nachbarn zu dicht beieinander, liefert das Ergebnis keine echte
+ * Trennung mehr -- dafuer fragt der Aufrufer vorher `needsRebalance`.
+ */
+export function computeBoardOrder(before: number | null, after: number | null): number {
+  if (before === null && after === null) return 0;
+  if (before === null) return (after as number) - 1;
+  if (after === null) return before + 1;
+  return (before + after) / 2;
+}
+
+/**
+ * Ob zwischen diese beiden Nachbarn keine Bruchzahl mehr passt, die Ziehende
+ * als Reihenfolge wahrnehmen. Trifft vor allem den Alltagsfall zweier noch nie
+ * gezogener Karten (beide 0) und -- theoretisch -- viele Drops auf dieselbe
+ * Stelle. Der Aufrufer verteilt die Spalte dann einmal neu.
+ */
+export function needsRebalance(before: number | null, after: number | null): boolean {
+  if (before === null || after === null) return false;
+  return Math.abs(after - before) < BOARD_ORDER_EPSILON;
+}
+
+/**
+ * Die Spalte neu durchnummeriert, in genau der Reihenfolge, in der sie
+ * hereingereicht wurde: 0, 1, 2, ... Der Aufrufer schreibt die Werte
+ * anschliessend einzeln.
+ */
+export function rebalanceBoardOrders<T extends { id: number; board_order: number }>(
+  lane: T[]
+): { id: number; board_order: number }[] {
+  return lane.map((todo, index) => ({ id: todo.id, board_order: index }));
+}
+
+/**
+ * Die Reihenfolge einer Brett-Spalte: erst der gezogene Platz, dann -- bei
+ * Gleichstand -- die Faelligkeit, die Prioritaet und zuletzt das Alter.
+ *
+ * Der Tie-Breaker ist kein Beiwerk: solange niemand gezogen hat, stehen alle
+ * Karten auf 0, und dann ist er die ganze Sortierung.
+ *
+ * Sortiert auf einer Kopie: die Aufrufer reichen React-State herein.
+ */
+export function sortBoardTodos(todos: Todo[]): Todo[] {
+  const priorityOrder: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+  return todos.slice().sort((a, b) => {
+    if (a.board_order !== b.board_order) return a.board_order - b.board_order;
+    if (a.due_date !== b.due_date) {
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return a.due_date.localeCompare(b.due_date);
+    }
+    const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+    if (pDiff !== 0) return pDiff;
+    return b.created_at.localeCompare(a.created_at);
   });
 }

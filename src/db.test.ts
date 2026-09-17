@@ -37,4 +37,27 @@ describe("db backend selection", () => {
     expect(getDb).toHaveBeenCalled();
     expect(localStorage.getItem("todolist_todos")).toBeNull();
   });
+
+  it("forwards updateTodoBoardOrder to the localStorage store outside Tauri", async () => {
+    isTauri.mockReturnValue(false);
+    const db = await import("./db");
+    const created = await db.addTodo("Browser", "low", null, null);
+
+    const moved = await db.updateTodoBoardOrder(created.id, -1.5);
+
+    expect(moved.board_order).toBe(-1.5);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("forwards updateTodoStatusAndOrder to the localStorage store outside Tauri", async () => {
+    isTauri.mockReturnValue(false);
+    const db = await import("./db");
+    const created = await db.addTodo("Browser", "low", null, null);
+
+    const moved = await db.updateTodoStatusAndOrder(created.id, "done", 2);
+
+    expect(moved.status).toBe("done");
+    expect(moved.board_order).toBe(2);
+    expect(getDb).not.toHaveBeenCalled();
+  });
 });

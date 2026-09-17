@@ -2,6 +2,14 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+- Karten lassen sich im Brett innerhalb einer Spalte an eine beliebige Stelle ziehen. Eine Linie zeigt beim Ziehen, wo die Karte landet, und die Reihenfolge überlebt den Neustart. Wer nichts zieht, sieht die Spalte weiterhin nach Fälligkeit sortiert.
+
+### Behoben
+- Fehlermeldungen erscheinen jetzt auch im Brett. Sie standen nur in der Listenansicht, ein fehlgeschlagener Schreibvorgang blieb im Brett also stumm, bis man die Ansicht wechselte.
+
 ## [0.11.0] - 2026-09-16
 
 ### Hinzugefügt

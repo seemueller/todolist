@@ -389,6 +389,16 @@ pub fn run() {
             sql: "ALTER TABLE categories ADD COLUMN time_kind TEXT NOT NULL DEFAULT 'internal';",
             kind: MigrationKind::Up,
         },
+        // Alle bestehenden Aufgaben starten auf 0 und sortieren sich damit
+        // weiter nach der Faelligkeitsregel. Bewusst keine Vorab-Nummerierung
+        // per ROW_NUMBER: die Reihenfolge waere dieselbe, aber jede Aufgabe
+        // haette einen eingefrorenen Platz, den niemand gesetzt hat.
+        Migration {
+            version: 13,
+            description: "add_board_order_to_todos",
+            sql: "ALTER TABLE todos ADD COLUMN board_order REAL NOT NULL DEFAULT 0;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

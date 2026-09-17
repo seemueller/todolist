@@ -84,15 +84,16 @@ function loadTodos(): StoredTodoRecord[] {
 // Daten, die davor geschrieben wurden.
 /** Ein Eintrag so, wie ihn ein aelterer Stand geschrieben haben kann: `status`
  *  und `description` koennen fehlen. */
-type StoredTodo = Omit<StoredTodoRecord, "status" | "description"> &
-  Partial<Pick<StoredTodoRecord, "status" | "description">>;
+type StoredTodo = Omit<StoredTodoRecord, "status" | "description" | "board_order"> &
+  Partial<Pick<StoredTodoRecord, "status" | "description" | "board_order">>;
 
 function migrateTodos(todos: StoredTodo[]): StoredTodoRecord[] {
   return todos.map((todo) => {
     const description = todo.description ?? "";
-    if (todo.status) return { ...todo, description, status: todo.status };
+    const board_order = todo.board_order ?? 0;
+    if (todo.status) return { ...todo, description, board_order, status: todo.status };
     const status: TodoStatus = todo.done ? "done" : "todo";
-    return { ...todo, description, status, done: status === "done" };
+    return { ...todo, description, board_order, status, done: status === "done" };
   });
 }
 
@@ -157,6 +158,7 @@ function addTodo(
     category_id: categoryId ?? null,
     category_name: categoryId ? findCategory(categoryId)?.name ?? null : null,
     category_color: categoryId ? findCategory(categoryId)?.color ?? null : null,
+    board_order: 0,
   };
   todos.unshift(todo);
   saveTodos(todos);
@@ -223,6 +225,28 @@ async function updateTodoStatus(id: number, status: TodoStatus): Promise<Todo> {
   const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   todos[idx] = { ...todos[idx], status, done: status === "done" };
+  saveTodos(todos);
+  return Promise.resolve(toTodo(todos[idx]));
+}
+
+async function updateTodoBoardOrder(id: number, order: number): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+  todos[idx] = { ...todos[idx], board_order: order };
+  saveTodos(todos);
+  return Promise.resolve(toTodo(todos[idx]));
+}
+
+async function updateTodoStatusAndOrder(
+  id: number,
+  status: TodoStatus,
+  order: number
+): Promise<Todo> {
+  const todos = loadTodos();
+  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
+  if (idx === -1) throw new Error(`Todo ${id} not found`);
+  todos[idx] = { ...todos[idx], status, done: status === "done", board_order: order };
   saveTodos(todos);
   return Promise.resolve(toTodo(todos[idx]));
 }
@@ -381,6 +405,8 @@ export const localTodoStore: TodoStore = {
   updateTodoCategory,
   updateTodoFields,
   updateTodoStatus,
+  updateTodoBoardOrder,
+  updateTodoStatusAndOrder,
   toggleTodoDone,
   deleteTodo,
   listDeletedTodos,
