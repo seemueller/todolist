@@ -3,6 +3,7 @@ import {
   DAY_END_HOUR,
   DAY_START_HOUR,
   addDays,
+  addMonths,
   applyPaint,
   buildBlocks,
   clampTarget,
@@ -10,10 +11,16 @@ import {
   formatDateLabel,
   formatDayLabel,
   formatDuration,
+  formatMonthLabel,
+  formatPercent,
   formatSignedDuration,
   formatWeekLabel,
+  endOfMonth,
   isWeekend,
+  monthDays,
   setBlockNote,
+  shareByCategory,
+  startOfMonth,
   slotToLabel,
   sumByCategory,
   startOfWeek,
@@ -326,5 +333,71 @@ describe("Wochenhilfen", () => {
   it("beschriftet Spaltenkopf und Woche", () => {
     expect(formatDayLabel("2026-08-31")).toBe("Mo 31.08.");
     expect(formatWeekLabel("2026-08-31")).toBe("31.08.–04.09.2026");
+  });
+});
+
+describe("Monatshilfen", () => {
+  it("findet Anfang und Ende des Monats", () => {
+    expect(startOfMonth("2026-09-17")).toBe("2026-09-01");
+    expect(endOfMonth("2026-09-17")).toBe("2026-09-30");
+    expect(endOfMonth("2026-02-10")).toBe("2026-02-28");
+    expect(endOfMonth("2024-02-10")).toBe("2024-02-29"); // Schaltjahr
+  });
+
+  it("verschiebt Monate und bleibt auf dem Ersten", () => {
+    expect(addMonths("2026-09-17", 1)).toBe("2026-10-01");
+    expect(addMonths("2026-01-31", -1)).toBe("2025-12-01");
+    expect(addMonths("2026-12-01", 1)).toBe("2027-01-01");
+  });
+
+  it("beschriftet den Monat", () => {
+    expect(formatMonthLabel("2026-09-01")).toBe("September 2026");
+    expect(formatMonthLabel("2026-01-15")).toBe("Januar 2026");
+  });
+
+  it("zaehlt die Tage eines Monats auf", () => {
+    const days = monthDays("2026-02-10");
+    expect(days).toHaveLength(28);
+    expect(days[0]).toBe("2026-02-01");
+    expect(days[27]).toBe("2026-02-28");
+  });
+});
+
+describe("shareByCategory", () => {
+  it("rechnet Anteile in Prozent aus", () => {
+    const shares = shareByCategory([
+      { category_id: 1, slotCount: 30 },
+      { category_id: 2, slotCount: 10 },
+    ]);
+    expect(shares).toEqual([
+      { category_id: 1, slotCount: 30, percent: 75 },
+      { category_id: 2, slotCount: 10, percent: 25 },
+    ]);
+  });
+
+  it("gibt bei leerer Eingabe nichts zurueck", () => {
+    expect(shareByCategory([])).toEqual([]);
+  });
+
+  it("laesst bei einer Gesamtsumme von null keinen Anteil entstehen", () => {
+    expect(shareByCategory([{ category_id: 1, slotCount: 0 }])).toEqual([
+      { category_id: 1, slotCount: 0, percent: 0 },
+    ]);
+  });
+
+  it("behaelt die Reihenfolge der Eingabe bei", () => {
+    const shares = shareByCategory([
+      { category_id: 5, slotCount: 1 },
+      { category_id: 3, slotCount: 3 },
+    ]);
+    expect(shares.map((s) => s.category_id)).toEqual([5, 3]);
+  });
+});
+
+describe("formatPercent", () => {
+  it("schreibt eine Nachkommastelle mit Komma", () => {
+    expect(formatPercent(48.375)).toBe("48,4 %");
+    expect(formatPercent(100)).toBe("100,0 %");
+    expect(formatPercent(0)).toBe("0,0 %");
   });
 });

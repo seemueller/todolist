@@ -342,6 +342,54 @@ test.describe("Zeiterfassung", () => {
     expect(csv).toContain('09:00;09:15;0:15;15;Alpha;intern;"Ticket 4711; Teil A"');
   });
 
+  test("zeigt die Auswertung als Prozentanteile der Arbeitszeit", async ({ page }) => {
+    await addCategory(page, "Alpha");
+    await addCategory(page, "Pause");
+    await setTimeKind(page, "Pause", "Keine");
+    await openTimeView(page);
+
+    // Alpha 45 Minuten, Pause 15 Minuten: Alpha traegt die ganze Arbeitszeit.
+    await page.getByRole("button", { name: "Pinsel Alpha" }).click();
+    await cell(page, 0, 9, 0).click();
+    await cell(page, 0, 9, 1).click();
+    await cell(page, 0, 9, 2).click();
+    await page.getByRole("button", { name: "Pinsel Pause" }).click();
+    await cell(page, 0, 12, 0).click();
+
+    await page.getByRole("button", { name: /Auswertung der Zeiterfassung/i }).click();
+    await expect(page.locator(".time-stats")).toBeVisible();
+
+    const week = page.locator(".time-stats-section").first();
+    await expect(week.locator(".time-share")).toHaveCount(1);
+    await expect(week.locator(".time-share-duration")).toHaveText("0:45");
+    await expect(week.locator(".time-share-percent")).toHaveText("100,0 %");
+    await expect(week.locator(".time-stats-total")).toHaveText("0:45");
+  });
+
+  test("blättert den Monat in der Auswertung unabhängig von der Woche", async ({ page }) => {
+    await addCategory(page, "Alpha");
+    await openTimeView(page);
+    await cell(page, 0, 9, 0).click();
+
+    const weekLabel = await page.locator(".time-date").textContent();
+
+    await page.getByRole("button", { name: /Auswertung der Zeiterfassung/i }).click();
+    const month = page.locator(".time-stats-section").nth(1);
+    const before = await month.locator(".time-stats-title").textContent();
+
+    await page.getByRole("button", { name: "Nächster Monat" }).click();
+    await expect(month.locator(".time-stats-title")).not.toHaveText(before ?? "");
+    // Der leere Folgemonat faellt auf null zurueck, die Woche bleibt stehen.
+    await expect(month.locator(".time-stats-total")).toHaveText("0:00");
+    await expect(page.locator(".time-stats-section").first().locator(".time-stats-total")).toHaveText(
+      "0:15"
+    );
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".time-stats")).toHaveCount(0);
+    await expect(page.locator(".time-date")).toHaveText(weekLabel ?? "");
+  });
+
   test("wechselt zwischen allen drei Ansichten", async ({ page }) => {
     await openTimeView(page);
     await page.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }).click();

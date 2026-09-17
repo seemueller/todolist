@@ -52,6 +52,7 @@ Beschriftung umbenennt, zieht den Test mit.
 - `src/timeSlots.test.ts` — unit tests for the time-tracking domain logic
 - `src/timeCsv.test.ts` — unit tests for the CSV export
 - `src/TimeTrackingView.test.tsx` — time-tracking view (`timeDb` is mocked)
+- `src/TimeStatsModal.test.tsx` — the time-tracking breakdown per category (`timeDb` is mocked)
 - `src/App.test.tsx` — React component tests (db layer is mocked)
 - `src/TodoDetailModal.test.tsx` — the detail window, isolated from `App`
 - `src/main.test.tsx` — checks that the migration runs before the first render

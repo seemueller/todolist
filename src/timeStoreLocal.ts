@@ -70,6 +70,15 @@ function listSlots(date: string): Promise<DaySlot[]> {
   return Promise.resolve(selectDay(loadAll(), date));
 }
 
+function listRange(from: string, to: string): Promise<TimeSlotRecord[]> {
+  // Die Datumsschluessel sind feste ISO-Tage (YYYY-MM-DD), darum sortiert und
+  // vergleicht sie ein reiner Textvergleich richtig.
+  const records = loadAll()
+    .filter((record) => record.date >= from && record.date <= to)
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.slot - b.slot));
+  return Promise.resolve(records);
+}
+
 function saveDay(date: string, slots: DaySlot[]): Promise<DaySlot[]> {
   return Promise.resolve(replaceDay(date, slots));
 }
@@ -98,6 +107,7 @@ export const localTimeStore: TimeStore = {
   getSettings,
   saveSettings,
   listSlots,
+  listRange,
   saveDay,
   paintSlots,
   setBlockNote,

@@ -9,6 +9,7 @@
 
 export {
   BoardViewIcon,
+  ChartIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,

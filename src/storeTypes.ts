@@ -1,6 +1,6 @@
 import { Category, Priority, TimeKind, Todo, TodoStatus } from "./types";
 import { DaySlot } from "./timeSlots";
-import { TimeSettings } from "./timeTypes";
+import { TimeSettings, TimeSlotRecord } from "./timeTypes";
 
 /**
  * Was `updateTodoFields` aendern soll. Ein fehlendes Feld bleibt unveraendert;
@@ -174,6 +174,15 @@ export interface TimeStore {
   saveSettings(settings: TimeSettings): Promise<TimeSettings>;
   /** Alle Buchungen eines Tages, nach Slot sortiert. */
   listSlots(date: string): Promise<DaySlot[]>;
+  /**
+   * Alle Buchungen eines Zeitraums, nach Datum und darin nach Slot sortiert.
+   * Beide Grenztage zaehlen mit (`from <= date <= to`), ein `from` hinter `to`
+   * liefert nichts. Anders als `listSlots` traegt jeder Datensatz sein Datum
+   * mit -- die Auswertung summiert ueber Tage hinweg und muss sie auseinander
+   * halten koennen. Gedacht fuer Wochen- und Monatsauswertungen, damit ein
+   * Monat eine Abfrage kostet und nicht einunddreissig.
+   */
+  listRange(from: string, to: string): Promise<TimeSlotRecord[]>;
   /**
    * Schreibt den kompletten Tagesstand. Die View nutzt das am Ende eines Zuges:
    * waehrend gezogen wird, rechnet sie die Vorschau selbst, gespeichert wird einmal.

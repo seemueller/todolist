@@ -37,6 +37,31 @@ describe("timeDb backend selection", () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
+  it("reicht listRange an den localStorage-Store durch", async () => {
+    isTauri.mockReturnValue(false);
+    const timeDb = await import("./timeDb");
+    await timeDb.saveDay("2026-09-03", [{ slot: 36, category_id: 2, note: "" }]);
+
+    const records = await timeDb.listRange("2026-09-01", "2026-09-30");
+
+    expect(records).toEqual([{ date: "2026-09-03", slot: 36, category_id: 2, note: "" }]);
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("reicht listRange an den SQLite-Store durch", async () => {
+    isTauri.mockReturnValue(true);
+    select.mockResolvedValue([]);
+    const timeDb = await import("./timeDb");
+
+    await timeDb.listRange("2026-09-01", "2026-09-30");
+
+    expect(select).toHaveBeenCalledWith(expect.stringContaining("FROM time_slots"), [
+      "2026-09-01",
+      "2026-09-30",
+    ]);
+    expect(localStorage.getItem("todolist_timeslots")).toBeNull();
+  });
+
   it("uses the SQLite store inside Tauri", async () => {
     isTauri.mockReturnValue(true);
     const timeDb = await import("./timeDb");

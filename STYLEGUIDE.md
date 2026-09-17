@@ -221,7 +221,7 @@ Modal offen sein soll** — der Listener hängt an der Lebensdauer der Komponent
 
 | Prop | Typ | Bedeutung |
 |---|---|---|
-| `variant` | `"changelog" \| "category" \| "todo"` | Wählt die Panelbreite (520 / 460 / 560 px). |
+| `variant` | `"changelog" \| "category" \| "todo" \| "trash" \| "stats"` | Wählt die Panelbreite (520 / 460 / 560 / 460 / 560 px). |
 | `title` | `string` | Text der `<h2>` in der Kopfzeile. |
 | `onClose` | `() => void` | Overlay-Klick, Schließen-Knopf, Escape. |
 | `closeLabel` | `string` | `aria-label` des Schließen-Knopfs. |
@@ -284,8 +284,8 @@ Tastaturvertrag: Enter und Verlassen übernehmen, Escape bricht ab.
 
 `CheckIcon`, `CloseIcon`, `PencilIcon`, `TrashIcon`, `TagIcon`, `PlusIcon`,
 `ChevronLeftIcon`, `LaneTodoIcon`, `LaneProgressIcon`, `LaneDoneIcon`,
-`ListViewIcon`, `BoardViewIcon`, `NoteIcon`. Alle nehmen `size` und die üblichen
-SVG-Props.
+`ListViewIcon`, `BoardViewIcon`, `NoteIcon`, `ChartIcon`. Alle nehmen `size` und
+die üblichen SVG-Props.
 Ein neues Icon entsteht hier und nirgends sonst: strichbasiert, `currentColor`,
 Raster 14/16/18 px, Strichstärke 1,6–2 px.
 
@@ -338,6 +338,16 @@ Viertelstunden). Ihre Regeln:
   und ungruppiert — die Farbe trägt die Zuordnung schon.
 - Selten Gebrauchtes gehört ins Einstellungs-Popup (`Modal variant="category"`),
   nicht in die Kopfzeile: dort stehen nur Navigation, Wochensumme und Differenz.
+- Die **Auswertung** liegt in `src/TimeStatsModal.tsx` und öffnet als
+  `Modal variant="stats"` über den Knopf „Auswertung der Zeiterfassung" in der
+  Kopfzeile. Sie zeigt je Zeitraum eine Zeile pro Kategorie (`.time-share`) als
+  festes Raster aus Badge, Balken, Dauer und Prozent — so stehen die Zahlen aller
+  Zeilen untereinander. Der Balken (`.time-share-bar`) ist eine Spur in
+  `--surface-muted` mit einer Füllung in der Kategoriefarbe; er trägt
+  `aria-hidden`, weil Dauer und Prozent daneben dasselbe schon als Text sagen.
+  Gezählt wird wie in der Kopfzeile **nur Arbeitszeit**, und der Prozentwert
+  steht mit einer Nachkommastelle und deutschem Komma („48,4 %"). Die Woche folgt
+  der Ansicht dahinter, der Monat hat eine eigene Navigation.
 
 ### Bewusst nicht extrahiert
 

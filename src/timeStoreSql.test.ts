@@ -94,6 +94,26 @@ describe("sqlTimeStore", () => {
     });
   });
 
+  it("liest einen Zeitraum in einer Abfrage, nach Datum und Slot sortiert", async () => {
+    select.mockResolvedValue([
+      { date: "2026-09-01", slot: 32, category_id: 1, note: "a" },
+      { date: "2026-09-03", slot: 20, category_id: 2, note: "" },
+    ]);
+
+    const records = await sqlTimeStore.listRange("2026-09-01", "2026-09-30");
+
+    expect(select).toHaveBeenCalledTimes(1);
+    const [sql, params] = select.mock.calls[0];
+    expect(sql).toContain("date >= $1");
+    expect(sql).toContain("date <= $2");
+    expect(sql).toContain("ORDER BY date ASC, slot ASC");
+    expect(params).toEqual(["2026-09-01", "2026-09-30"]);
+    expect(records).toEqual([
+      { date: "2026-09-01", slot: 32, category_id: 1, note: "a" },
+      { date: "2026-09-03", slot: 20, category_id: 2, note: "" },
+    ]);
+  });
+
   it("clears a block by painting it with no category", async () => {
     select.mockResolvedValue([
       { slot: 36, category_id: 2, note: "Meeting" },

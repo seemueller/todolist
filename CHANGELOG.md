@@ -2,6 +2,11 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unreleased]
+
+### Hinzugefügt
+- Die Zeiterfassung hat eine Auswertung: ein Knopf in der Kopfzeile öffnet ein Fenster, das je Kategorie zeigt, welcher Anteil der Arbeitszeit auf sie entfällt — als Balken, Dauer und Prozentwert. Oben die angezeigte Woche, darunter ein Kalendermonat mit eigener Navigation. Gezählt wird nur Arbeitszeit; Pausen und Privates bleiben außen vor.
+
 ## [0.12.0] - 2026-09-17
 
 ### Hinzugefügt

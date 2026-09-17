@@ -47,7 +47,27 @@ export interface CategorySum {
   slotCount: number;
 }
 
+/** Eine Kategoriesumme samt ihrem Anteil an der Gesamtsumme, in Prozent (0-100). */
+export interface CategoryShare extends CategorySum {
+  percent: number;
+}
+
 const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"] as const;
+
+const MONTHS = [
+  "Januar",
+  "Februar",
+  "März",
+  "April",
+  "Mai",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "Dezember",
+] as const;
 
 function pad(value: number): string {
   return String(value).padStart(2, "0");
@@ -285,4 +305,61 @@ export function formatWeekLabel(monday: string): string {
 export function formatDateLabel(key: string): string {
   const date = fromDateKey(key);
   return `${WEEKDAYS[date.getDay()]}, ${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()}`;
+}
+
+/**
+ * Anteil jeder Kategorie an der Gesamtsumme, in Prozent. Die Reihenfolge der
+ * Eingabe bleibt erhalten; eine Gesamtsumme von null ergibt ueberall 0 statt
+ * NaN. Es wird bewusst nicht gerundet -- das macht erst formatPercent, damit
+ * die Balkenbreiten den exakten Anteil behalten.
+ */
+export function shareByCategory(sums: CategorySum[]): CategoryShare[] {
+  const total = sumSlots(sums);
+  return sums.map((sum) => ({
+    ...sum,
+    percent: total === 0 ? 0 : (sum.slotCount / total) * 100,
+  }));
+}
+
+/** "48,4 %" fuer 48.375 -- eine Nachkommastelle, deutsches Dezimalkomma. */
+export function formatPercent(percent: number): string {
+  return `${percent.toFixed(1).replace(".", ",")} %`;
+}
+
+/** Erster Tag des Monats, in dem `key` liegt. */
+export function startOfMonth(key: string): string {
+  const date = fromDateKey(key);
+  return toDateKey(new Date(date.getFullYear(), date.getMonth(), 1));
+}
+
+/** Letzter Tag des Monats, in dem `key` liegt. */
+export function endOfMonth(key: string): string {
+  const date = fromDateKey(key);
+  // Tag 0 des Folgemonats ist der letzte Tag dieses Monats.
+  return toDateKey(new Date(date.getFullYear(), date.getMonth() + 1, 0));
+}
+
+/**
+ * Verschiebt um Monate und landet immer auf dem Ersten. Das Kappen auf den
+ * Monatsanfang ist Absicht: ein Monatswechsel vom 31. aus wuerde sonst im
+ * Folgemonat ueberlaufen (31. Januar + 1 Monat = 3. Maerz).
+ */
+export function addMonths(key: string, months: number): string {
+  const date = fromDateKey(key);
+  return toDateKey(new Date(date.getFullYear(), date.getMonth() + months, 1));
+}
+
+/** Alle Tage des Monats, in dem `key` liegt. */
+export function monthDays(key: string): string[] {
+  const first = startOfMonth(key);
+  const last = endOfMonth(key);
+  const days: string[] = [];
+  for (let day = first; day <= last; day = addDays(day, 1)) days.push(day);
+  return days;
+}
+
+/** "September 2026" fuer die Kopfzeile der Auswertung. */
+export function formatMonthLabel(key: string): string {
+  const date = fromDateKey(key);
+  return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }

@@ -3,7 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { DaySlot, applyPaint, clampTarget, setBlockNote as setNoteOnBlock } from "./timeSlots";
-import { TimeSettings, DEFAULT_SETTINGS } from "./timeTypes";
+import { TimeSettings, DEFAULT_SETTINGS, TimeSlotRecord } from "./timeTypes";
 import { TimeStore } from "./storeTypes";
 import { getDb } from "./sqlClient";
 
@@ -54,6 +54,16 @@ async function listSlots(date: string): Promise<DaySlot[]> {
   return rows.map((row) => ({ slot: row.slot, category_id: row.category_id, note: row.note }));
 }
 
+async function listRange(from: string, to: string): Promise<TimeSlotRecord[]> {
+  const db = await getDb();
+  return db.select<TimeSlotRecord[]>(
+    `SELECT date, slot, category_id, note FROM time_slots
+     WHERE date >= $1 AND date <= $2
+     ORDER BY date ASC, slot ASC`,
+    [from, to]
+  );
+}
+
 // Ersetzt den Tag ueber den Rust-Command replace_time_day statt ueber db.execute():
 // db.execute() zieht je Aufruf eine beliebige Verbindung aus dem Pool des SQL-
 // Plugins, darum haelt ein BEGIN/COMMIT ueber mehrere execute()-Aufrufe hinweg
@@ -96,6 +106,7 @@ export const sqlTimeStore: TimeStore = {
   getSettings,
   saveSettings,
   listSlots,
+  listRange,
   saveDay,
   paintSlots,
   setBlockNote,

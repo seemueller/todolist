@@ -135,6 +135,16 @@ export function SlidersIcon(props: IconProps) {
   );
 }
 
+/** Saeulendiagramm - Auswertung der Zeiterfassung. */
+export function ChartIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" strokeWidth={1.6} {...props}>
+      <path d="M2 12h10" />
+      <path d="M4 12V7.5M7 12V3M10 12V6" />
+    </BaseIcon>
+  );
+}
+
 /** Pfeil in eine Ablage - CSV-Export. */
 export function DownloadIcon(props: IconProps) {
   return (

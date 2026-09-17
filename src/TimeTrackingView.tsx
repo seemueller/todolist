@@ -48,8 +48,10 @@ import {
 import * as timeDb from "./timeDb";
 import { DEFAULT_SETTINGS, type TimeSettings } from "./timeDb";
 import { buildCsv, csvFileName } from "./timeCsv";
+import { TimeStatsModal } from "./TimeStatsModal";
 import {
   CategoryBadge,
+  ChartIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   DownloadIcon,
@@ -81,6 +83,7 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
   const [settings, setSettings] = useState<TimeSettings>(DEFAULT_SETTINGS);
   const [brushId, setBrushId] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState<{
     date: string;
@@ -359,6 +362,13 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
         </FilterChip>
         <IconButton
           variant="icon"
+          onClick={() => setShowStats(true)}
+          aria-label="Auswertung der Zeiterfassung"
+        >
+          <ChartIcon />
+        </IconButton>
+        <IconButton
+          variant="icon"
           onClick={() => setShowSettings(true)}
           aria-label="Einstellungen der Zeiterfassung"
         >
@@ -579,6 +589,14 @@ export function TimeTrackingView({ categories, onManageCategories }: TimeTrackin
             </div>
           )}
         </>
+      )}
+
+      {showStats && (
+        <TimeStatsModal
+          categories={categories}
+          monday={monday}
+          onClose={() => setShowStats(false)}
+        />
       )}
 
       {showSettings && (

@@ -59,6 +59,33 @@ describe("localTimeStore", () => {
     expect(day1).toEqual([{ slot: 10, category_id: 1, note: "" }]);
   });
 
+  it("liefert mit listRange alle Buchungen eines Zeitraums, nach Datum und Slot sortiert", async () => {
+    await localTimeStore.saveDay("2026-09-03", [{ slot: 20, category_id: 2, note: "" }]);
+    await localTimeStore.saveDay("2026-09-01", [
+      { slot: 33, category_id: 1, note: "a" },
+      { slot: 32, category_id: 1, note: "a" },
+    ]);
+
+    const records = await localTimeStore.listRange("2026-09-01", "2026-09-03");
+
+    expect(records).toEqual([
+      { date: "2026-09-01", slot: 32, category_id: 1, note: "a" },
+      { date: "2026-09-01", slot: 33, category_id: 1, note: "a" },
+      { date: "2026-09-03", slot: 20, category_id: 2, note: "" },
+    ]);
+  });
+
+  it("schliesst bei listRange beide Grenztage ein und laesst alles davor und danach weg", async () => {
+    await localTimeStore.saveDay("2026-08-31", [{ slot: 32, category_id: 1, note: "" }]);
+    await localTimeStore.saveDay("2026-09-01", [{ slot: 32, category_id: 1, note: "" }]);
+    await localTimeStore.saveDay("2026-09-30", [{ slot: 32, category_id: 1, note: "" }]);
+    await localTimeStore.saveDay("2026-10-01", [{ slot: 32, category_id: 1, note: "" }]);
+
+    const records = await localTimeStore.listRange("2026-09-01", "2026-09-30");
+
+    expect(records.map((r) => r.date)).toEqual(["2026-09-01", "2026-09-30"]);
+  });
+
   it("leert einen ganzen Block mit clearBlock", async () => {
     await localTimeStore.saveDay("2026-09-03", [
       { slot: 32, category_id: 1, note: "" },
