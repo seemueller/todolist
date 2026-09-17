@@ -961,7 +961,8 @@ a:hover {
 .changelog-modal,
 .category-modal,
 .todo-modal,
-.trash-modal {
+.trash-modal,
+.stats-modal {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -988,6 +989,10 @@ a:hover {
 
 .trash-modal {
   max-width: 460px;
+}
+
+.stats-modal {
+  max-width: 560px;
 }
 
 .todo-modal-body {
@@ -2513,4 +2518,104 @@ a:hover {
   color: var(--ink);
   padding: 5px 11px;
   cursor: pointer;
+}
+
+/* Auswertung: Anteil der Arbeitszeit je Kategorie, Woche und Monat. */
+.time-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.time-stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.time-stats-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: var(--border-thin);
+}
+
+.time-stats-title {
+  margin: 0;
+  font-family: 'Archivo Black', system-ui, sans-serif;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+.time-stats-total {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--highlight);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-share-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Feste Spalten, damit Dauer und Prozent aller Zeilen untereinander stehen. */
+.time-share {
+  display: grid;
+  grid-template-columns: minmax(80px, 140px) 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-share .category-badge {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-share-bar {
+  display: block;
+  height: 12px;
+  border: var(--border-thin);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.time-share-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.time-share-duration {
+  min-width: 46px;
+  text-align: right;
+}
+
+.time-share-percent {
+  min-width: 56px;
+  text-align: right;
+  color: var(--ink-soft);
+}
+
+.time-stats-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
 }

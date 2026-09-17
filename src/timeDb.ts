@@ -8,7 +8,7 @@ import { localTimeStore } from "./timeStoreLocal";
 import { sqlTimeStore } from "./timeStoreSql";
 import { isTauri } from "./sqlClient";
 import { TimeStore } from "./storeTypes";
-import { TimeSettings, DEFAULT_SETTINGS } from "./timeTypes";
+import { TimeSettings, DEFAULT_SETTINGS, TimeSlotRecord } from "./timeTypes";
 
 export type { TimeSettings };
 export { DEFAULT_SETTINGS };
@@ -27,6 +27,10 @@ export function saveSettings(settings: TimeSettings): Promise<TimeSettings> {
 
 export function listSlots(date: string): Promise<DaySlot[]> {
   return store().listSlots(date);
+}
+
+export function listRange(from: string, to: string): Promise<TimeSlotRecord[]> {
+  return store().listRange(from, to);
 }
 
 export function saveDay(date: string, slots: DaySlot[]): Promise<DaySlot[]> {
