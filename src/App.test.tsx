@@ -986,6 +986,28 @@ describe("App", () => {
     expect(screen.getByText(/Datenbank weg/i)).toBeInTheDocument();
   });
 
+  it("zeigt eine fehlgeschlagene Kartenverschiebung auch im Brett, ohne dass man in die Liste wechseln muss", async () => {
+    // Das Fehler-Banner steckte bislang nur im Zweig der Listenansicht --
+    // schlaegt ein Drag im Brett fehl, blieb die Oberflaeche stumm.
+    const container = await renderBoard([
+      makeTodo({ id: 1, title: "Erste", board_order: 0 }),
+      makeTodo({ id: 2, title: "Zweite", board_order: 1 }),
+    ]);
+    vi.mocked(db.updateTodoBoardOrder).mockRejectedValue("Datenbank weg");
+
+    const [first, second] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    stubRect(first);
+    const dataTransfer = makeDataTransfer();
+
+    fireDrag("dragstart", second, dataTransfer);
+    fireDrag("dragover", first, dataTransfer, 10);
+    fireDrag("drop", first, dataTransfer, 10);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Datenbank weg/i)).toBeInTheDocument();
+    });
+  });
+
   it("keeps a reorder inside the done lane a plain position write", async () => {
     // Das Feuerwerk (`burstId`/`.done-flash`) zeichnet nur die Listenansicht;
     // im Brett ist es nicht sichtbar. Pruefbar ist deshalb der Schreibpfad:
