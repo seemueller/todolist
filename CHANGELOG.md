@@ -2,7 +2,7 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [Unreleased]
+## [0.13.0] - 2026-09-17
 
 ### Hinzugefügt
 - Die Notiz eines Zeitblocks steht jetzt im Raster, mitten in der Buchung. Sie sitzt in der breitesten Stundenzeile des Blocks und rückt von selbst mit, wenn der Block wächst, schrumpft oder verschoben wird. Die Schriftfarbe richtet sich nach dem Kontrast zur Kategoriefarbe. Eine einzelne Viertelstunde bleibt unbeschriftet — dort passt kein Text.

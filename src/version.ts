@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.0";
+export const APP_VERSION = "0.13.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.13.0",
+    date: "2026-09-17",
+    changes: [
+      "Die Zeiterfassung hat eine Auswertung: ein Knopf in der Kopfzeile zeigt je Kategorie, welcher Anteil der Arbeitszeit auf sie entfällt — als Balken, Dauer und Prozentwert",
+      "Die Auswertung zeigt oben die angezeigte Woche und darunter einen Kalendermonat mit eigener Navigation; gezählt wird nur Arbeitszeit, Pausen und Privates bleiben außen vor",
+      "Die Notiz eines Zeitblocks steht jetzt mitten in der Buchung im Raster und rückt mit, wenn der Block wächst, schrumpft oder verschoben wird",
+    ],
+  },
   {
     version: "0.12.0",
     date: "2026-09-17",
