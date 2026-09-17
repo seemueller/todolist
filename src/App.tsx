@@ -772,6 +772,10 @@ function App({ migrationError = null }: AppProps) {
   // das Band informieren muesste.
   const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "open" || searchQuery || categoryFilter !== null;
 
+  // Beide Ansichten teilen sich diese eine Fehlermeldung -- die Liste zeigt
+  // sie an ihrer angestammten Stelle, das Brett hat sonst keine.
+  const errorBanner = error && <p className="error">Fehler: {error}</p>;
+
   return (
     <div className="app-shell">
       <CustomTitleBar />
@@ -937,7 +941,7 @@ function App({ migrationError = null }: AppProps) {
             </IconButton>
           </div>
         )}
-        {error && <p className="error">Fehler: {error}</p>}
+        {errorBanner}
         {loading && <p className="muted">Lade Aufgaben …</p>}
 
         {!loading && todos.length === 0 && !error && (
@@ -1050,6 +1054,7 @@ function App({ migrationError = null }: AppProps) {
 
         {viewMode === "kanban" && (
           <>
+          {errorBanner}
           {/* Die Kategoriefarbe kommt als Inline-Style aus den Daten, wie bei
               CategoryBadge auch -- hier als Rahmen, damit der aktive Chip
               weiterhin die Tintenflaeche tragen kann. */}
