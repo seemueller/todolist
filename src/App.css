@@ -1883,6 +1883,24 @@ a:hover {
   border-left: var(--border-thin);
 }
 
+/* Notiz mitten im Block: liegt als eigenes Rasterfeld ueber den Zellen und
+   laesst Zeigerereignisse durch, damit das Malen darunter weiterlaeuft. Die
+   Schriftfarbe kommt als Inline-Style aus `readableInk`, weil sie von der
+   Kategoriefarbe abhaengt. */
+.time-note-label {
+  z-index: 1;
+  align-self: center;
+  overflow: hidden;
+  padding: 0 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .time-cell:hover {
   background: var(--highlight);
 }

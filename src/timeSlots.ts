@@ -363,3 +363,63 @@ export function formatMonthLabel(key: string): string {
   const date = fromDateKey(key);
   return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
+
+/**
+ * Wo im Raster die Notiz eines Blocks steht: ueber welchem Stueck, von wo bis
+ * wo. `endSlot` ist wie beim Block ausschliesslich.
+ */
+export interface NoteLabel {
+  startSlot: number;
+  endSlot: number;
+  note: string;
+}
+
+/** Ab so vielen Viertelstunden ist ein Stueck breit genug fuer Text. */
+export const MIN_NOTE_LABEL_SLOTS = 2;
+
+/** Zerlegt einen Block in die Stuecke, die je eine Stundenzeile des Rasters fuellen. */
+function splitByHour(block: TimeBlock): { startSlot: number; endSlot: number }[] {
+  const pieces: { startSlot: number; endSlot: number }[] = [];
+  let start = block.startSlot;
+  while (start < block.endSlot) {
+    const nextHour = (Math.floor(start / SLOTS_PER_HOUR) + 1) * SLOTS_PER_HOUR;
+    const end = Math.min(nextHour, block.endSlot);
+    pieces.push({ startSlot: start, endSlot: end });
+    start = end;
+  }
+  return pieces;
+}
+
+/**
+ * Die Notizen eines Tages so, wie das Raster sie zeigt: je Block hoechstens
+ * eine Beschriftung.
+ *
+ * Das Raster bricht einen Block an jeder vollen Stunde um -- ein Block von
+ * 09:30 bis 11:30 liegt in drei Stundenzeilen. Die Notiz steht in der
+ * breitesten davon, weil dort am meisten Text lesbar bleibt; sind zwei gleich
+ * breit, gewinnt die, in der die Mitte des Blocks liegt. Ein Stueck unter
+ * MIN_NOTE_LABEL_SLOTS Viertelstunden bekommt gar keine Beschriftung -- drei
+ * Zeichen und Auslassungspunkte waeren nur Rauschen, die Notiz steht ohnehin
+ * vollstaendig in der Blockliste.
+ */
+export function noteLabels(slots: DaySlot[]): NoteLabel[] {
+  const labels: NoteLabel[] = [];
+  for (const block of buildBlocks(slots)) {
+    if (block.note === "") continue;
+    const middle = (block.startSlot + block.endSlot) / 2;
+    let best: { startSlot: number; endSlot: number } | null = null;
+    for (const piece of splitByHour(block)) {
+      const width = piece.endSlot - piece.startSlot;
+      const holdsMiddle = middle >= piece.startSlot && middle < piece.endSlot;
+      if (!best) {
+        best = piece;
+        continue;
+      }
+      const bestWidth = best.endSlot - best.startSlot;
+      if (width > bestWidth || (width === bestWidth && holdsMiddle)) best = piece;
+    }
+    if (!best || best.endSlot - best.startSlot < MIN_NOTE_LABEL_SLOTS) continue;
+    labels.push({ startSlot: best.startSlot, endSlot: best.endSlot, note: block.note });
+  }
+  return labels;
+}

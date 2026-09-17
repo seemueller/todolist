@@ -325,6 +325,21 @@ Viertelstunden). Ihre Regeln:
 - Die Spaltenzahl steckt in der Klasse `days-5` bzw. `days-7` am `.time-grid`;
   `repeat()` nimmt kein `calc()`, darum zwei feste Varianten. Wer eine dritte
   Spaltenzahl braucht, legt eine dritte Klasse an.
+- **Jede Zelle einer Stundenzeile steht explizit in ihrem Rasterfeld**
+  (`grid-row: 1`, `grid-column` aus Tag und Viertelstunde). Das ist keine
+  Kosmetik: ein automatisch platziertes Rasterfeld weicht einem belegten Bereich
+  aus, die darüberliegende Notiz-Beschriftung schöbe die Zellen unter sich sonst
+  in eine zweite Rasterzeile, statt von ihnen überdeckt zu werden.
+- Die Notiz eines Blocks steht als `.time-note-label` **im Block selbst**, über
+  den Zellen derselben Stundenzeile. Sie liegt in der breitesten Stundenzeile
+  des Blocks — bei Gleichstand in der mit der Blockmitte — und erscheint erst ab
+  zwei Viertelstunden; darunter wäre sie nur Rauschen, der volle Text steht
+  ohnehin in der Blockliste. Sie trägt `pointer-events: none`, damit das Malen
+  darunter weiterläuft. Die Schriftfarbe kommt aus `readableInk`
+  (`src/contrast.ts`): das Kontrastverhältnis nach WCAG entscheidet zwischen
+  `--ink` und `--canvas`, statt einer Faustregel. Auf der ganzen Palette gewinnt
+  die Tinte, auch auf `--accent` (4,58:1); erst eine eigene dunkle Farbe kippt
+  auf die Grundfläche.
 - Die Kategoriefarbe kommt als Inline-Style aus den Daten, wie `category_color`
   sonst auch.
 - Eine Zelle ist 30 px hoch und damit auf Klickflächengröße; ihr `aria-label` ist
