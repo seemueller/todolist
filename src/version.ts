@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.13.0";
+export const APP_VERSION = "0.14.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.14.0",
+    date: "2026-09-21",
+    changes: [
+      "Die Beschreibung einer Aufgabe wird gelesen statt entziffert: das Detail-Fenster zeigt sie als gesetzten Text und formt Markdown aus — Überschriften, Listen, Checklisten, Zitate, Code, Trennlinien, fett, kursiv und Links",
+      "Ein Knopf über dem Feld schaltet zwischen Lesen und Schreiben; wo noch keine Beschreibung steht, öffnet gleich das Textfeld",
+      "Links in einer Beschreibung öffnen im Systembrowser — zum Link werden nur http, https und mailto, alles andere bleibt Text",
+    ],
+  },
   {
     version: "0.13.0",
     date: "2026-09-17",
