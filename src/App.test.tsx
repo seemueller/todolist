@@ -1510,6 +1510,19 @@ describe("der Papierkorb-Knopf", () => {
       expect(screen.queryByText("Epos")).not.toBeInTheDocument();
     });
 
+    it("nimmt den gemerkten Typfilter beim naechsten Start wieder auf", async () => {
+      localStorage.setItem("todolist.typeFilter", "bug");
+      vi.mocked(db.listTodos).mockResolvedValue([
+        makeTodo({ id: 1, title: "Login kaputt", type: "bug" }),
+        makeTodo({ id: 2, title: "Epos", type: "story" }),
+      ]);
+
+      render(<App />);
+
+      expect(await screen.findByText("Login kaputt")).toBeInTheDocument();
+      expect(screen.queryByText("Epos")).not.toBeInTheDocument();
+    });
+
     it("merkt sich den Typfilter", async () => {
       vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 2, title: "Epos", type: "story" })]);
 

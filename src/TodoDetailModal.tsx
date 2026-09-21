@@ -199,12 +199,11 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
         <div className="todo-modal-row">
           <div className="todo-modal-field">
             <label htmlFor="todo-detail-type">Typ</label>
-            <TypeSelect
-              id="todo-detail-type"
-              variant="inline"
-              value={type}
-              onValueChange={setType}
-            />
+            {/* Ohne variant, also wie der Prioritaets-Zwilling daneben: die
+                Spalten der Reihe sind gleich breit, und .type-select-inline
+                saesse dort als schmales, fettes Feld neben einem nackten
+                Auswahlfeld. */}
+            <TypeSelect id="todo-detail-type" value={type} onValueChange={setType} />
           </div>
 
           <div className="todo-modal-field">

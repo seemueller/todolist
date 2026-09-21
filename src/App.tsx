@@ -893,7 +893,7 @@ function App({ migrationError = null }: AppProps) {
             {/* Eigene Leiste neben dem Statusfilter. Die Beschriftungen tragen
                 "Typ" im aria-label, weil "Alle" sonst dreimal auf der Seite
                 steht -- Faelligkeit, Status und hier. */}
-            <div className="status-filter" role="group" aria-label="Typ filtern">
+            <div className="type-filter" role="group" aria-label="Typ filtern">
               <FilterChip
                 variant="segment"
                 active={typeFilter === "all"}

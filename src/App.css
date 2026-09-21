@@ -357,15 +357,27 @@ a:hover {
   color: var(--canvas);
 }
 
-.status-filter {
+/* Statusleiste und Typleiste sind dieselbe Segmentleiste, darum eine Regel
+   fuer beide -- wie .time-kind-select einen eigenen Namen traegt und sich den
+   Stil trotzdem teilt. */
+.status-filter,
+.type-filter {
   display: flex;
-  margin-left: auto;
   border: var(--border);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
 
-.status-filter button {
+/* Nur die erste Leiste schiebt sich nach rechts. Zwei auto-Raender in
+   derselben Flex-Zeile teilen den freien Platz unter sich auf: die
+   Statusleiste schwaemme dann bei mittlerer Fensterbreite zwischen zwei
+   Loechern statt am rechten Rand zu stehen. */
+.status-filter {
+  margin-left: auto;
+}
+
+.status-filter button,
+.type-filter button {
   padding: 7px 13px;
   border: none;
   border-left: var(--border);
@@ -380,15 +392,18 @@ a:hover {
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.status-filter button:first-child {
+.status-filter button:first-child,
+.type-filter button:first-child {
   border-left: none;
 }
 
-.status-filter button:hover {
+.status-filter button:hover,
+.type-filter button:hover {
   background: var(--highlight);
 }
 
-.status-filter button.active {
+.status-filter button.active,
+.type-filter button.active {
   background: var(--ink);
   color: var(--canvas);
 }
