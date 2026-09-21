@@ -23,6 +23,26 @@ export function saveStatusFilter(value: StatusFilter): void {
   localStorage.setItem(STATUS_FILTER_KEY, value);
 }
 
+/** Die vier Zustaende der Typleiste ueber der Liste. */
+export type TypeFilter = "all" | "bug" | "task" | "story";
+
+export const TYPE_FILTER_KEY = "todolist.typeFilter";
+
+// "Alle" als Vorgabe: anders als beim Status gibt es keinen Typ, den man
+// ueblicherweise ausblenden will.
+const DEFAULT_TYPE_FILTER: TypeFilter = "all";
+
+export function loadTypeFilter(): TypeFilter {
+  const stored = localStorage.getItem(TYPE_FILTER_KEY);
+  return stored === "bug" || stored === "task" || stored === "story"
+    ? stored
+    : DEFAULT_TYPE_FILTER;
+}
+
+export function saveTypeFilter(value: TypeFilter): void {
+  localStorage.setItem(TYPE_FILTER_KEY, value);
+}
+
 /** Groesse eines Modal-Panels in Pixeln. */
 export interface ModalSize {
   width: number;
