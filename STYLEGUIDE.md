@@ -221,10 +221,23 @@ Modal offen sein soll** — der Listener hängt an der Lebensdauer der Komponent
 
 | Prop | Typ | Bedeutung |
 |---|---|---|
-| `variant` | `"changelog" \| "category" \| "todo" \| "trash" \| "stats"` | Wählt die Panelbreite (520 / 460 / 560 / 460 / 560 px). |
+| `variant` | `"changelog" \| "category" \| "todo" \| "trash" \| "stats"` | Wählt die Panelbreite (520 / 460 / **896** / 460 / 560 px). |
 | `title` | `string` | Text der `<h2>` in der Kopfzeile. |
 | `onClose` | `() => void` | Overlay-Klick, Schließen-Knopf, Escape. |
 | `closeLabel` | `string` | `aria-label` des Schließen-Knopfs. |
+| `resizable` | `boolean` | Hängt `.modal-resizable` an: Anfasser unten rechts, 360×320 px bis 96vw × 92vh. |
+| `size` | `ModalSize \| null` | Startgröße als Inline-Maß; `null` nimmt die Breite aus dem CSS. |
+| `onSizeChange` | `(size: ModalSize) => void` | Nach dem Ziehen, einmal je neuer Größe. |
+
+Beim ziehbaren Panel kommt die Breite als `width`, nicht als `max-width` — ein
+`max-width` deckelt auch die gezogene Breite. Gemeldet wird über einen
+`ResizeObserver`, nicht über Pointer-Ereignisse: der Anfasser gehört der
+Oberfläche des Browsers und schickt dem Element kein `pointerup`. Gespeichert
+wird nur, was gezogen wurde — der Beobachter meldet nur, wenn `width`/`height`
+inline gesetzt sind, und eine Höhenänderung aus dem Inhalt setzt dort nichts.
+Die Größe liegt in `localStorage` über `src/listPrefs.ts`, wie der Statusfilter
+der Liste, und wird beim Lesen auf den aktuellen Bildschirm begrenzt, ohne den
+gespeicherten Wert zu überschreiben.
 
 ```tsx
 {showChangelog && (

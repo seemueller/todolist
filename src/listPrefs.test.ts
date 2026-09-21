@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { loadStatusFilter, saveStatusFilter, STATUS_FILTER_KEY } from "./listPrefs";
+import {
+  loadStatusFilter,
+  loadTodoModalSize,
+  saveStatusFilter,
+  saveTodoModalSize,
+  STATUS_FILTER_KEY,
+  TODO_MODAL_SIZE_KEY,
+} from "./listPrefs";
 
 describe("listPrefs", () => {
   beforeEach(() => localStorage.clear());
@@ -21,5 +28,41 @@ describe("listPrefs", () => {
   it("nimmt auch 'all' zurueck", () => {
     saveStatusFilter("all");
     expect(loadStatusFilter()).toBe("all");
+  });
+});
+
+describe("listPrefs — Fenstergroesse", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("liefert ohne gespeicherten Wert null", () => {
+    expect(loadTodoModalSize()).toBeNull();
+  });
+
+  it("liest zurueck, was geschrieben wurde", () => {
+    saveTodoModalSize({ width: 900, height: 600 });
+    expect(loadTodoModalSize()).toEqual({ width: 900, height: 600 });
+  });
+
+  it("liefert bei kaputtem Inhalt null, statt zu werfen", () => {
+    for (const broken of ["{kein json", "null", '"text"', "{}", '{"width":"breit","height":1}']) {
+      localStorage.setItem(TODO_MODAL_SIZE_KEY, broken);
+      expect(loadTodoModalSize()).toBeNull();
+    }
+  });
+
+  // Am grossen Monitor gezogen, am Laptop geoeffnet: das Fenster muss auf den
+  // Schirm passen, der gespeicherte Wert bleibt aber unangetastet.
+  it("begrenzt eine zu grosse Groesse auf den Bildschirm, ohne sie zu ueberschreiben", () => {
+    saveTodoModalSize({ width: 4000, height: 3000 });
+
+    const size = loadTodoModalSize();
+    expect(size!.width).toBe(window.innerWidth - 32);
+    expect(size!.height).toBe(window.innerHeight - 32);
+    expect(localStorage.getItem(TODO_MODAL_SIZE_KEY)).toBe('{"width":4000,"height":3000}');
+  });
+
+  it("hebt eine unbedienbar kleine Groesse auf das Mindestmass", () => {
+    saveTodoModalSize({ width: 40, height: 20 });
+    expect(loadTodoModalSize()).toEqual({ width: 360, height: 320 });
   });
 });

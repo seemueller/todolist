@@ -2,6 +2,12 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unreleased]
+
+### Geändert
+- Das Fenster einer Aufgabe ist 60 % breiter (896 statt 560 px) — die Beschreibung ist laufender Text geworden, und der braucht Breite.
+- Das Fenster lässt sich an der unteren rechten Ecke größer ziehen; die Beschreibung wächst dabei mit. Die gezogene Größe merkt sich die App und öffnet das nächste Fenster wieder so. Auf einem kleineren Bildschirm wird sie auf dessen Maße begrenzt, ohne den gemerkten Wert zu verlieren.
+
 ## [0.14.0] - 2026-09-21
 
 ### Hinzugefügt
