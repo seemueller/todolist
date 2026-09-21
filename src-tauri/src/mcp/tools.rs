@@ -247,7 +247,7 @@ pub struct AddTodo {
     pub description: Option<String>,
     /// Prioritaet: "low", "medium" oder "high". Vorgabe ist "medium".
     pub priority: Option<String>,
-    /// Art der Aufgabe: "bug", "task" oder "story". Vorgabe ist "task".
+    /// Typ der Aufgabe: "bug", "task" oder "story". Vorgabe ist "task".
     pub r#type: Option<String>,
     /// Faelligkeitstag, ISO-Format YYYY-MM-DD. Ohne Angabe hat die Aufgabe
     /// keine Faelligkeit.
@@ -276,9 +276,9 @@ pub struct UpdateTodo {
     pub status: Option<String>,
     /// Neue Prioritaet: "low", "medium" oder "high".
     pub priority: Option<String>,
-    /// Neue Art der Aufgabe: "bug", "task" oder "story". Weglassen, null und
-    /// "" lassen die bestehende Art unveraendert. Es gibt kein "clear_type" --
-    /// eine Aufgabe ohne Typ gibt es nicht.
+    /// Neuer Typ der Aufgabe: "bug", "task" oder "story". Weglassen, null und
+    /// "" lassen den bestehenden Typ unveraendert. Es gibt kein "clear_type"
+    /// -- eine Aufgabe ohne Typ gibt es nicht.
     pub r#type: Option<String>,
     /// Neuer Faelligkeitstag, ISO-Format YYYY-MM-DD. Weglassen, null und ""
     /// lassen die bestehende Faelligkeit unveraendert; entfernt wird sie
@@ -1922,7 +1922,7 @@ mod tests {
                 r#type: Some("bug".to_string()),
             }))
             .await
-            .expect("Antwort");
+            .expect("no protocol error");
         assert_eq!(ok_json(&result)["type"], "bug");
     }
 
@@ -1939,7 +1939,7 @@ mod tests {
                 r#type: None,
             }))
             .await
-            .expect("Antwort");
+            .expect("no protocol error");
         assert_eq!(ok_json(&result)["type"], "task");
     }
 
@@ -1956,7 +1956,7 @@ mod tests {
                 r#type: Some("epic".to_string()),
             }))
             .await
-            .expect("Antwort");
+            .expect("no protocol error");
         // Ein Tool-Fehler, kein McpError: nur so liest das Modell, was erlaubt ist.
         let message = tool_error(&result, "epic");
         assert!(message.contains("bug, task, story"), "{message}");
@@ -1967,7 +1967,7 @@ mod tests {
         let (server, pool) = server().await;
         let todo = store::add_todo(&pool, "Wird Story", None, None, None, None, None)
             .await
-            .expect("anlegen");
+            .expect("add");
         let result = server
             .update_todo(Parameters(super::UpdateTodo {
                 id: todo.id,
@@ -1975,7 +1975,7 @@ mod tests {
                 ..Default::default()
             }))
             .await
-            .expect("Antwort");
+            .expect("no protocol error");
         assert_eq!(ok_json(&result)["type"], "story");
     }
 
@@ -1984,7 +1984,7 @@ mod tests {
         let (server, pool) = server().await;
         let todo = store::add_todo(&pool, "Bleibt Bug", None, None, None, None, Some("bug"))
             .await
-            .expect("anlegen");
+            .expect("add");
         let result = server
             .update_todo(Parameters(super::UpdateTodo {
                 id: todo.id,
@@ -1993,7 +1993,7 @@ mod tests {
                 ..Default::default()
             }))
             .await
-            .expect("Antwort");
+            .expect("no protocol error");
         assert_eq!(ok_json(&result)["type"], "bug");
     }
 }

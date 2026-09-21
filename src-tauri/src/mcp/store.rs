@@ -244,13 +244,13 @@ fn check_priority(priority: &str) -> Result<(), StoreError> {
     ))
 }
 
-fn check_type(value: &str) -> Result<(), StoreError> {
-    if TYPES.contains(&value) {
+fn check_type(todo_type: &str) -> Result<(), StoreError> {
+    if TYPES.contains(&todo_type) {
         return Ok(());
     }
     bad_request(format!(
         "{} ist kein Aufgabentyp; erlaubt sind {}.",
-        quoted(value),
+        quoted(todo_type),
         TYPES.join(", ")
     ))
 }
@@ -2148,7 +2148,7 @@ mod tests {
         let pool = setup().await;
         let todo = add_todo(&pool, "Ohne Typ", None, None, None, None, None)
             .await
-            .expect("anlegen");
+            .expect("add");
         assert_eq!(todo.r#type, "task");
     }
 
@@ -2157,7 +2157,7 @@ mod tests {
         let pool = setup().await;
         let todo = add_todo(&pool, "Login kaputt", None, None, None, None, Some("bug"))
             .await
-            .expect("anlegen");
+            .expect("add");
         assert_eq!(todo.r#type, "bug");
     }
 
@@ -2166,7 +2166,7 @@ mod tests {
         let pool = setup().await;
         let error = add_todo(&pool, "Egal", None, None, None, None, Some("epic"))
             .await
-            .expect_err("unbekannter Typ");
+            .expect_err("unknown type");
         let message = error.to_string();
         assert!(message.contains("epic"), "{message}");
         assert!(message.contains("bug, task, story"), "{message}");
@@ -2177,12 +2177,12 @@ mod tests {
         let pool = setup().await;
         let todo = add_todo(&pool, "Wird Story", None, None, None, None, None)
             .await
-            .expect("anlegen");
+            .expect("add");
         let update = TodoUpdate {
             r#type: Some("story".to_string()),
             ..TodoUpdate::default()
         };
-        let updated = update_todo(&pool, todo.id, update).await.expect("aendern");
+        let updated = update_todo(&pool, todo.id, update).await.expect("update");
         assert_eq!(updated.r#type, "story");
         assert_eq!(updated.title, "Wird Story");
     }
@@ -2199,14 +2199,14 @@ mod tests {
         let pool = setup().await;
         let todo = add_todo(&pool, "Wird Story", None, None, None, None, None)
             .await
-            .expect("anlegen");
+            .expect("add");
         let update = TodoUpdate {
             priority: Some("high".to_string()),
             r#type: Some("story".to_string()),
             due_date: Some(Some("2026-10-01".to_string())),
             ..TodoUpdate::default()
         };
-        let updated = update_todo(&pool, todo.id, update).await.expect("aendern");
+        let updated = update_todo(&pool, todo.id, update).await.expect("update");
         assert_eq!(updated.priority, "high");
         assert_eq!(updated.r#type, "story");
         assert_eq!(updated.due_date.as_deref(), Some("2026-10-01"));
@@ -2217,7 +2217,7 @@ mod tests {
         let pool = setup().await;
         let todo = add_todo(&pool, "Bleibt", None, None, None, None, Some("bug"))
             .await
-            .expect("anlegen");
+            .expect("add");
         let update = TodoUpdate {
             title: Some("Neuer Titel".to_string()),
             r#type: Some("epic".to_string()),
@@ -2225,9 +2225,10 @@ mod tests {
         };
         update_todo(&pool, todo.id, update)
             .await
-            .expect_err("unbekannter Typ");
+            .expect_err("unknown type");
         // Erst pruefen, dann schreiben: der Titel darf nicht schon stehen.
-        let unchanged = list_todos(&pool, None, None, None).await.expect("lesen");
+        let unchanged = list_todos(&pool, None, None, None).await.expect("list");
+        assert_eq!(unchanged.len(), 1);
         assert_eq!(unchanged[0].title, "Bleibt");
         assert_eq!(unchanged[0].r#type, "bug");
     }
