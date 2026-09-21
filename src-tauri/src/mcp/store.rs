@@ -75,6 +75,10 @@ pub struct Todo {
     pub description: String,
     pub done: bool,
     pub status: String,
+    /// "bug", "task" oder "story". Altbestand aus der Zeit vor Migration 14
+    /// steht als "task" in der Spalte -- die Migration hat den Vorgabewert
+    /// gesetzt, hier kommt also nie ein leerer String an.
+    pub r#type: String,
     pub priority: String,
     pub created_at: String,
     pub due_date: Option<String>,
@@ -90,6 +94,7 @@ struct TodoRow {
     description: String,
     done: i64,
     status: String,
+    r#type: String,
     priority: String,
     created_at: String,
     due_date: Option<String>,
@@ -109,6 +114,7 @@ impl From<TodoRow> for Todo {
             title: row.title,
             description: row.description,
             status: row.status,
+            r#type: row.r#type,
             priority: row.priority,
             created_at: row.created_at,
             due_date: row.due_date,
@@ -143,6 +149,7 @@ pub struct TodoUpdate {
     pub description: Option<Option<String>>,
     pub status: Option<String>,
     pub priority: Option<String>,
+    pub r#type: Option<String>,
     pub due_date: Option<Option<String>>,
     pub category: Option<Option<String>>,
 }
@@ -153,6 +160,7 @@ impl TodoUpdate {
             && self.description.is_none()
             && self.status.is_none()
             && self.priority.is_none()
+            && self.r#type.is_none()
             && self.due_date.is_none()
             && self.category.is_none()
     }
@@ -212,6 +220,7 @@ pub struct Booking {
 const STATUS_DONE: &str = "done";
 const STATUSES: [&str; 3] = ["todo", "in_progress", STATUS_DONE];
 const PRIORITIES: [&str; 3] = ["low", "medium", "high"];
+const TYPES: [&str; 3] = ["bug", "task", "story"];
 
 fn check_status(status: &str) -> Result<(), StoreError> {
     if STATUSES.contains(&status) {
@@ -232,6 +241,17 @@ fn check_priority(priority: &str) -> Result<(), StoreError> {
         "{} ist keine Prioritaet; erlaubt sind {}.",
         quoted(priority),
         PRIORITIES.join(", ")
+    ))
+}
+
+fn check_type(value: &str) -> Result<(), StoreError> {
+    if TYPES.contains(&value) {
+        return Ok(());
+    }
+    bad_request(format!(
+        "{} ist kein Aufgabentyp; erlaubt sind {}.",
+        quoted(value),
+        TYPES.join(", ")
     ))
 }
 
@@ -429,7 +449,7 @@ pub async fn resolve_category(pool: &Pool<Sqlite>, name: &str) -> Result<Categor
 
 // --- Aufgaben ---------------------------------------------------------------
 
-const TODO_COLUMNS: &str = "t.id, t.title, t.description, t.done, t.status, t.priority,
+const TODO_COLUMNS: &str = "t.id, t.title, t.description, t.done, t.status, t.type, t.priority,
      t.created_at, t.due_date, t.category_id, c.name AS category_name, c.color AS category_color";
 
 /// Die eine Stelle, an der steht, was "nicht im Papierkorb" heisst. Spiegelt
@@ -527,7 +547,7 @@ pub async fn list_todos(
 /// Legt eine Aufgabe an und gibt sie zurueck.
 ///
 /// Ohne Angabe gelten dieselben Vorgaben wie im Frontend: Prioritaet "medium",
-/// Status "todo", nicht erledigt, keine Faelligkeit, keine Kategorie.
+/// Status "todo", Typ "task", nicht erledigt, keine Faelligkeit, keine Kategorie.
 pub async fn add_todo(
     pool: &Pool<Sqlite>,
     title: &str,
@@ -535,6 +555,7 @@ pub async fn add_todo(
     due_date: Option<&str>,
     category: Option<&str>,
     description: Option<&str>,
+    todo_type: Option<&str>,
 ) -> Result<Todo, StoreError> {
     let title = title.trim();
     if title.is_empty() {
@@ -542,6 +563,8 @@ pub async fn add_todo(
     }
     let priority = priority.unwrap_or("medium");
     check_priority(priority)?;
+    let todo_type = todo_type.unwrap_or("task");
+    check_type(todo_type)?;
     let due_date = due_date.map(check_date).transpose()?;
     let category_id = match category {
         Some(name) => Some(resolve_category(pool, name).await?.id),
@@ -553,12 +576,13 @@ pub async fn add_todo(
     // und Z, das `new Date().toISOString()` im Frontend schreibt, und ohne neue
     // Abhaengigkeit.
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO todos (title, description, done, status, priority, created_at, due_date, category_id)
-         VALUES (?, ?, 0, 'todo', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?)
+        "INSERT INTO todos (title, description, done, status, type, priority, created_at, due_date, category_id)
+         VALUES (?, ?, 0, 'todo', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?)
          RETURNING id",
     )
     .bind(title)
     .bind(description)
+    .bind(todo_type)
     .bind(priority)
     .bind(due_date)
     .bind(category_id)
@@ -598,6 +622,9 @@ pub async fn update_todo(
     if let Some(priority) = &update.priority {
         check_priority(priority)?;
     }
+    if let Some(todo_type) = &update.r#type {
+        check_type(todo_type)?;
+    }
     let due_date = match &update.due_date {
         Some(Some(date)) => Some(Some(check_date(date)?)),
         Some(None) => Some(None),
@@ -629,6 +656,9 @@ pub async fn update_todo(
     if update.priority.is_some() {
         assignments.push("priority = ?");
     }
+    if update.r#type.is_some() {
+        assignments.push("type = ?");
+    }
     if due_date.is_some() {
         assignments.push("due_date = ?");
     }
@@ -653,6 +683,9 @@ pub async fn update_todo(
     }
     if let Some(priority) = &update.priority {
         query = query.bind(priority.clone());
+    }
+    if let Some(todo_type) = &update.r#type {
+        query = query.bind(todo_type.clone());
     }
     if let Some(due_date) = due_date {
         query = query.bind(due_date);
@@ -870,7 +903,8 @@ pub(crate) const SCHEMA: &[&str] = &[
         status TEXT NOT NULL DEFAULT 'todo',
         description TEXT NOT NULL DEFAULT '',
         deleted_at TEXT DEFAULT NULL,
-        board_order REAL NOT NULL DEFAULT 0
+        board_order REAL NOT NULL DEFAULT 0,
+        type TEXT NOT NULL DEFAULT 'task'
     );",
     "CREATE TABLE time_slots (
         date TEXT NOT NULL,
@@ -942,7 +976,7 @@ mod tests {
     async fn list_todos_without_a_filter_returns_everything_newest_first() {
         let pool = setup().await;
         for title in ["erste", "zweite", "dritte"] {
-            add_todo(&pool, title, None, None, None, None)
+            add_todo(&pool, title, None, None, None, None, None)
                 .await
                 .expect("add todo");
         }
@@ -961,10 +995,10 @@ mod tests {
     #[tokio::test]
     async fn list_todos_filters_by_status() {
         let pool = setup().await;
-        let offen = add_todo(&pool, "offen", None, None, None, None)
+        let offen = add_todo(&pool, "offen", None, None, None, None, None)
             .await
             .expect("add");
-        let fertig = add_todo(&pool, "fertig", None, None, None, None)
+        let fertig = add_todo(&pool, "fertig", None, None, None, None, None)
             .await
             .expect("add");
         update_todo(
@@ -995,10 +1029,10 @@ mod tests {
     async fn list_todos_filters_by_category_name_case_insensitively() {
         let pool = setup().await;
         category(&pool, "Kundenprojekt").await;
-        add_todo(&pool, "mit", None, None, Some("Kundenprojekt"), None)
+        add_todo(&pool, "mit", None, None, Some("Kundenprojekt"), None, None)
             .await
             .expect("add");
-        add_todo(&pool, "ohne", None, None, None, None)
+        add_todo(&pool, "ohne", None, None, None, None, None)
             .await
             .expect("add");
 
@@ -1013,16 +1047,16 @@ mod tests {
     #[tokio::test]
     async fn list_todos_filters_by_a_due_date_cutoff() {
         let pool = setup().await;
-        add_todo(&pool, "frueh", None, Some("2026-09-01"), None, None)
+        add_todo(&pool, "frueh", None, Some("2026-09-01"), None, None, None)
             .await
             .expect("add");
-        add_todo(&pool, "genau", None, Some("2026-09-10"), None, None)
+        add_todo(&pool, "genau", None, Some("2026-09-10"), None, None, None)
             .await
             .expect("add");
-        add_todo(&pool, "spaet", None, Some("2026-09-20"), None, None)
+        add_todo(&pool, "spaet", None, Some("2026-09-20"), None, None, None)
             .await
             .expect("add");
-        add_todo(&pool, "ohne", None, None, None, None)
+        add_todo(&pool, "ohne", None, None, None, None, None)
             .await
             .expect("add");
 
@@ -1068,7 +1102,7 @@ mod tests {
     async fn add_todo_inserts_and_returns_the_row_with_defaults() {
         let pool = setup().await;
 
-        let todo = add_todo(&pool, "  Einkaufen  ", None, None, None, None)
+        let todo = add_todo(&pool, "  Einkaufen  ", None, None, None, None, None)
             .await
             .expect("add");
 
@@ -1101,6 +1135,7 @@ mod tests {
             Some("2026-09-30"),
             Some("kundenprojekt"),
             None,
+            None,
         )
         .await
         .expect("add");
@@ -1115,7 +1150,7 @@ mod tests {
     async fn add_todo_with_an_unknown_category_errors_and_inserts_nothing() {
         let pool = setup().await;
 
-        let error = add_todo(&pool, "Angebot", None, None, Some("Gibtsnicht"), None)
+        let error = add_todo(&pool, "Angebot", None, None, Some("Gibtsnicht"), None, None)
             .await
             .expect_err("unknown category");
         expect_request_error(error, "Gibtsnicht");
@@ -1135,19 +1170,19 @@ mod tests {
         let pool = setup().await;
 
         expect_request_error(
-            add_todo(&pool, "   ", None, None, None, None)
+            add_todo(&pool, "   ", None, None, None, None, None)
                 .await
                 .expect_err("empty title"),
             "Titel",
         );
         expect_request_error(
-            add_todo(&pool, "Angebot", Some("dringend"), None, None, None)
+            add_todo(&pool, "Angebot", Some("dringend"), None, None, None, None)
                 .await
                 .expect_err("bad priority"),
             "dringend",
         );
         expect_request_error(
-            add_todo(&pool, "Angebot", None, Some("morgen"), None, None)
+            add_todo(&pool, "Angebot", None, Some("morgen"), None, None, None)
                 .await
                 .expect_err("bad due date"),
             "morgen",
@@ -1166,7 +1201,7 @@ mod tests {
     async fn a_new_todo_has_an_empty_description_by_default() {
         let pool = setup().await;
 
-        let todo = add_todo(&pool, "Ohne Text", None, None, None, None)
+        let todo = add_todo(&pool, "Ohne Text", None, None, None, None, None)
             .await
             .expect("add");
 
@@ -1177,7 +1212,7 @@ mod tests {
     async fn a_description_survives_creation_and_listing() {
         let pool = setup().await;
 
-        add_todo(&pool, "Mit Text", None, None, None, Some("Zeile eins\nZeile zwei"))
+        add_todo(&pool, "Mit Text", None, None, None, Some("Zeile eins\nZeile zwei"), None)
             .await
             .expect("add");
 
@@ -1188,7 +1223,7 @@ mod tests {
     #[tokio::test]
     async fn update_sets_and_clears_the_description() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Titel", None, None, None, Some("alt"))
+        let todo = add_todo(&pool, "Titel", None, None, None, Some("alt"), None)
             .await
             .expect("add");
 
@@ -1220,7 +1255,7 @@ mod tests {
     #[tokio::test]
     async fn an_omitted_description_stays_untouched() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Titel", None, None, None, Some("bleibt"))
+        let todo = add_todo(&pool, "Titel", None, None, None, Some("bleibt"), None)
             .await
             .expect("add");
 
@@ -1246,7 +1281,7 @@ mod tests {
     #[tokio::test]
     async fn updating_title_and_description_together_lands_in_the_right_columns() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Alter Titel", None, None, None, Some("alte Beschreibung"))
+        let todo = add_todo(&pool, "Alter Titel", None, None, None, Some("alte Beschreibung"), None)
             .await
             .expect("add");
 
@@ -1279,6 +1314,7 @@ mod tests {
             Some("2026-09-30"),
             Some("Kundenprojekt"),
             None,
+            None,
         )
         .await
         .expect("add");
@@ -1304,7 +1340,7 @@ mod tests {
     #[tokio::test]
     async fn update_todo_keeps_done_in_step_with_status() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Angebot", None, None, None, None)
+        let todo = add_todo(&pool, "Angebot", None, None, None, None, None)
             .await
             .expect("add");
 
@@ -1344,6 +1380,7 @@ mod tests {
             Some("2026-09-30"),
             Some("Kundenprojekt"),
             None,
+            None,
         )
         .await
         .expect("add");
@@ -1368,7 +1405,7 @@ mod tests {
     #[tokio::test]
     async fn update_todo_without_any_field_is_an_error() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Angebot", None, None, None, None)
+        let todo = add_todo(&pool, "Angebot", None, None, None, None, None)
             .await
             .expect("add");
 
@@ -1415,7 +1452,7 @@ mod tests {
     #[tokio::test]
     async fn update_todo_with_an_unknown_category_errors_and_changes_nothing() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Angebot", None, None, None, None)
+        let todo = add_todo(&pool, "Angebot", None, None, None, None, None)
             .await
             .expect("add");
 
@@ -1443,7 +1480,7 @@ mod tests {
     #[tokio::test]
     async fn delete_todo_removes_the_row() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Angebot", None, None, None, None)
+        let todo = add_todo(&pool, "Angebot", None, None, None, None, None)
             .await
             .expect("add");
 
@@ -1965,7 +2002,7 @@ mod tests {
     #[tokio::test]
     async fn delete_todo_moves_a_todo_to_the_trash() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None, None)
             .await
             .expect("add");
 
@@ -1996,7 +2033,7 @@ mod tests {
     #[tokio::test]
     async fn the_deleted_at_stamp_compares_against_a_javascript_cutoff() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None, None)
             .await
             .expect("add");
         delete_todo(&pool, todo.id).await.expect("delete");
@@ -2051,7 +2088,7 @@ mod tests {
     #[tokio::test]
     async fn list_todos_hides_the_trash() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None, None)
             .await
             .expect("add");
         delete_todo(&pool, todo.id).await.expect("delete");
@@ -2064,7 +2101,7 @@ mod tests {
     #[tokio::test]
     async fn update_todo_does_not_touch_a_todo_in_the_trash() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None, None)
             .await
             .expect("add");
         delete_todo(&pool, todo.id).await.expect("delete");
@@ -2096,7 +2133,7 @@ mod tests {
     #[tokio::test]
     async fn a_todo_in_the_trash_is_unknown_to_writes() {
         let pool = setup().await;
-        let todo = add_todo(&pool, "Weg damit", None, None, None, None)
+        let todo = add_todo(&pool, "Weg damit", None, None, None, None, None)
             .await
             .expect("add");
         delete_todo(&pool, todo.id).await.expect("delete");
@@ -2104,5 +2141,69 @@ mod tests {
         let again = delete_todo(&pool, todo.id).await;
 
         assert!(again.is_err(), "deleting twice must report an unknown id");
+    }
+
+    #[tokio::test]
+    async fn add_todo_defaults_to_task() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Ohne Typ", None, None, None, None, None)
+            .await
+            .expect("anlegen");
+        assert_eq!(todo.r#type, "task");
+    }
+
+    #[tokio::test]
+    async fn add_todo_takes_the_given_type() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Login kaputt", None, None, None, None, Some("bug"))
+            .await
+            .expect("anlegen");
+        assert_eq!(todo.r#type, "bug");
+    }
+
+    #[tokio::test]
+    async fn add_todo_refuses_an_unknown_type() {
+        let pool = setup().await;
+        let error = add_todo(&pool, "Egal", None, None, None, None, Some("epic"))
+            .await
+            .expect_err("unbekannter Typ");
+        let message = error.to_string();
+        assert!(message.contains("epic"), "{message}");
+        assert!(message.contains("bug, task, story"), "{message}");
+    }
+
+    #[tokio::test]
+    async fn update_todo_changes_only_the_type() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Wird Story", None, None, None, None, None)
+            .await
+            .expect("anlegen");
+        let update = TodoUpdate {
+            r#type: Some("story".to_string()),
+            ..TodoUpdate::default()
+        };
+        let updated = update_todo(&pool, todo.id, update).await.expect("aendern");
+        assert_eq!(updated.r#type, "story");
+        assert_eq!(updated.title, "Wird Story");
+    }
+
+    #[tokio::test]
+    async fn update_todo_refuses_an_unknown_type_before_writing() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Bleibt", None, None, None, None, Some("bug"))
+            .await
+            .expect("anlegen");
+        let update = TodoUpdate {
+            title: Some("Neuer Titel".to_string()),
+            r#type: Some("epic".to_string()),
+            ..TodoUpdate::default()
+        };
+        update_todo(&pool, todo.id, update)
+            .await
+            .expect_err("unbekannter Typ");
+        // Erst pruefen, dann schreiben: der Titel darf nicht schon stehen.
+        let unchanged = list_todos(&pool, None, None, None).await.expect("lesen");
+        assert_eq!(unchanged[0].title, "Bleibt");
+        assert_eq!(unchanged[0].r#type, "bug");
     }
 }

@@ -395,6 +395,7 @@ impl TodoServer {
                 non_empty(&params.due_date),
                 non_empty(&params.category),
                 params.description.as_deref(),
+                None,
             )
             .await,
         )
@@ -461,6 +462,7 @@ impl TodoServer {
             description: set_or_clear(description, params.clear_description),
             status: non_empty(&params.status).map(str::to_string),
             priority: non_empty(&params.priority).map(str::to_string),
+            r#type: None,
             due_date: set_or_clear(due_date, params.clear_due_date),
             category: set_or_clear(category, params.clear_category),
         };
