@@ -280,6 +280,36 @@ Tastaturvertrag: Enter und Verlassen übernehmen, Escape bricht ab.
 | `onCommit` | `() => void` | Enter oder Blur. |
 | `onCancel` | `() => void` | Escape. |
 
+### `Markdown`
+
+Setzt die Beschreibung einer Aufgabe als Text. Der Parser liegt in
+`src/markdown.ts` (rein, ohne React) und liefert einen Baum aus Werten; der
+Baustein macht daraus React-Elemente. **Kein `dangerouslySetInnerHTML`, kein
+HTML-String, kein Sanitizer** — eine Beschreibung wird auch über MCP von einem
+Modell geschrieben, und was der Parser nicht kennt, bleibt sichtbarer Text.
+
+| Prop | Typ | Bedeutung |
+|---|---|---|
+| `text` | `string` | Der Quelltext. Leer heißt: nichts rendern; den Leerzustand zeigt der Aufrufer. |
+| `className` | `string` | Ergänzt die Klasse `.markdown`. |
+
+Unterstützt sind Überschriften (drei Ebenen, gerendert als `h3`–`h5`, weil im
+Fenster schon eine `h2` steht), Absätze mit Zeilenumbruch, Aufzählung,
+nummerierte Liste, Checkliste, Codeblock und Code im Text, Zitat, Trennlinie,
+fett/kursiv/durchgestrichen und Links. Bewusst nicht unterstützt: Tabellen,
+Bilder, verschachtelte Listen, rohes HTML. Ein Link entsteht nur für `http`,
+`https` und `mailto` — alles andere bleibt Text. Schachtelung ist gedeckelt
+(Zitate und Betonungen/Links), damit ein pathologischer Text nicht mitten im
+Rendern den Stack wirft; was der Deckel abschneidet, bleibt als Text stehen.
+
+Die Regeln in `App.css` greifen unter `.markdown` auf Elementnamen zu; der
+Baustein erfindet nur zwei Klassen, `.markdown-tasks` und `.markdown-check` für
+die Checkliste, deren Haken den Aufzählungspunkt ersetzt.
+
+```tsx
+<Markdown text={description} />
+```
+
 ### `icons.tsx`
 
 `CheckIcon`, `CloseIcon`, `PencilIcon`, `TrashIcon`, `TagIcon`, `PlusIcon`,

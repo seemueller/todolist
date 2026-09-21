@@ -2,6 +2,12 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unreleased]
+
+### Hinzugefügt
+- Die Beschreibung einer Aufgabe wird gelesen, statt im Textfeld entziffert: das Detail-Fenster öffnet sie als gesetzten Text und formt Markdown aus — Überschriften, Listen, Checklisten, Zitate, Code, Trennlinien, fett/kursiv/durchgestrichen und Links. Ein Knopf über dem Feld schaltet zum Schreiben und zurück; wo noch nichts steht, öffnet gleich das Textfeld.
+- Links in einer Beschreibung öffnen im Systembrowser. Nur `http`, `https` und `mailto` werden zum Link, alles andere bleibt Text — eine Beschreibung schreibt auch ein Modell über MCP.
+
 ## [0.13.0] - 2026-09-17
 
 ### Hinzugefügt
