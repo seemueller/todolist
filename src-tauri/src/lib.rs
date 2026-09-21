@@ -399,6 +399,16 @@ pub fn run() {
             sql: "ALTER TABLE todos ADD COLUMN board_order REAL NOT NULL DEFAULT 0;",
             kind: MigrationKind::Up,
         },
+        // Der Typ ist eine Eigenschaft der Aufgabe, keine Stammdatenzeile:
+        // drei feste Werte, geprueft in `toTodoType` (src/types.ts) und an der
+        // MCP-Grenze in `check_type`. Bestandsaufgaben werden Aufgaben --
+        // dieselbe Vorgabe, die auch die Oberflaeche anbietet.
+        Migration {
+            version: 14,
+            description: "add_type_to_todos",
+            sql: "ALTER TABLE todos ADD COLUMN type TEXT NOT NULL DEFAULT 'task';",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
