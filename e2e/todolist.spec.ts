@@ -63,8 +63,8 @@ test.describe("TodoList App", () => {
     // Die Liste startet auf "Offen", die erledigte Aufgabe verschwindet also
     // daraus; erst "Alle" zeigt sie wieder.
     await expect(page.locator(".todo-list li")).toHaveCount(0);
-    // "Status Alle", nicht "Alle": seit der Typleiste gibt es eine zweite
-    // .status-filter-Gruppe, und deren "Typ Alle" traefe ein blosses "Alle" mit.
+    // "Status Alle", nicht "Alle": der Faelligkeits-Chip und der Chip "Typ Alle"
+    // traegen denselben Text, ein blosses "Alle" traefe sie mit.
     await page.getByRole("button", { name: "Status Alle", exact: true }).click();
 
     // Todo should appear done (reduced opacity)
@@ -341,8 +341,8 @@ test.describe("Filtering and Search", () => {
     const checkboxes = page.getByRole("button", { name: /als erledigt markieren/i });
     await checkboxes.nth(0).click();
 
-    // Ueber die Gruppe, nicht ueber .status-filter: die Klasse traegt seit der
-    // Typleiste zwei Elemente, der Gruppenname ist eindeutig.
+    // Ueber die Rolle mit ihrem zugaenglichen Namen: der beschreibt, was gemeint
+    // ist, und ueberlebt eine Umbenennung der Klasse.
     const openBtn = page.getByRole("group", { name: "Status filtern" }).getByRole("button", { name: "Offen" });
     await openBtn.click();
 
@@ -363,7 +363,7 @@ test.describe("Filtering and Search", () => {
     const checkboxes = page.getByRole("button", { name: /als erledigt markieren/i });
     await checkboxes.nth(0).click();
 
-    // Ueber die Gruppe, siehe oben.
+    // Ueber die Rolle, siehe oben.
     const doneBtn = page.getByRole("group", { name: "Status filtern" }).getByRole("button", { name: "Erledigt" });
     await doneBtn.click();
 
