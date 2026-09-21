@@ -1,4 +1,4 @@
-import { Priority, TimeKind, Todo, TodoStatus, Category } from "./types";
+import { Priority, TimeKind, Todo, TodoStatus, TodoType, Category } from "./types";
 import { localTodoStore } from "./todoStoreLocal";
 import { sqlTodoStore } from "./todoStoreSql";
 import { isTauri } from "./sqlClient";
@@ -17,9 +17,10 @@ export function addTodo(
   priority: Priority,
   dueDate: string | null,
   categoryId?: number | null,
-  description?: string
+  description?: string,
+  type?: TodoType
 ): Promise<Todo> {
-  return store().addTodo(title, priority, dueDate, categoryId, description);
+  return store().addTodo(title, priority, dueDate, categoryId, description, type);
 }
 
 export function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
