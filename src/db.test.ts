@@ -60,4 +60,26 @@ describe("db backend selection", () => {
     expect(moved.board_order).toBe(2);
     expect(getDb).not.toHaveBeenCalled();
   });
+
+  it("forwards the type as addTodo's sixth argument to the store", async () => {
+    // Der Compiler deckt diese Stelle nicht ab: eine Fassade mit weniger
+    // Parametern bleibt zuweisbar, ein vergessenes Argument faellt also still
+    // unter den Tisch und jede Aufgabe entstuende als "task".
+    isTauri.mockReturnValue(false);
+    const db = await import("./db");
+
+    const created = await db.addTodo("Login kaputt", "high", null, null, "", "bug");
+
+    expect(created.type).toBe("bug");
+    expect(localStorage.getItem("todolist_todos")).toContain('"type":"bug"');
+  });
+
+  it("leaves addTodo's type at the store's default when the caller omits it", async () => {
+    isTauri.mockReturnValue(false);
+    const db = await import("./db");
+
+    const created = await db.addTodo("Ohne Typ", "low", null);
+
+    expect(created.type).toBe("task");
+  });
 });
