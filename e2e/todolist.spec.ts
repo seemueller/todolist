@@ -682,6 +682,52 @@ test.describe("Beschreibung", () => {
     await page.getByRole("button", { name: "Beschreibung bearbeiten" }).click();
     await expect(page.getByRole("textbox", { name: "Beschreibung" })).toBeVisible();
   });
+
+  test("oeffnet das Fenster in der zuletzt gezogenen Groesse", async ({ page }) => {
+    const input = page.getByPlaceholder(/Was steht an/i);
+    await input.fill("Groessen-Aufgabe");
+    await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
+    await expect(page.getByText("Groessen-Aufgabe")).toBeVisible();
+
+    await page.evaluate(() =>
+      localStorage.setItem("todolist.todoModalSize", JSON.stringify({ width: 820, height: 560 })),
+    );
+    await page.reload();
+    await page.getByRole("button", { name: "Aufgabe bearbeiten" }).first().click();
+
+    const panel = page.locator(".todo-modal");
+    const box = await panel.boundingBox();
+    expect(Math.round(box!.width)).toBe(820);
+    expect(Math.round(box!.height)).toBe(560);
+    // Der Anfasser sitzt am Panel, nicht mehr am Textfeld.
+    await expect(panel).toHaveCSS("resize", "both");
+  });
+
+  test("zieht das Fenster groesser und merkt sich die Groesse", async ({ page }) => {
+    const input = page.getByPlaceholder(/Was steht an/i);
+    await input.fill("Zieh-Aufgabe");
+    await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
+    await page.getByRole("button", { name: "Aufgabe bearbeiten" }).first().click();
+
+    const panel = page.locator(".todo-modal");
+    const before = (await panel.boundingBox())!;
+
+    // Der Anfasser liegt in der unteren rechten Ecke des Panels.
+    await page.mouse.move(before.x + before.width - 4, before.y + before.height - 4);
+    await page.mouse.down();
+    await page.mouse.move(before.x + before.width + 60, before.y + before.height + 40, {
+      steps: 8,
+    });
+    await page.mouse.up();
+
+    const after = (await panel.boundingBox())!;
+    expect(after.width).toBeGreaterThan(before.width);
+    expect(after.height).toBeGreaterThan(before.height);
+
+    const stored = await page.evaluate(() => localStorage.getItem("todolist.todoModalSize"));
+    expect(stored).not.toBeNull();
+    expect(JSON.parse(stored!).width).toBe(Math.round(after.width));
+  });
 });
 
 test.describe("Brett-Filter", () => {

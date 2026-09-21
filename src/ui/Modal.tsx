@@ -5,7 +5,8 @@
 // der Escape-Listener haengt an der Lebensdauer der Komponente.
 
 import { useEffect, useRef } from "react";
-import type { HTMLAttributes, MouseEvent, ReactNode, Ref } from "react";
+import type { HTMLAttributes, MouseEvent, ReactNode } from "react";
+import type { ModalSize } from "../listPrefs";
 import { IconButton } from "./IconButton";
 import { CloseIcon } from "./icons";
 
@@ -27,8 +28,13 @@ export interface ModalProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"
   onClose: () => void;
   /** aria-label des Schliessen-Knopfs; ohne Angabe wird kein Attribut gesetzt. */
   closeLabel?: string;
-  /** ref auf das Panel (nicht auf das Overlay). */
-  panelRef?: Ref<HTMLDivElement>;
+  /** Panel per Ziehen groessenverstellbar (Anfasser unten rechts). */
+  resizable?: boolean;
+  /** Startgroesse; ohne Angabe gilt die Breite aus dem CSS. */
+  size?: ModalSize | null;
+  /** Nach dem Ziehen: die neue Groesse in Pixeln. Wird nur gerufen, wenn sie
+   *  sich von der zuletzt gemeldeten unterscheidet. */
+  onSizeChange?: (size: ModalSize) => void;
   children: ReactNode;
 }
 
@@ -37,7 +43,9 @@ export function Modal({
   title,
   onClose,
   closeLabel,
-  panelRef,
+  resizable = false,
+  size,
+  onSizeChange,
   className,
   children,
   ...rest
@@ -66,13 +74,52 @@ export function Modal({
     mouseDownOnOverlay.current = false;
   }
 
-  const panelClasses = [VARIANT_CLASS[variant], className ?? ""].filter(Boolean).join(" ");
+  // Die zuletzt gemeldete Groesse, damit dieselbe Groesse nicht zweimal
+  // geschrieben wird.
+  const lastSize = useRef<ModalSize | null>(size ?? null);
+  const panel = useRef<HTMLDivElement | null>(null);
+
+  // Der Anfasser ist der des Browsers: er schreibt beim Ziehen inline
+  // width/height auf das Panel und feuert dabei *kein* Pointer-Ereignis an das
+  // Element -- der Zug gehoert der Oberflaeche des Browsers. Beobachtet wird
+  // darum die Groesse selbst.
+  //
+  // Gemeldet wird nur, was der Nutzer gezogen hat: ein inline gesetztes
+  // width/height gibt es ausschliesslich vom Anfasser oder aus `size`. Aendert
+  // sich die Hoehe, weil der Inhalt wechselt -- Umschalten zwischen Lesen und
+  // Schreiben --, steht dort nichts, und es wird nichts gespeichert.
+  useEffect(() => {
+    const el = panel.current;
+    if (!resizable || !onSizeChange || !el) return;
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      if (el.style.width === "" || el.style.height === "") return;
+      const next = { width: Math.round(el.offsetWidth), height: Math.round(el.offsetHeight) };
+      if (lastSize.current?.width === next.width && lastSize.current?.height === next.height) {
+        return;
+      }
+      lastSize.current = next;
+      onSizeChange(next);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [resizable, onSizeChange]);
+
+  const panelClasses = [
+    VARIANT_CLASS[variant],
+    resizable ? "modal-resizable" : "",
+    className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className="modal-overlay" onMouseDown={handleOverlayMouseDown} onClick={handleOverlayClick}>
       <div
-        ref={panelRef}
+        ref={panel}
         className={panelClasses}
+        style={size ? { width: size.width, height: size.height } : undefined}
         onClick={(e) => e.stopPropagation()}
         {...rest}
       >

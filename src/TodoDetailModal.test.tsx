@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { TodoDetailModal } from "./TodoDetailModal";
 import { Category, Todo } from "./types";
+import { TODO_MODAL_SIZE_KEY } from "./listPrefs";
 
 const categories: Category[] = [
   { id: 1, name: "Arbeit", color: "#7cc3f7", created_at: "2026-01-01T00:00:00.000Z", time_kind: "internal" },
@@ -50,6 +51,36 @@ function descriptionInput(): HTMLElement {
   if (toEdit) fireEvent.click(toEdit);
   return screen.getByLabelText("Beschreibung");
 }
+
+describe("TodoDetailModal — Fenstergroesse", () => {
+  beforeEach(() => localStorage.clear());
+
+  function panel(): HTMLElement {
+    return screen.getByRole("heading", { name: "Aufgabe bearbeiten" }).closest(".todo-modal")!;
+  }
+
+  it("oeffnet ohne gespeicherte Groesse in der Breite aus dem CSS", () => {
+    renderModal();
+    expect(panel().style.width).toBe("");
+    expect(panel().style.height).toBe("");
+  });
+
+  it("uebernimmt die zuletzt gezogene Groesse", () => {
+    localStorage.setItem(TODO_MODAL_SIZE_KEY, JSON.stringify({ width: 900, height: 620 }));
+    renderModal();
+
+    expect(panel().style.width).toBe("900px");
+    expect(panel().style.height).toBe("620px");
+  });
+
+  // Das Speichern haengt am ResizeObserver und am Anfasser des Browsers --
+  // jsdom hat beides nicht. Geprueft wird es in e2e/todolist.spec.ts
+  // ("zieht das Fenster groesser und merkt sich die Groesse").
+  it("schreibt beim blossen Oeffnen nichts in die Vorlieben", () => {
+    renderModal();
+    expect(localStorage.getItem(TODO_MODAL_SIZE_KEY)).toBeNull();
+  });
+});
 
 describe("TodoDetailModal", () => {
   it("shows the current values of the todo", () => {

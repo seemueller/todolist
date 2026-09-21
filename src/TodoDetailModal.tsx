@@ -14,6 +14,7 @@ import { useState } from "react";
 import type { KeyboardEvent } from "react";
 import { Category, Priority, Todo } from "./types";
 import type { TodoFieldsPatch } from "./storeTypes";
+import { loadTodoModalSize, saveTodoModalSize } from "./listPrefs";
 import {
   CategorySelect,
   IconButton,
@@ -54,6 +55,10 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
   // gesetzter Text zu lesen, nicht als Quelltext in einem Textfeld. Nur wenn
   // noch nichts dasteht, waere die leere Lesefläche sinnlos -- dann beginnt
   // das Fenster gleich beim Schreiben.
+  // Die zuletzt gezogene Fenstergroesse, einmal beim Oeffnen gelesen. Sie liegt
+  // in localStorage, nicht im Store: eine Oberflaechen-Vorliebe, kein
+  // Domaenendatum -- dieselbe Begruendung wie beim Statusfilter der Liste.
+  const [size] = useState(loadTodoModalSize);
   const [openedEmpty] = useState(todo.description.trim() === "");
   const [editingDescription, setEditingDescription] = useState(openedEmpty);
 
@@ -126,6 +131,9 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
       onClose={onClose}
       closeLabel="Schließen"
       onKeyDown={handleKeyDown}
+      resizable
+      size={size}
+      onSizeChange={saveTodoModalSize}
     >
       <div className="todo-modal-body">
         <div className="todo-modal-field">
@@ -140,7 +148,7 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
           />
         </div>
 
-        <div className="todo-modal-field">
+        <div className="todo-modal-field todo-modal-field-grow">
           <div className="todo-modal-field-head">
             <label
               id="todo-detail-description-label"
