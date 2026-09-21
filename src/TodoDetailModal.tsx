@@ -199,10 +199,9 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
         <div className="todo-modal-row">
           <div className="todo-modal-field">
             <label htmlFor="todo-detail-type">Typ</label>
-            {/* Ohne variant, also wie der Prioritaets-Zwilling daneben: die
-                Spalten der Reihe sind gleich breit, und .type-select-inline
-                saesse dort als schmales, fettes Feld neben einem nackten
-                Auswahlfeld. */}
+            {/* .type-select hat wie .priority-select ausserhalb von .add-form
+                keine eigene Regel: beide Felder stehen hier nackt und gleich
+                breit nebeneinander. */}
             <TypeSelect id="todo-detail-type" value={type} onValueChange={setType} />
           </div>
 

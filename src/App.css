@@ -801,7 +801,6 @@ a:hover {
 }
 
 .priority-select-inline,
-.type-select-inline,
 .todo-select {
   flex-shrink: 0;
   max-width: 96px;
@@ -820,7 +819,6 @@ a:hover {
 }
 
 .priority-select-inline:hover,
-.type-select-inline:hover,
 .todo-select:hover {
   background: var(--highlight);
 }

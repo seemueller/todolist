@@ -16,8 +16,8 @@ describe("TypeSelect", () => {
     expect(onValueChange).toHaveBeenCalledWith("bug");
   });
 
-  it("nimmt in der Inline-Variante die Inline-Klasse", () => {
-    render(<TypeSelect variant="inline" value="story" onValueChange={() => {}} aria-label="Typ" />);
-    expect(screen.getByLabelText("Typ")).toHaveClass("type-select-inline");
+  it("traegt die Klasse .type-select", () => {
+    render(<TypeSelect value="story" onValueChange={() => {}} aria-label="Typ" />);
+    expect(screen.getByLabelText("Typ")).toHaveClass("type-select");
   });
 });

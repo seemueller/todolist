@@ -204,13 +204,15 @@ Auswahlfeld mit den drei festen Optionen Niedrig / Mittel / Hoch.
 ### `TypeSelect`
 
 Auswahlfeld für den Aufgabentyp, gebaut wie `PrioritySelect`: drei feste
-Optionen Bug / Task / Story, deren Reihenfolge aus `TODO_TYPES` kommt.
+Optionen Bug / Task / Story, deren Reihenfolge aus `TODO_TYPES` kommt. Anders
+als `PrioritySelect` ohne Varianten — der Typ wird nur im Hinzufüge-Formular
+und im Detailfenster gewählt, beide tragen `.type-select`. In der Listenzeile
+steht er als `TypeBadge`, nicht als Auswahlfeld.
 
 | Prop | Typ | Bedeutung |
 |---|---|---|
 | `value` | `TodoType` | Gewählter Typ. |
 | `onValueChange` | `(t: TodoType) => void` | Neuer Typ. |
-| `variant` | `"form" \| "inline"` | Im Hinzufügen-Formular oder im Detailfenster. |
 
 ### `DueDateBadge`
 

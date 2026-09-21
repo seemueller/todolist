@@ -47,7 +47,7 @@ export { PrioritySelect } from "./PrioritySelect";
 export type { PrioritySelectProps, PrioritySelectVariant } from "./PrioritySelect";
 
 export { TypeSelect } from "./TypeSelect";
-export type { TypeSelectProps, TypeSelectVariant } from "./TypeSelect";
+export type { TypeSelectProps } from "./TypeSelect";
 
 export { DueDateBadge } from "./DueDateBadge";
 export type { BadgeVariant, DueDateBadgeProps } from "./DueDateBadge";
