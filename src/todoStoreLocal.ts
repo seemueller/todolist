@@ -6,9 +6,11 @@ import {
   Priority,
   Todo,
   TodoStatus,
+  TodoType,
   Category,
   CategoryRow,
   TimeKind,
+  toTodoType,
   fromCategoryRow,
   sortCategories,
   sortTodos,
@@ -80,20 +82,24 @@ function loadTodos(): StoredTodoRecord[] {
 }
 
 // Holt Eintraege aus aelteren Staenden auf den heutigen Stand: `status` kam
-// mit dem Brett dazu, `description` mit dem Detail-Fenster. Beides fehlt in
-// Daten, die davor geschrieben wurden.
-/** Ein Eintrag so, wie ihn ein aelterer Stand geschrieben haben kann: `status`
- *  und `description` koennen fehlen. */
-type StoredTodo = Omit<StoredTodoRecord, "status" | "description" | "board_order"> &
-  Partial<Pick<StoredTodoRecord, "status" | "description" | "board_order">>;
+// mit dem Brett dazu, `description` mit dem Detail-Fenster, `type` mit dem
+// Aufgabentyp. Alles davon fehlt in Daten, die davor geschrieben wurden.
+/** Ein Eintrag so, wie ihn ein aelterer Stand geschrieben haben kann: `status`,
+ *  `description` und `type` koennen fehlen. */
+type StoredTodo = Omit<StoredTodoRecord, "status" | "description" | "board_order" | "type"> &
+  Partial<Pick<StoredTodoRecord, "status" | "description" | "board_order" | "type">>;
 
 function migrateTodos(todos: StoredTodo[]): StoredTodoRecord[] {
   return todos.map((todo) => {
     const description = todo.description ?? "";
     const board_order = todo.board_order ?? 0;
-    if (todo.status) return { ...todo, description, board_order, status: todo.status };
+    // Dieselbe Rolle wie der Spaltenvorgabewert in SQLite: ein fehlender oder
+    // unbekannter Wert wird zur Aufgabe, und zwar ueber toTodoType aus
+    // types.ts, damit beide Speicher dieselbe Regel benutzen.
+    const type = toTodoType(todo.type);
+    if (todo.status) return { ...todo, description, board_order, type, status: todo.status };
     const status: TodoStatus = todo.done ? "done" : "todo";
-    return { ...todo, description, board_order, status, done: status === "done" };
+    return { ...todo, description, board_order, type, status, done: status === "done" };
   });
 }
 
@@ -143,7 +149,8 @@ function addTodo(
   priority: Priority,
   dueDate: string | null,
   categoryId?: number | null,
-  description = ""
+  description = "",
+  type: TodoType = "task"
 ): Promise<Todo> {
   const todos = loadTodos();
   const todo: Todo = {
@@ -152,6 +159,7 @@ function addTodo(
     description,
     done: false,
     status: "todo",
+    type,
     priority,
     created_at: now(),
     due_date: dueDate,
@@ -207,6 +215,7 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
   if (patch.title !== undefined) next.title = patch.title;
   if (patch.description !== undefined) next.description = patch.description;
   if (patch.priority !== undefined) next.priority = patch.priority;
+  if (patch.type !== undefined) next.type = patch.type;
   if (patch.dueDate !== undefined) next.due_date = patch.dueDate;
   if (patch.categoryId !== undefined) {
     const cat = patch.categoryId === null ? null : findCategory(patch.categoryId);
