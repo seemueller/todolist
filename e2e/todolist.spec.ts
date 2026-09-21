@@ -341,8 +341,9 @@ test.describe("Filtering and Search", () => {
     const checkboxes = page.getByRole("button", { name: /als erledigt markieren/i });
     await checkboxes.nth(0).click();
 
-    // Filter by open (scope to status-filter container)
-    const openBtn = page.locator(".status-filter").getByRole("button", { name: "Offen" });
+    // Ueber die Gruppe, nicht ueber .status-filter: die Klasse traegt seit der
+    // Typleiste zwei Elemente, der Gruppenname ist eindeutig.
+    const openBtn = page.getByRole("group", { name: "Status filtern" }).getByRole("button", { name: "Offen" });
     await openBtn.click();
 
     await expect(page.locator(".todo-list .title").getByText("Open task")).toBeVisible();
@@ -362,8 +363,8 @@ test.describe("Filtering and Search", () => {
     const checkboxes = page.getByRole("button", { name: /als erledigt markieren/i });
     await checkboxes.nth(0).click();
 
-    // Filter by done (scope to status-filter container)
-    const doneBtn = page.locator(".status-filter").getByRole("button", { name: "Erledigt" });
+    // Ueber die Gruppe, siehe oben.
+    const doneBtn = page.getByRole("group", { name: "Status filtern" }).getByRole("button", { name: "Erledigt" });
     await doneBtn.click();
 
     await expect(page.locator(".todo-list .title").getByText("Done task")).toBeVisible();
@@ -456,8 +457,8 @@ test.describe("Layout and UI", () => {
     // Due date filter "Alle"
     await expect(page.locator(".filter-btn").getByText("Alle")).toBeVisible();
     // Status filter buttons
-    await expect(page.locator(".status-filter").getByRole("button", { name: "Offen" })).toBeVisible();
-    await expect(page.locator(".status-filter").getByRole("button", { name: "Erledigt" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Status filtern" }).getByRole("button", { name: "Offen" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Status filtern" }).getByRole("button", { name: "Erledigt" })).toBeVisible();
   });
 
   test("changelog modal opens and closes", async ({ page }) => {
@@ -888,11 +889,12 @@ test.describe("Aufgabentyp", () => {
     await expect(page.locator(".type-badge--bug")).toHaveText("Bug");
     await expect(page.locator(".type-badge--task")).toHaveText("Task");
 
-    await page.getByRole("button", { name: "Typ Bug", exact: true }).click();
+    const typeGroup = page.getByRole("group", { name: "Typ filtern" });
+    await typeGroup.getByRole("button", { name: "Typ Bug", exact: true }).click();
     await expect(page.locator(".todo-list .title").getByText("Login kaputt")).toBeVisible();
     await expect(page.locator(".todo-list .title").getByText("Ganz normale Aufgabe")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Typ Alle", exact: true }).click();
+    await typeGroup.getByRole("button", { name: "Typ Alle", exact: true }).click();
     await expect(page.locator(".todo-list .title").getByText("Ganz normale Aufgabe")).toBeVisible();
   });
 });
