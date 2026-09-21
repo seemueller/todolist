@@ -14,6 +14,10 @@ import {
   needsRebalance,
   rebalanceBoardOrders,
   sortBoardTodos,
+  TodoType,
+  TODO_TYPES,
+  TODO_TYPE_LABELS,
+  toTodoType,
 } from "./types";
 
 /** "Ärzte" zerlegt: A plus kombinierendes Trema (NFD). */
@@ -43,6 +47,7 @@ describe("fromRow", () => {
       description: "",
       done: true,
       status: "done",
+      type: "task",
       priority: "medium",
       created_at: "2026-01-01T00:00:00Z",
       due_date: null,
@@ -240,6 +245,7 @@ describe("sortTodos", () => {
     description: "",
     done: false,
     status: "todo",
+    type: "task",
     priority: "medium",
     created_at,
     due_date: null,
@@ -345,6 +351,7 @@ describe("sortBoardTodos", () => {
     description: "",
     done: false,
     status: "todo",
+    type: "task",
     priority: "medium",
     created_at: "2026-01-01T00:00:00.000Z",
     due_date: null,
@@ -406,5 +413,61 @@ describe("fromCategoryRow", () => {
 
   it("faellt auf internal zurueck, wenn der Wert unbekannt ist", () => {
     expect(fromCategoryRow({ ...row, time_kind: "quatsch" }).time_kind).toBe("internal");
+  });
+});
+
+describe("toTodoType", () => {
+  it("nimmt die drei bekannten Werte unveraendert", () => {
+    expect(toTodoType("bug")).toBe("bug");
+    expect(toTodoType("task")).toBe("task");
+    expect(toTodoType("story")).toBe("story");
+  });
+
+  it("faellt auf task zurueck", () => {
+    // Deckt beides ab: Eintraege aus der Zeit vor der Spalte und Muellwerte.
+    expect(toTodoType(undefined)).toBe("task");
+    expect(toTodoType(null)).toBe("task");
+    expect(toTodoType("")).toBe("task");
+    expect(toTodoType("epic")).toBe("task");
+    expect(toTodoType("BUG")).toBe("task");
+  });
+
+  it("bietet die Typen in fester Reihenfolge mit deutschen Beschriftungen an", () => {
+    const types: TodoType[] = TODO_TYPES;
+    expect(types).toEqual(["bug", "task", "story"]);
+    expect(TODO_TYPE_LABELS).toEqual({ bug: "Bug", task: "Task", story: "Story" });
+  });
+});
+
+describe("fromRow mit Typ", () => {
+  it("uebernimmt den Typ aus der Zeile", () => {
+    const row: TodoRow = {
+      id: 1,
+      title: "Login kaputt",
+      done: 0,
+      priority: "medium",
+      created_at: "2026-09-21T10:00:00.000Z",
+      due_date: null,
+      category_id: null,
+      category_name: null,
+      category_color: null,
+      type: "bug",
+    };
+    expect(fromRow(row).type).toBe("bug");
+  });
+
+  it("macht eine Zeile ohne Typ zur Aufgabe", () => {
+    const row: TodoRow = {
+      id: 2,
+      title: "Alt",
+      done: 0,
+      priority: "medium",
+      created_at: "2026-09-21T10:00:00.000Z",
+      due_date: null,
+      category_id: null,
+      category_name: null,
+      category_color: null,
+    };
+    expect(fromRow(row).type).toBe("task");
   });
 });
