@@ -9,6 +9,7 @@ import {
   Todo,
   TodoRow,
   TodoStatus,
+  TodoType,
   TimeKind,
   fromRow,
   fromCategoryRow,
@@ -20,7 +21,7 @@ import { getDb } from "./sqlClient";
 import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
 const TODO_COLUMNS = `
-  t.id, t.title, t.description, t.done, t.status, t.priority, t.created_at,
+  t.id, t.title, t.description, t.done, t.status, t.type, t.priority, t.created_at,
   t.due_date, t.category_id, t.board_order,
   c.name AS category_name, c.color AS category_color
 `;
@@ -62,13 +63,14 @@ async function addTodo(
   priority: Priority,
   dueDate: string | null,
   categoryId?: number | null,
-  description = ""
+  description = "",
+  type: TodoType = "task"
 ): Promise<Todo> {
   const db = await getDb();
   const result = await db.execute(
-    `INSERT INTO todos (title, description, done, status, priority, created_at, due_date, category_id)
-     VALUES ($1, $2, 0, 'todo', $3, $4, $5, $6)`,
-    [title, description, priority, new Date().toISOString(), dueDate, categoryId ?? null]
+    `INSERT INTO todos (title, description, done, status, type, priority, created_at, due_date, category_id)
+     VALUES ($1, $2, 0, 'todo', $3, $4, $5, $6, $7)`,
+    [title, description, type, priority, new Date().toISOString(), dueDate, categoryId ?? null]
   );
   return selectTodo(result.lastInsertId as number);
 }
@@ -109,6 +111,7 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
   if (patch.title !== undefined) set("title", patch.title);
   if (patch.description !== undefined) set("description", patch.description);
   if (patch.priority !== undefined) set("priority", patch.priority);
+  if (patch.type !== undefined) set("type", patch.type);
   if (patch.dueDate !== undefined) set("due_date", patch.dueDate);
   if (patch.categoryId !== undefined) set("category_id", patch.categoryId);
 

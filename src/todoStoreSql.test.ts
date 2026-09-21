@@ -361,6 +361,7 @@ describe("sqlTodoStore", () => {
     expect(execute.mock.calls[0][1]).toEqual([
       "Mit Text",
       "Zeile eins\nZeile zwei",
+      "task",
       "medium",
       expect.any(String),
       null,
@@ -377,6 +378,7 @@ describe("sqlTodoStore", () => {
     expect(execute.mock.calls[0][1]).toEqual([
       "Ohne Text",
       "",
+      "task",
       "medium",
       expect.any(String),
       null,
@@ -570,5 +572,64 @@ describe("sqlTodoStore", () => {
     await expect(sqlTodoStore.updateTodoStatusAndOrder(99, "todo", 1)).rejects.toThrow(
       "Todo 99 not found"
     );
+  });
+});
+
+describe("Aufgabentyp", () => {
+  beforeEach(() => {
+    select.mockReset();
+    execute.mockReset();
+  });
+
+  it("schreibt beim Anlegen ohne Angabe den Typ task", async () => {
+    execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
+    select.mockResolvedValue([ROW]);
+
+    await sqlTodoStore.addTodo("Ohne Typ", "medium", null);
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("INSERT INTO todos");
+    expect(sql).toContain("type");
+    expect(params).toContain("task");
+  });
+
+  it("schreibt den angegebenen Typ", async () => {
+    execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
+    select.mockResolvedValue([ROW]);
+
+    await sqlTodoStore.addTodo("Login kaputt", "high", null, null, "", "bug");
+
+    const params = execute.mock.calls[0][1] as unknown[];
+    expect(params).toContain("bug");
+    expect(params).not.toContain("task");
+  });
+
+  it("liest die Typspalte mit und reicht sie durch", async () => {
+    select.mockResolvedValue([{ ...ROW, type: "story" }]);
+
+    const todos = await sqlTodoStore.listTodos();
+
+    expect(select.mock.calls[0][0]).toContain("t.type");
+    expect(todos[0].type).toBe("story");
+  });
+
+  it("setzt den Typ im Patch", async () => {
+    execute.mockResolvedValue({ rowsAffected: 1 });
+    select.mockResolvedValue([ROW]);
+
+    await sqlTodoStore.updateTodoFields(7, { type: "story" });
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("type = $1");
+    expect(params).toEqual(["story", 7]);
+  });
+
+  it("fasst den Typ nicht an, wenn der Patch ihn nicht nennt", async () => {
+    execute.mockResolvedValue({ rowsAffected: 1 });
+    select.mockResolvedValue([ROW]);
+
+    await sqlTodoStore.updateTodoFields(7, { title: "Neuer Titel" });
+
+    expect(execute.mock.calls[0][0]).not.toContain("type =");
   });
 });
