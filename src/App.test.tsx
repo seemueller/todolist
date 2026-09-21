@@ -1493,5 +1493,50 @@ describe("der Papierkorb-Knopf", () => {
       expect(badge).toHaveClass("type-badge");
       expect(badge).toHaveClass("type-badge--bug");
     });
+
+    it("filtert die Liste auf einen Typ", async () => {
+      vi.mocked(db.listTodos).mockResolvedValue([
+        makeTodo({ id: 1, title: "Login kaputt", type: "bug" }),
+        makeTodo({ id: 2, title: "Epos", type: "story" }),
+      ]);
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Login kaputt")).toBeInTheDocument());
+      expect(screen.getByText("Epos")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Typ Bug" }));
+
+      expect(screen.getByText("Login kaputt")).toBeInTheDocument();
+      expect(screen.queryByText("Epos")).not.toBeInTheDocument();
+    });
+
+    it("merkt sich den Typfilter", async () => {
+      vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 2, title: "Epos", type: "story" })]);
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Epos")).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole("button", { name: "Typ Story" }));
+
+      expect(localStorage.getItem("todolist.typeFilter")).toBe("story");
+    });
+
+    it("setzt den Typfilter mit zurueck", async () => {
+      vi.mocked(db.listTodos).mockResolvedValue([
+        makeTodo({ id: 1, title: "Login kaputt", type: "bug" }),
+        makeTodo({ id: 2, title: "Epos", type: "story" }),
+      ]);
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Login kaputt")).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole("button", { name: "Typ Bug" }));
+      expect(screen.queryByText("Epos")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Zurücksetzen" }));
+
+      expect(screen.getByText("Epos")).toBeInTheDocument();
+      expect(localStorage.getItem("todolist.typeFilter")).toBe("all");
+    });
   });
 });
