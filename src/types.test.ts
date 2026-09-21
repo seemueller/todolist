@@ -14,7 +14,6 @@ import {
   needsRebalance,
   rebalanceBoardOrders,
   sortBoardTodos,
-  TodoType,
   TODO_TYPES,
   TODO_TYPE_LABELS,
   toTodoType,
@@ -432,9 +431,8 @@ describe("toTodoType", () => {
     expect(toTodoType("BUG")).toBe("task");
   });
 
-  it("bietet die Typen in fester Reihenfolge mit deutschen Beschriftungen an", () => {
-    const types: TodoType[] = TODO_TYPES;
-    expect(types).toEqual(["bug", "task", "story"]);
+  it("bietet die Typen in fester Reihenfolge mit ihren Beschriftungen an", () => {
+    expect(TODO_TYPES).toEqual(["bug", "task", "story"]);
     expect(TODO_TYPE_LABELS).toEqual({ bug: "Bug", task: "Task", story: "Story" });
   });
 });

@@ -8,10 +8,11 @@ export type TodoStatus = "todo" | "in_progress" | "done";
  */
 export type TodoType = "bug" | "task" | "story";
 
-/** Die Typen in der Reihenfolge, in der die Oberflaeche sie anbietet. */
+/** Die Typen in der Reihenfolge, in der die Oberflaeche sie anbietet: nach
+ *  Dringlichkeit, nicht mit der Vorgabe zuerst -- ein Fehler steht oben. */
 export const TODO_TYPES: TodoType[] = ["bug", "task", "story"];
 
-/** Deutsche Beschriftungen der Typen fuer die Oberflaeche. */
+/** Beschriftungen der Typen fuer die Oberflaeche. */
 export const TODO_TYPE_LABELS: Record<TodoType, string> = {
   bug: "Bug",
   task: "Task",
