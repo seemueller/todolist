@@ -2187,6 +2187,31 @@ mod tests {
         assert_eq!(updated.title, "Wird Story");
     }
 
+    /// Wacht ueber die Reihenfolge von `assignments` und den Bindungen in
+    /// `update_todo`: beide Listen werden getrennt aufgebaut, und `type` sitzt
+    /// in beiden zwischen `priority` und `due_date`. Mit nur einem gesetzten
+    /// Feld ist jede Reihenfolge richtig -- der Typ muss deshalb zusammen mit
+    /// seinen Nachbarn ankommen. Die Spalte hat keinen CHECK-Constraint,
+    /// SQLite nimmt also auch "high" als Typ klaglos an: eine vertauschte
+    /// Bindung faellt nur hier auf. Nicht zu einem Einfeld-Test vereinfachen.
+    #[tokio::test]
+    async fn update_todo_changes_the_type_next_to_its_neighbours() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Wird Story", None, None, None, None, None)
+            .await
+            .expect("anlegen");
+        let update = TodoUpdate {
+            priority: Some("high".to_string()),
+            r#type: Some("story".to_string()),
+            due_date: Some(Some("2026-10-01".to_string())),
+            ..TodoUpdate::default()
+        };
+        let updated = update_todo(&pool, todo.id, update).await.expect("aendern");
+        assert_eq!(updated.priority, "high");
+        assert_eq!(updated.r#type, "story");
+        assert_eq!(updated.due_date.as_deref(), Some("2026-10-01"));
+    }
+
     #[tokio::test]
     async fn update_todo_refuses_an_unknown_type_before_writing() {
         let pool = setup().await;
