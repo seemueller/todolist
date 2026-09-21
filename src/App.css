@@ -274,7 +274,8 @@ a:hover {
 
 .add-form .date-input,
 .add-form .category-select,
-.add-form .priority-select {
+.add-form .priority-select,
+.add-form .type-select {
   border: none;
   border-left: var(--border);
   border-radius: 0;
@@ -293,7 +294,8 @@ a:hover {
 
 .add-form .date-input:hover,
 .add-form .category-select:hover,
-.add-form .priority-select:hover {
+.add-form .priority-select:hover,
+.add-form .type-select:hover {
   background: var(--highlight);
 }
 
@@ -784,6 +786,7 @@ a:hover {
 }
 
 .priority-select-inline,
+.type-select-inline,
 .todo-select {
   flex-shrink: 0;
   max-width: 96px;
@@ -802,6 +805,7 @@ a:hover {
 }
 
 .priority-select-inline:hover,
+.type-select-inline:hover,
 .todo-select:hover {
   background: var(--highlight);
 }
@@ -2408,7 +2412,8 @@ a:hover {
 
   .add-form .date-input,
   .add-form .category-select,
-  .add-form .priority-select {
+  .add-form .priority-select,
+  .add-form .type-select {
     flex: 1 1 0;
     border-top: var(--border);
     padding: 10px 12px;
