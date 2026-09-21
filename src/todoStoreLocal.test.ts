@@ -570,4 +570,31 @@ describe("Aufgabentyp", () => {
     const [listed] = await localTodoStore.listTodos();
     expect(listed.type).toBe("task");
   });
+
+  it("macht einen unbekannten Typ zur Aufgabe", async () => {
+    // Von Hand geschriebener localStorage -- der Wert gehoert zu keinem der
+    // drei Typen. Ohne Rueckfall liefe "epic" bis in die Oberflaeche durch.
+    localStorage.setItem(
+      "todolist_todos",
+      JSON.stringify([
+        {
+          id: 8,
+          title: "Krumm",
+          description: "",
+          done: false,
+          status: "todo",
+          type: "epic",
+          priority: "medium",
+          created_at: "2026-01-01T00:00:00.000Z",
+          due_date: null,
+          category_id: null,
+          category_name: null,
+          category_color: null,
+          board_order: 0,
+        },
+      ])
+    );
+    const [listed] = await localTodoStore.listTodos();
+    expect(listed.type).toBe("task");
+  });
 });
