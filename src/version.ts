@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.14.0";
+export const APP_VERSION = "0.15.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.15.0",
+    date: "2026-09-21",
+    changes: [
+      "Das Fenster einer Aufgabe ist 60 % breiter — die Beschreibung ist laufender Text geworden, und der braucht Breite",
+      "Das Fenster lässt sich an der unteren rechten Ecke größer ziehen; die Beschreibung wächst mit, und die gezogene Größe gilt beim nächsten Öffnen wieder",
+      "Auf einem kleineren Bildschirm wird die gemerkte Größe auf dessen Maße begrenzt, ohne verloren zu gehen",
+    ],
+  },
   {
     version: "0.14.0",
     date: "2026-09-21",

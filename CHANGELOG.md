@@ -2,7 +2,7 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [Unreleased]
+## [0.15.0] - 2026-09-21
 
 ### Geändert
 - Das Fenster einer Aufgabe ist 60 % breiter (896 statt 560 px) — die Beschreibung ist laufender Text geworden, und der braucht Breite.
