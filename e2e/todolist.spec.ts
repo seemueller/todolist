@@ -656,6 +656,32 @@ test.describe("Beschreibung", () => {
     await page.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }).click();
     await expect(page.getByText("Belege aus dem Ordner")).toBeVisible();
   });
+
+  test("zeigt die Beschreibung beim zweiten Oeffnen als gesetztes Markdown", async ({ page }) => {
+    const input = page.getByPlaceholder(/Was steht an/i);
+    await input.fill("Markdown-Aufgabe");
+    await page.getByRole("button", { name: /Aufgabe hinzufügen/i }).click();
+    await expect(page.getByText("Markdown-Aufgabe")).toBeVisible();
+
+    await page.getByRole("button", { name: "Aufgabe bearbeiten" }).first().click();
+    await page
+      .getByLabel("Beschreibung", { exact: true })
+      .fill("## Kontext\n\n- **Betrag** prüfen\n- [x] Freigabe geholt");
+    await page.getByRole("button", { name: /Sichern/i }).click();
+    await expect(page.getByLabel("Beschreibung", { exact: true })).not.toBeVisible();
+
+    // Zweites Oeffnen: das Fenster steht im Lesemodus, das Textfeld erscheint
+    // erst nach dem Umschalten.
+    await page.getByRole("button", { name: "Aufgabe bearbeiten" }).first().click();
+    await expect(page.locator(".markdown h4")).toHaveText("Kontext");
+    await expect(page.locator(".markdown strong")).toHaveText("Betrag");
+    await expect(page.locator(".markdown-check.checked")).toBeVisible();
+    // Ueber die Rolle: die Leseflaeche traegt denselben Namen wie das Textfeld.
+    await expect(page.getByRole("textbox", { name: "Beschreibung" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Beschreibung bearbeiten" }).click();
+    await expect(page.getByRole("textbox", { name: "Beschreibung" })).toBeVisible();
+  });
 });
 
 test.describe("Brett-Filter", () => {

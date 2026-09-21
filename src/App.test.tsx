@@ -448,7 +448,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
 
-    expect(await screen.findByLabelText(/Beschreibung/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Beschreibung")).toBeInTheDocument();
   });
 
   it("opens the detail modal on a double click on the title", async () => {
@@ -459,7 +459,7 @@ describe("App", () => {
 
     fireEvent.doubleClick(screen.getByText("Task"));
 
-    expect(await screen.findByLabelText(/Beschreibung/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Beschreibung")).toBeInTheDocument();
   });
 
   it("writes the changed fields through updateTodoFields", async () => {
@@ -472,7 +472,7 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
-    fireEvent.change(await screen.findByLabelText(/Beschreibung/i), {
+    fireEvent.change(await screen.findByLabelText("Beschreibung"), {
       target: { value: "Neuer Text" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
@@ -548,7 +548,7 @@ describe("App", () => {
     const card = await waitFor(() => screen.getByText("Task").closest(".kanban-card"));
     fireEvent.doubleClick(card!);
 
-    expect(await screen.findByLabelText(/Beschreibung/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Beschreibung")).toBeInTheDocument();
   });
 
   it("clears the description through the detail modal", async () => {
@@ -563,9 +563,10 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
-    // Exakt, nicht als Muster: mit gesetzter Beschreibung matcht /Beschreibung/i
-    // auch die Notiz-Markierung "Hat eine Beschreibung" in der Zeile dahinter.
-    fireEvent.change(await screen.findByLabelText("Beschreibung"), {
+    // Mit gesetzter Beschreibung oeffnet das Fenster im Lesemodus; das Textfeld
+    // gibt es erst nach dem Umschalten.
+    fireEvent.click(await screen.findByRole("button", { name: "Beschreibung bearbeiten" }));
+    fireEvent.change(screen.getByLabelText("Beschreibung"), {
       target: { value: "" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));

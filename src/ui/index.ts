@@ -61,5 +61,8 @@ export type { ColorPickerProps } from "./ColorPicker";
 export { TimeKindSelect } from "./TimeKindSelect";
 export type { TimeKindSelectProps } from "./TimeKindSelect";
 
+export { Markdown } from "./Markdown";
+export type { MarkdownProps } from "./Markdown";
+
 export { InlineEditInput } from "./InlineEditInput";
 export type { InlineEditInputProps } from "./InlineEditInput";
