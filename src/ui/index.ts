@@ -52,6 +52,9 @@ export type { BadgeVariant, DueDateBadgeProps } from "./DueDateBadge";
 export { CategoryBadge, CATEGORY_BADGE_FALLBACK } from "./CategoryBadge";
 export type { CategoryBadgeProps, CategoryBadgeVariant } from "./CategoryBadge";
 
+export { TypeBadge } from "./TypeBadge";
+export type { TypeBadgeProps, TypeBadgeVariant } from "./TypeBadge";
+
 export { Modal } from "./Modal";
 export type { ModalProps, ModalVariant } from "./Modal";
 
