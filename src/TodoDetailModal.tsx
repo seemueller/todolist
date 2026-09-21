@@ -1,6 +1,9 @@
 // Detail-Fenster einer Aufgabe: Titel, Beschreibung, Prioritaet, Faelligkeit
-// und Kategorie an einer Stelle. Eigene Datei, weil App.tsx schon zu gross
-// ist, um noch ein Formular mit eigenem Entwurfszustand aufzunehmen.
+// und Kategorie an einer Stelle. Die Beschreibung hat zwei Zustaende: gelesen
+// wird sie als gesetztes Markdown (`src/ui/Markdown.tsx`), geschrieben im
+// Textfeld daneben -- der Knopf ueber dem Feld schaltet um. Eigene Datei, weil
+// App.tsx schon zu gross ist, um noch ein Formular mit eigenem Entwurfszustand
+// aufzunehmen.
 //
 // Das Fenster arbeitet auf einem Entwurf und schreibt erst beim Sichern --
 // deshalb gibt es hier ein Abbrechen, anders als bei der Bedienung direkt in
@@ -11,7 +14,15 @@ import { useState } from "react";
 import type { KeyboardEvent } from "react";
 import { Category, Priority, Todo } from "./types";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CategorySelect, Modal, PrioritySelect } from "./ui";
+import {
+  CategorySelect,
+  IconButton,
+  Markdown,
+  Modal,
+  PencilIcon,
+  PrioritySelect,
+  EyeIcon,
+} from "./ui";
 
 export interface TodoDetailModalProps {
   todo: Todo;
@@ -39,6 +50,24 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
   const [categoryId, setCategoryId] = useState<number | null>(todo.category_id);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Das Fenster oeffnet im Lesemodus: laengere Beschreibungen sind als
+  // gesetzter Text zu lesen, nicht als Quelltext in einem Textfeld. Nur wenn
+  // noch nichts dasteht, waere die leere Lesefläche sinnlos -- dann beginnt
+  // das Fenster gleich beim Schreiben.
+  const [openedEmpty] = useState(todo.description.trim() === "");
+  const [editingDescription, setEditingDescription] = useState(openedEmpty);
+
+  /**
+   * Das Textfeld entsteht erst beim Umschalten -- dann gehoert der Cursor
+   * hinein, und zwar ans Ende des vorhandenen Textes, nicht davor. Oeffnet das
+   * Fenster ohnehin im Schreibmodus, bleibt der Fokus beim Titel: sonst haette
+   * der Nutzer ihn nie gesehen.
+   */
+  function focusEndOnSwitch(el: HTMLTextAreaElement | null) {
+    if (!el || openedEmpty) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
 
   /** Nur die Felder, die sich gegenueber dem Ausgangsstand beim Oeffnen unterscheiden. */
   function buildPatch(trimmedTitle: string): TodoFieldsPatch {
@@ -112,14 +141,48 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
         </div>
 
         <div className="todo-modal-field">
-          <label htmlFor="todo-detail-description">Beschreibung</label>
-          <textarea
-            id="todo-detail-description"
-            className="todo-modal-description"
-            value={description}
-            placeholder="Was zur Aufgabe noch zu sagen ist"
-            onChange={(e) => setDescription(e.currentTarget.value)}
-          />
+          <div className="todo-modal-field-head">
+            <label
+              id="todo-detail-description-label"
+              htmlFor={editingDescription ? "todo-detail-description" : undefined}
+            >
+              Beschreibung
+            </label>
+            <IconButton
+              variant="icon"
+              className="todo-modal-mode"
+              aria-label={editingDescription ? "Beschreibung lesen" : "Beschreibung bearbeiten"}
+              onClick={() => setEditingDescription((on) => !on)}
+            >
+              {editingDescription ? <EyeIcon /> : <PencilIcon />}
+              {editingDescription ? "Lesen" : "Bearbeiten"}
+            </IconButton>
+          </div>
+          {editingDescription ? (
+            <textarea
+              id="todo-detail-description"
+              className="todo-modal-description"
+              value={description}
+              ref={focusEndOnSwitch}
+              placeholder="Was zur Aufgabe noch zu sagen ist — Markdown ist erlaubt"
+              onChange={(e) => setDescription(e.currentTarget.value)}
+            />
+          ) : (
+            // Scrollbar, also auch mit der Tastatur erreichbar, und benannt --
+            // sonst steht hier eine Flaeche ohne Namen, die niemand scrollen kann.
+            <div
+              className="todo-modal-description-view"
+              role="group"
+              aria-labelledby="todo-detail-description-label"
+              tabIndex={0}
+            >
+              {description.trim() === "" ? (
+                <p className="muted">Keine Beschreibung</p>
+              ) : (
+                <Markdown text={description} />
+              )}
+            </div>
+          )}
         </div>
 
         <div className="todo-modal-row">

@@ -1026,6 +1026,9 @@ a:hover {
 
 .todo-modal-description {
   min-height: 160px;
+  /* Dieselbe Spanne wie die Leseflaeche daneben: sonst springt das Fenster
+     bei jedem Umschalten um bis zu 180 px. */
+  max-height: 340px;
   padding: 10px 12px;
   border: var(--border-thin);
   border-radius: var(--radius-md);
@@ -1037,6 +1040,183 @@ a:hover {
 }
 
 .todo-modal-description::placeholder {
+  color: var(--ink-faint);
+}
+
+/* Kopfzeile eines Feldes: Beschriftung links, der Umschalter Lesen/Bearbeiten
+   rechts. Bisher trug kein Feld etwas neben seiner Beschriftung. */
+.todo-modal-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Der Umschalter Lesen/Bearbeiten in der Kopfzeile des Feldes. `.icon-button`
+   ist fuer die Kopfzeile der Seite gebaut und dort zu gross; neben einer
+   Feldbeschriftung sitzt er eine Stufe kleiner. */
+.todo-modal-mode {
+  padding: 4px 10px;
+  border: var(--border-thin);
+  font-size: 10.5px;
+}
+
+/* Die Leseflaeche der Beschreibung. Dieselbe Flaeche und derselbe Rahmen wie
+   das Textfeld daneben, damit das Umschalten das Fenster nicht springen
+   laesst; die Mindesthoehe ist dieselbe wie dort. */
+.todo-modal-description-view {
+  min-height: 160px;
+  max-height: 340px;
+  overflow-y: auto;
+  /* Die Flaeche ist mit der Tastatur anfahrbar, damit langer Text ohne Maus
+     scrollt; der Fokus zeigt sich wie ueberall als Akzentschatten. */
+  outline: none;
+  padding: 10px 12px;
+  border: var(--border-thin);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* ----------------------------------------------------------------------- */
+/* Gesetztes Markdown (src/ui/Markdown.tsx).                                */
+/* Die Regeln greifen auf Elementnamen zu, weil der Baustein den Baum aus    */
+/* dem Parser rendert und keine Klasse je Element erfindet.                  */
+
+.todo-modal-description-view:focus-visible {
+  box-shadow: var(--shadow-focus);
+}
+
+.markdown {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.markdown > *:first-child {
+  margin-top: 0;
+}
+
+.markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.markdown p {
+  margin: 0 0 10px;
+}
+
+.markdown h3,
+.markdown h4,
+.markdown h5 {
+  margin: 16px 0 8px;
+  font-family: "Archivo Black", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+
+.markdown h3 {
+  font-size: 16px;
+}
+
+.markdown h4 {
+  font-size: 14px;
+}
+
+.markdown h5 {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.markdown li {
+  margin-bottom: 4px;
+}
+
+.markdown li::marker {
+  color: var(--accent);
+}
+
+/* Checkliste: der Haken ersetzt den Aufzaehlungspunkt, statt neben ihm zu
+   stehen -- zwei Markierungen derselben Zeile waeren Rauschen. */
+.markdown .markdown-tasks {
+  list-style: none;
+  padding-left: 0;
+}
+
+.markdown .markdown-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.markdown-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.markdown-check.checked {
+  background: var(--success);
+}
+
+.markdown code {
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--canvas-sunken);
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", monospace;
+  font-size: 12.5px;
+}
+
+.markdown pre {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border: var(--border-thin);
+  border-radius: var(--radius-md);
+  background: var(--canvas-sunken);
+}
+
+.markdown pre code {
+  padding: 0;
+  background: none;
+}
+
+.markdown blockquote {
+  margin: 0 0 10px;
+  padding: 2px 0 2px 12px;
+  border-left: 4px solid var(--ink-line);
+  color: var(--ink-soft);
+}
+
+.markdown hr {
+  margin: 14px 0;
+  border: none;
+  border-top: var(--border-thin);
+}
+
+.markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.markdown a:hover {
+  color: var(--accent-ink);
+}
+
+.markdown del {
   color: var(--ink-faint);
 }
 

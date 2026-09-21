@@ -39,20 +39,70 @@ function renderModal(overrides: Partial<Todo> = {}) {
   return { onSave, onClose };
 }
 
+/**
+ * Das Textfeld der Beschreibung. Das Fenster oeffnet bei einer vorhandenen
+ * Beschreibung im Lesemodus, darum schaltet der Helfer vorher um, wenn noetig.
+ * Die Tests, die ihn nutzen, sind damit bewusst modusblind -- welcher Modus
+ * beim Oeffnen gilt, pruefen die beiden Tests darunter eigens.
+ */
+function descriptionInput(): HTMLElement {
+  const toEdit = screen.queryByRole("button", { name: "Beschreibung bearbeiten" });
+  if (toEdit) fireEvent.click(toEdit);
+  return screen.getByLabelText("Beschreibung");
+}
+
 describe("TodoDetailModal", () => {
   it("shows the current values of the todo", () => {
     renderModal({ description: "Belege holen", priority: "high", due_date: "2026-09-20" });
 
     expect(screen.getByLabelText(/Titel/i)).toHaveValue("Steuererklärung");
-    expect(screen.getByLabelText(/Beschreibung/i)).toHaveValue("Belege holen");
+    expect(descriptionInput()).toHaveValue("Belege holen");
     expect(screen.getByLabelText(/Priorität/i)).toHaveValue("high");
     expect(screen.getByLabelText(/Fällig/i)).toHaveValue("2026-09-20");
+  });
+
+  it("opens in reading mode and renders the description as markdown", () => {
+    renderModal({ description: "## Kontext\n\n- **Betrag** prüfen" });
+
+    // Die Leseflaeche traegt denselben Namen wie das Textfeld, darum ueber die
+    // Rolle: ein Eingabefeld gibt es im Lesemodus nicht.
+    expect(screen.queryByRole("textbox", { name: "Beschreibung" })).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Beschreibung" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 4, name: "Kontext" })).toBeInTheDocument();
+    expect(screen.getByText("Betrag")).toBeInTheDocument();
+  });
+
+  it("opens in writing mode when there is no description yet", () => {
+    renderModal();
+
+    expect(screen.getByLabelText("Beschreibung")).toHaveValue("");
+  });
+
+  it("switches between writing and reading", () => {
+    renderModal({ description: "Belege holen" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Beschreibung bearbeiten" }));
+    fireEvent.change(screen.getByLabelText("Beschreibung"), { target: { value: "# Neu" } });
+    fireEvent.click(screen.getByRole("button", { name: "Beschreibung lesen" }));
+
+    // Gelesen wird der Entwurf, nicht der gesicherte Stand.
+    expect(screen.getByRole("heading", { level: 3, name: "Neu" })).toBeInTheDocument();
+  });
+
+  it("shows an empty state when the description was cleared", () => {
+    renderModal({ description: "Belege holen" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Beschreibung bearbeiten" }));
+    fireEvent.change(screen.getByLabelText("Beschreibung"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Beschreibung lesen" }));
+
+    expect(screen.getByText("Keine Beschreibung")).toBeInTheDocument();
   });
 
   it("saves only the fields that changed", async () => {
     const { onSave } = renderModal();
 
-    fireEvent.change(screen.getByLabelText(/Beschreibung/i), {
+    fireEvent.change(descriptionInput(), {
       target: { value: "Zeile eins\nZeile zwei" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
@@ -74,7 +124,7 @@ describe("TodoDetailModal", () => {
   it("discards the draft on cancel", () => {
     const { onSave, onClose } = renderModal();
 
-    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "verworfen" } });
+    fireEvent.change(descriptionInput(), { target: { value: "verworfen" } });
     fireEvent.click(screen.getByRole("button", { name: /Abbrechen/i }));
 
     expect(onSave).not.toHaveBeenCalled();
@@ -84,7 +134,7 @@ describe("TodoDetailModal", () => {
   it("treats a whitespace-only description as empty", async () => {
     const { onSave } = renderModal({ description: "Belege holen" });
 
-    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "   " } });
+    fireEvent.change(descriptionInput(), { target: { value: "   " } });
     fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
 
     await waitFor(() => {
@@ -95,7 +145,7 @@ describe("TodoDetailModal", () => {
   it("keeps leading and trailing newlines around real text", async () => {
     const { onSave } = renderModal();
 
-    fireEvent.change(screen.getByLabelText(/Beschreibung/i), {
+    fireEvent.change(descriptionInput(), {
       target: { value: "\n\nText\n\n" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
@@ -108,7 +158,7 @@ describe("TodoDetailModal", () => {
   it("puts an empty description alone in the patch when a filled one is cleared", async () => {
     const { onSave } = renderModal({ description: "Belege holen" });
 
-    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "" } });
+    fireEvent.change(descriptionInput(), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
 
     await waitFor(() => {
@@ -129,7 +179,7 @@ describe("TodoDetailModal", () => {
   it("saves on Ctrl+Enter", async () => {
     const { onSave } = renderModal();
 
-    const description = screen.getByLabelText(/Beschreibung/i);
+    const description = descriptionInput();
     fireEvent.change(description, { target: { value: "Text" } });
     fireEvent.keyDown(description, { key: "Enter", ctrlKey: true });
 
@@ -139,7 +189,7 @@ describe("TodoDetailModal", () => {
   it("saves on Ctrl+Enter from the Abbrechen button, outside the body", async () => {
     const { onSave } = renderModal();
 
-    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "Text" } });
+    fireEvent.change(descriptionInput(), { target: { value: "Text" } });
     fireEvent.keyDown(screen.getByRole("button", { name: /Abbrechen/i }), {
       key: "Enter",
       ctrlKey: true,
@@ -160,7 +210,7 @@ describe("TodoDetailModal", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "Text" } });
+    fireEvent.change(descriptionInput(), { target: { value: "Text" } });
     fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
 
     expect(await screen.findByText(/Datenbank weg/i)).toBeInTheDocument();
@@ -175,7 +225,7 @@ describe("TodoDetailModal", () => {
       <TodoDetailModal todo={original} categories={categories} onSave={onSave} onClose={onClose} />,
     );
 
-    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "Belege holen" } });
+    fireEvent.change(descriptionInput(), { target: { value: "Belege holen" } });
 
     // Waehrend das Fenster offen ist, aendert sich die Aufgabe von aussen --
     // z. B. weil der MCP-Server die Prioritaet setzt und die App neu laedt.
@@ -232,7 +282,7 @@ describe("TodoDetailModal", () => {
   it("does not close when a drag started in the textarea ends on the overlay", () => {
     const { onClose } = renderModal();
 
-    const description = screen.getByLabelText(/Beschreibung/i);
+    const description = descriptionInput();
     fireEvent.mouseDown(description);
     fireEvent.click(document.querySelector(".modal-overlay")!);
 
@@ -262,7 +312,7 @@ describe("TodoDetailModal", () => {
       <TodoDetailModal todo={makeTodo()} categories={categories} onSave={onSave} onClose={onClose} />,
     );
 
-    fireEvent.change(screen.getByLabelText(/Beschreibung/i), { target: { value: "Text" } });
+    fireEvent.change(descriptionInput(), { target: { value: "Text" } });
     fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
 
     await waitFor(() => expect(screen.getByRole("button", { name: /Sichern/i })).toBeDisabled());
