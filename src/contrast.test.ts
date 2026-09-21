@@ -63,4 +63,20 @@ describe("contrast", () => {
       expect(contrastRatio(color, ink)).toBeGreaterThanOrEqual(4.5);
     }
   });
+
+  it("traegt auf allen drei Typfarben die Tinte", () => {
+    // Das Typ-Badge setzt seine Textfarbe fest auf var(--ink) statt sie zu
+    // rechnen, weil die drei Flaechen feststehen. Dieser Fall belegt die
+    // Annahme -- und faellt um, sobald jemand eines der Token verschiebt.
+    expect(readableInk(token("accent"))).toBe("var(--ink)");
+    expect(readableInk(token("info"))).toBe("var(--ink)");
+    expect(readableInk(token("success"))).toBe("var(--ink)");
+  });
+
+  it("aliasiert die Typfarben auf die Akzente", () => {
+    const css = readFileSync(new NodeURL("./App.css", import.meta.url), "utf8");
+    expect(css).toContain("--type-bug: var(--accent);");
+    expect(css).toContain("--type-task: var(--info);");
+    expect(css).toContain("--type-story: var(--success);");
+  });
 });

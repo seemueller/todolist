@@ -26,6 +26,13 @@
   --prio-medium: var(--highlight);
   --prio-low: var(--ink-line);
 
+  /* Aufgabentyp. Aliase auf die Akzente statt eigener Hexwerte: die Palette
+     soll nicht wachsen, nur weil ein Feld dazukommt. contrast.test.ts belegt,
+     dass die Tinte auf allen dreien lesbar bleibt. */
+  --type-bug: var(--accent);
+  --type-task: var(--info);
+  --type-story: var(--success);
+
   /* Rahmen und Schatten */
   --border: 2.5px solid var(--ink);
   --border-thin: 2px solid var(--ink);
@@ -738,6 +745,41 @@ a:hover {
 .done .category-badge {
   border-color: var(--ink-ghost);
   background: transparent !important;
+  color: var(--ink-faint);
+}
+
+/* Typ-Badge. Anders als das Kategorie-Badge kommt die Flaeche nicht aus den
+   Daten, sondern aus einer der drei Klassen -- kein Inline-Style. Form und
+   Masse sind die des Kategorie-Badges: die beiden stehen nebeneinander. */
+.type-badge {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.type-badge--bug {
+  background: var(--type-bug);
+}
+
+.type-badge--task {
+  background: var(--type-task);
+}
+
+.type-badge--story {
+  background: var(--type-story);
+}
+
+/* Kein !important noetig wie beim Kategorie-Badge: dessen Flaeche steht als
+   Inline-Style, hier ist sie eine Klasse und verliert gegen diesen Selektor. */
+.done .type-badge {
+  border-color: var(--ink-ghost);
+  background: transparent;
   color: var(--ink-faint);
 }
 
@@ -1709,6 +1751,7 @@ a:hover {
 }
 
 .kanban-card.done .kanban-category-badge,
+.kanban-card.done .kanban-type-badge,
 .kanban-card.done .kanban-due-badge {
   border-color: var(--ink-ghost);
   background: transparent !important;
@@ -1758,6 +1801,19 @@ a:hover {
 }
 
 .kanban-category-badge {
+  padding: 3px 8px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Typ-Badge auf der Karte -- dieselben Masse wie das Kategorie-Badge daneben.
+   Die Flaeche kommt aus .type-badge--bug/--task/--story. */
+.kanban-type-badge {
   padding: 3px 8px;
   border: var(--border-thin);
   border-radius: var(--radius-sm);
