@@ -8,7 +8,7 @@ describe("localTodoStore", () => {
   });
 
   it("stores a todo and reads it back", async () => {
-    const created = await localTodoStore.addTodo("Schreiben", "high", null, null);
+    const created = await localTodoStore.addTodo("Schreiben", null, null);
     expect(created.title).toBe("Schreiben");
     expect(created.status).toBe("todo");
     expect(created.done).toBe(false);
@@ -19,7 +19,7 @@ describe("localTodoStore", () => {
   });
 
   it("keeps done and status consistent", async () => {
-    const created = await localTodoStore.addTodo("Testen", "low", null, null);
+    const created = await localTodoStore.addTodo("Testen", null, null);
     const updated = await localTodoStore.updateTodoStatus(created.id, "done");
     expect(updated.done).toBe(true);
 
@@ -29,14 +29,14 @@ describe("localTodoStore", () => {
 
   it("denormalises the category name onto the todo", async () => {
     const cat = await localTodoStore.addCategory("Kunde", "#a78bfa");
-    const todo = await localTodoStore.addTodo("Meeting", "medium", null, cat.id);
+    const todo = await localTodoStore.addTodo("Meeting", null, cat.id);
     expect(todo.category_name).toBe("Kunde");
     expect(todo.category_color).toBe("#a78bfa");
   });
 
   it("clears the category off a todo when its category is deleted", async () => {
     const cat = await localTodoStore.addCategory("Kunde", "#a78bfa");
-    const todo = await localTodoStore.addTodo("Meeting", "medium", null, cat.id);
+    const todo = await localTodoStore.addTodo("Meeting", null, cat.id);
 
     await localTodoStore.deleteCategory(cat.id);
 
@@ -179,13 +179,13 @@ describe("localTodoStore", () => {
   });
 
   it("creates a todo without a description by default", async () => {
-    const todo = await localTodoStore.addTodo("Ohne Text", "medium", null);
+    const todo = await localTodoStore.addTodo("Ohne Text", null);
 
     expect(todo.description).toBe("");
   });
 
   it("stores a description given at creation time", async () => {
-    const todo = await localTodoStore.addTodo("Mit Text", "medium", null, null, "Zeile eins\nZeile zwei");
+    const todo = await localTodoStore.addTodo("Mit Text", null, null, "Zeile eins\nZeile zwei");
 
     expect(todo.description).toBe("Zeile eins\nZeile zwei");
     const [listed] = await localTodoStore.listTodos();
@@ -218,7 +218,7 @@ describe("localTodoStore", () => {
 
   describe("updateTodoFields", () => {
     it("changes a single field and leaves the rest alone", async () => {
-      const todo = await localTodoStore.addTodo("Titel", "medium", "2026-09-20");
+      const todo = await localTodoStore.addTodo("Titel", "2026-09-20");
 
       const updated = await localTodoStore.updateTodoFields(todo.id, {
         description: "Neuer Text",
@@ -226,31 +226,28 @@ describe("localTodoStore", () => {
 
       expect(updated.description).toBe("Neuer Text");
       expect(updated.title).toBe("Titel");
-      expect(updated.priority).toBe("medium");
       expect(updated.due_date).toBe("2026-09-20");
     });
 
     it("changes several fields at once", async () => {
-      const todo = await localTodoStore.addTodo("Alt", "low", null);
+      const todo = await localTodoStore.addTodo("Alt", null);
 
       const updated = await localTodoStore.updateTodoFields(todo.id, {
         title: "Neu",
         description: "Text",
-        priority: "high",
         dueDate: "2026-10-01",
       });
 
       expect(updated).toMatchObject({
         title: "Neu",
         description: "Text",
-        priority: "high",
         due_date: "2026-10-01",
       });
     });
 
     it("clears the due date and the category with null", async () => {
       const category = await localTodoStore.addCategory("Arbeit", "#7cc3f7");
-      const todo = await localTodoStore.addTodo("Titel", "medium", "2026-09-20", category.id);
+      const todo = await localTodoStore.addTodo("Titel", "2026-09-20", category.id);
 
       const updated = await localTodoStore.updateTodoFields(todo.id, {
         dueDate: null,
@@ -265,7 +262,7 @@ describe("localTodoStore", () => {
 
     it("denormalises name and colour when the category changes", async () => {
       const category = await localTodoStore.addCategory("Arbeit", "#7cc3f7");
-      const todo = await localTodoStore.addTodo("Titel", "medium", null);
+      const todo = await localTodoStore.addTodo("Titel", null);
 
       const updated = await localTodoStore.updateTodoFields(todo.id, {
         categoryId: category.id,
@@ -276,7 +273,7 @@ describe("localTodoStore", () => {
     });
 
     it("clears a description with the empty string rather than skipping the field", async () => {
-      const todo = await localTodoStore.addTodo("Titel", "medium", null);
+      const todo = await localTodoStore.addTodo("Titel", null);
       await localTodoStore.updateTodoFields(todo.id, { description: "Text" });
 
       const updated = await localTodoStore.updateTodoFields(todo.id, { description: "" });
@@ -285,7 +282,7 @@ describe("localTodoStore", () => {
     });
 
     it("returns the todo unchanged for an empty patch", async () => {
-      const todo = await localTodoStore.addTodo("Titel", "medium", null);
+      const todo = await localTodoStore.addTodo("Titel", null);
 
       const updated = await localTodoStore.updateTodoFields(todo.id, {});
 
@@ -301,7 +298,7 @@ describe("localTodoStore", () => {
 
   describe("der Papierkorb im localStorage-Store", () => {
     it("nimmt eine gelöschte Aufgabe aus der Liste, behält sie aber gespeichert", async () => {
-      const todo = await localTodoStore.addTodo("Weg damit", "medium", null);
+      const todo = await localTodoStore.addTodo("Weg damit", null);
 
       await localTodoStore.deleteTodo(todo.id);
 
@@ -312,7 +309,7 @@ describe("localTodoStore", () => {
     });
 
     it("gibt eine Aufgabe ohne den internen Zeitstempel heraus", async () => {
-      const todo = await localTodoStore.addTodo("Bleibt", "medium", null);
+      const todo = await localTodoStore.addTodo("Bleibt", null);
 
       const [listed] = await localTodoStore.listTodos();
 
@@ -322,7 +319,7 @@ describe("localTodoStore", () => {
 
     it("nimmt auch einer Aufgabe im Papierkorb die gelöschte Kategorie", async () => {
       const kategorie = await localTodoStore.addCategory("Kunde", "#111111");
-      const todo = await localTodoStore.addTodo("Weg damit", "medium", null, kategorie.id);
+      const todo = await localTodoStore.addTodo("Weg damit", null, kategorie.id);
       await localTodoStore.deleteTodo(todo.id);
 
       await localTodoStore.deleteCategory(kategorie.id);
@@ -333,13 +330,13 @@ describe("localTodoStore", () => {
     });
 
     it("behandelt eine Aufgabe im Papierkorb wie eine unbekannte Id", async () => {
-      const todo = await localTodoStore.addTodo("Weg damit", "medium", null);
+      const todo = await localTodoStore.addTodo("Weg damit", null);
       await localTodoStore.deleteTodo(todo.id);
 
       await expect(localTodoStore.toggleTodoDone(todo.id, true)).rejects.toThrow(
         `Todo ${todo.id} not found`
       );
-      await expect(localTodoStore.updateTodoPriority(todo.id, "high")).rejects.toThrow(
+      await expect(localTodoStore.updateTodoDueDate(todo.id, "2026-10-01")).rejects.toThrow(
         `Todo ${todo.id} not found`
       );
     });
@@ -347,8 +344,8 @@ describe("localTodoStore", () => {
 
   describe("listDeletedTodos und restoreTodo im localStorage-Store", () => {
     it("zeigt zuletzt Gelöschtes zuerst", async () => {
-      const erste = await localTodoStore.addTodo("Erste", "medium", null);
-      const zweite = await localTodoStore.addTodo("Zweite", "medium", null);
+      const erste = await localTodoStore.addTodo("Erste", null);
+      const zweite = await localTodoStore.addTodo("Zweite", null);
 
       await localTodoStore.deleteTodo(erste.id);
       await localTodoStore.deleteTodo(zweite.id);
@@ -359,7 +356,7 @@ describe("localTodoStore", () => {
     });
 
     it("holt eine Aufgabe zurück in die Liste", async () => {
-      const todo = await localTodoStore.addTodo("Zurück", "medium", null);
+      const todo = await localTodoStore.addTodo("Zurück", null);
       await localTodoStore.deleteTodo(todo.id);
 
       const restored = await localTodoStore.restoreTodo(todo.id);
@@ -370,7 +367,7 @@ describe("localTodoStore", () => {
     });
 
     it("lehnt das Wiederherstellen einer nicht gelöschten Aufgabe ab", async () => {
-      const todo = await localTodoStore.addTodo("Lebt", "medium", null);
+      const todo = await localTodoStore.addTodo("Lebt", null);
 
       await expect(localTodoStore.restoreTodo(todo.id)).rejects.toThrow(
         `Todo ${todo.id} not found`
@@ -380,7 +377,7 @@ describe("localTodoStore", () => {
 
   describe("purgeTodo und purgeDeletedBefore im localStorage-Store", () => {
     it("entfernt eine Aufgabe unwiederbringlich", async () => {
-      const todo = await localTodoStore.addTodo("Endgültig", "medium", null);
+      const todo = await localTodoStore.addTodo("Endgültig", null);
       await localTodoStore.deleteTodo(todo.id);
 
       await localTodoStore.purgeTodo(todo.id);
@@ -411,7 +408,7 @@ describe("localTodoStore", () => {
       // dieser Test soll pruefen, was `now()` in todoStoreLocal.ts tatsaechlich
       // schreibt, nicht nur, dass purgeDeletedBefore mit irgendeiner Form
       // umgehen kann.
-      const todo = await localTodoStore.addTodo("Weg damit", "medium", null);
+      const todo = await localTodoStore.addTodo("Weg damit", null);
       await localTodoStore.deleteTodo(todo.id);
 
       const raw = JSON.parse(localStorage.getItem("todolist_todos") ?? "[]");
@@ -434,7 +431,7 @@ describe("localTodoStore", () => {
     });
 
     it("lässt eine nicht gelöschte Aufgabe vom Stichtag unberührt", async () => {
-      const todo = await localTodoStore.addTodo("Lebt", "medium", null);
+      const todo = await localTodoStore.addTodo("Lebt", null);
 
       const removed = await localTodoStore.purgeDeletedBefore("2099-01-01T00:00:00Z");
 
@@ -443,7 +440,7 @@ describe("localTodoStore", () => {
     });
 
     it("lässt eine lebende Aufgabe unberührt, statt sie zu entfernen", async () => {
-      const todo = await localTodoStore.addTodo("Lebt noch", "medium", null);
+      const todo = await localTodoStore.addTodo("Lebt noch", null);
 
       await localTodoStore.purgeTodo(todo.id);
 
@@ -451,7 +448,7 @@ describe("localTodoStore", () => {
     });
 
     it("bleibt bei einer unbekannten Id folgenlos", async () => {
-      const todo = await localTodoStore.addTodo("Unberührt", "medium", null);
+      const todo = await localTodoStore.addTodo("Unberührt", null);
 
       await localTodoStore.purgeTodo(999999);
 
@@ -460,7 +457,7 @@ describe("localTodoStore", () => {
   });
 
   it("starts a new todo at position zero", async () => {
-    const created = await localTodoStore.addTodo("Schreiben", "high", null, null);
+    const created = await localTodoStore.addTodo("Schreiben", null, null);
     expect(created.board_order).toBe(0);
   });
 
@@ -487,8 +484,37 @@ describe("localTodoStore", () => {
     expect(todo.board_order).toBe(0);
   });
 
+  it("ignoriert eine gespeicherte Prioritaet aus der Zeit davor", () => {
+    // Altbestand traegt das Feld noch; es darf weder stoeren noch
+    // durchgereicht werden.
+    localStorage.setItem(
+      "todolist_todos",
+      JSON.stringify([
+        {
+          id: 9,
+          title: "Alt",
+          description: "",
+          done: false,
+          status: "todo",
+          type: "task",
+          priority: "high",
+          created_at: "2026-01-01T00:00:00.000Z",
+          due_date: null,
+          category_id: null,
+          category_name: null,
+          category_color: null,
+          board_order: 0,
+        },
+      ])
+    );
+    return localTodoStore.listTodos().then(([listed]) => {
+      expect(listed).not.toHaveProperty("priority");
+      expect(listed.title).toBe("Alt");
+    });
+  });
+
   it("moves a card inside its lane without touching the status", async () => {
-    const created = await localTodoStore.addTodo("Schreiben", "high", null, null);
+    const created = await localTodoStore.addTodo("Schreiben", null, null);
     const moved = await localTodoStore.updateTodoBoardOrder(created.id, -1.5);
 
     expect(moved.board_order).toBe(-1.5);
@@ -499,7 +525,7 @@ describe("localTodoStore", () => {
   });
 
   it("sets status, done and position together", async () => {
-    const created = await localTodoStore.addTodo("Schreiben", "high", null, null);
+    const created = await localTodoStore.addTodo("Schreiben", null, null);
     const moved = await localTodoStore.updateTodoStatusAndOrder(created.id, "done", 2);
 
     expect(moved.status).toBe("done");
@@ -521,19 +547,19 @@ describe("Aufgabentyp", () => {
   });
 
   it("legt ohne Angabe eine Aufgabe vom Typ task an", async () => {
-    const todo = await localTodoStore.addTodo("Ohne Typ", "medium", null);
+    const todo = await localTodoStore.addTodo("Ohne Typ", null);
     expect(todo.type).toBe("task");
   });
 
   it("legt mit Angabe den gewuenschten Typ an", async () => {
-    const todo = await localTodoStore.addTodo("Login kaputt", "high", null, null, "", "bug");
+    const todo = await localTodoStore.addTodo("Login kaputt", null, null, "", "bug");
     expect(todo.type).toBe("bug");
     const [listed] = await localTodoStore.listTodos();
     expect(listed.type).toBe("bug");
   });
 
   it("aendert den Typ ueber den Patch", async () => {
-    const todo = await localTodoStore.addTodo("Wird Story", "medium", null);
+    const todo = await localTodoStore.addTodo("Wird Story", null);
     const updated = await localTodoStore.updateTodoFields(todo.id, { type: "story" });
     expect(updated.type).toBe("story");
     const [listed] = await localTodoStore.listTodos();
@@ -541,7 +567,7 @@ describe("Aufgabentyp", () => {
   });
 
   it("laesst den Typ stehen, wenn der Patch ihn nicht nennt", async () => {
-    const todo = await localTodoStore.addTodo("Bleibt Bug", "medium", null, null, "", "bug");
+    const todo = await localTodoStore.addTodo("Bleibt Bug", null, null, "", "bug");
     const updated = await localTodoStore.updateTodoFields(todo.id, { title: "Neuer Titel" });
     expect(updated.type).toBe("bug");
   });

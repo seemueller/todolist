@@ -3,7 +3,6 @@
 // holds implementation detail.
 
 import {
-  Priority,
   Todo,
   TodoStatus,
   TodoType,
@@ -85,12 +84,16 @@ function loadTodos(): StoredTodoRecord[] {
 // mit dem Brett dazu, `description` mit dem Detail-Fenster, `type` mit dem
 // Aufgabentyp. Alles davon fehlt in Daten, die davor geschrieben wurden.
 /** Ein Eintrag so, wie ihn ein aelterer Stand geschrieben haben kann: `status`,
- *  `description` und `type` koennen fehlen. */
+ *  `description` und `type` koennen fehlen, `priority` kann noch dastehen. */
 type StoredTodo = Omit<StoredTodoRecord, "status" | "description" | "board_order" | "type"> &
-  Partial<Pick<StoredTodoRecord, "status" | "description" | "board_order" | "type">>;
+  Partial<Pick<StoredTodoRecord, "status" | "description" | "board_order" | "type">> & {
+    priority?: unknown;
+  };
 
 function migrateTodos(todos: StoredTodo[]): StoredTodoRecord[] {
-  return todos.map((todo) => {
+  // Die abgeschaffte Prioritaet wird hier abgestreift: was `toTodo` nicht
+  // sieht, kann auch nicht in ein `Todo` durchrutschen.
+  return todos.map(({ priority: _priority, ...todo }) => {
     const description = todo.description ?? "";
     const board_order = todo.board_order ?? 0;
     // Dieselbe Rolle wie der Spaltenvorgabewert in SQLite: ein fehlender oder
@@ -146,7 +149,6 @@ function listTodos(categoryId?: number | null): Promise<Todo[]> {
 
 function addTodo(
   title: string,
-  priority: Priority,
   dueDate: string | null,
   categoryId?: number | null,
   description = "",
@@ -160,7 +162,6 @@ function addTodo(
     done: false,
     status: "todo",
     type,
-    priority,
     created_at: now(),
     due_date: dueDate,
     category_id: categoryId ?? null,
@@ -178,15 +179,6 @@ async function updateTodoDueDate(id: number, dueDate: string | null): Promise<To
   const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
   if (idx === -1) throw new Error(`Todo ${id} not found`);
   todos[idx] = { ...todos[idx], due_date: dueDate };
-  saveTodos(todos);
-  return Promise.resolve(toTodo(todos[idx]));
-}
-
-async function updateTodoPriority(id: number, priority: Priority): Promise<Todo> {
-  const todos = loadTodos();
-  const idx = todos.findIndex((t) => t.id === id && !isInTrash(t));
-  if (idx === -1) throw new Error(`Todo ${id} not found`);
-  todos[idx] = { ...todos[idx], priority };
   saveTodos(todos);
   return Promise.resolve(toTodo(todos[idx]));
 }
@@ -214,7 +206,6 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
   const next = { ...todos[idx] };
   if (patch.title !== undefined) next.title = patch.title;
   if (patch.description !== undefined) next.description = patch.description;
-  if (patch.priority !== undefined) next.priority = patch.priority;
   if (patch.type !== undefined) next.type = patch.type;
   if (patch.dueDate !== undefined) next.due_date = patch.dueDate;
   if (patch.categoryId !== undefined) {
@@ -410,7 +401,6 @@ export const localTodoStore: TodoStore = {
   listTodos,
   addTodo,
   updateTodoDueDate,
-  updateTodoPriority,
   updateTodoCategory,
   updateTodoFields,
   updateTodoStatus,
