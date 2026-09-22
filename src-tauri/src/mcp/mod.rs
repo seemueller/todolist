@@ -109,7 +109,10 @@ pub async fn serve(
         .layer(axum::middleware::from_fn_with_state(
             auth::ExpectedToken(Arc::new(token)),
             auth::require_bearer,
-        ));
+        ))
+        // Zuletzt gehaengt, also aeusserste Schicht: die Origin-Pruefung laeuft vor
+        // der Token-Pruefung. Beide muessen passieren.
+        .layer(axum::middleware::from_fn(auth::require_local_origin));
 
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", PORT)).await?;
     axum::serve(listener, router)

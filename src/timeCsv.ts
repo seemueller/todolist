@@ -32,10 +32,21 @@ const NEWLINE = "\r\n";
 /** Byte Order Mark, damit Excel die Datei als UTF-8 liest. */
 export const CSV_BOM = "﻿";
 
-/** Ein Feld wird nur eingefasst, wenn es Trennzeichen, Anfuehrungszeichen oder Umbruch enthaelt. */
+// Excel und LibreOffice werten eine Zelle als Formel, wenn sie mit = + - @ oder
+// einem Tabulator/Wagenruecklauf beginnt -- auch in einer eingefassten Zelle. Da
+// Notiz und Kategoriename frei formuliert sind (die Notiz auch ueber MCP von einem
+// fremden Prozess), wird ein solcher Anfang mit einem vorangestellten Apostroph
+// neutralisiert. Der Apostroph zwingt die Tabellenkalkulation zu Text.
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/**
+ * Ein Feld wird eingefasst, wenn es Trennzeichen, Anfuehrungszeichen oder Umbruch
+ * enthaelt, und mit einem Apostroph entschaerft, wenn es wie eine Formel beginnt.
+ */
 function escapeField(value: string): string {
-  if (!/[";\r\n]/.test(value)) return value;
-  return `"${value.replace(/"/g, '""')}"`;
+  const safe = FORMULA_LEAD.test(value) ? `'${value}` : value;
+  if (!/[";\r\n]/.test(safe)) return safe;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 function blockRow(

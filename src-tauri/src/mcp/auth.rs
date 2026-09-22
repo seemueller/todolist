@@ -70,6 +70,39 @@ pub async fn require_bearer(
     }
 }
 
+/// Die einzigen Origins, unter denen der Server sich selbst kennt.
+const ALLOWED_ORIGINS: [&str; 2] = ["http://127.0.0.1:4319", "http://localhost:4319"];
+
+/// Entscheidet, ob eine Anfrage mit diesem `Origin` durchgelassen wird. Fehlt der
+/// Header (`None` -- native MCP-Clients, curl, kein Browser), ist alles erlaubt;
+/// ist er gesetzt, muss er auf den lokalen Server zeigen. Ausgelagert, weil sich
+/// nur diese Entscheidung sinnvoll pruefen laesst.
+fn origin_allowed(origin: Option<&str>) -> bool {
+    match origin {
+        None => true,
+        Some(value) => ALLOWED_ORIGINS.contains(&value),
+    }
+}
+
+/// Wehrt DNS-Rebinding ab. Ein Browser schickt bei einer Cross-Origin-Anfrage
+/// immer einen `Origin`-Header; bindet eine Angreifer-Seite ihren Host auf
+/// `127.0.0.1:4319` um, traegt ihre Anfrage weiterhin die fremde Origin. Fehlt
+/// der Header (native MCP-Clients, curl -- kein Browser), wird durchgelassen; ist
+/// er gesetzt, muss er auf den lokalen Server zeigen, sonst `403`. Vor
+/// `require_bearer` gehaengt, damit eine fremde Seite gar nicht erst bis zur
+/// Token-Pruefung kommt. Wie die 401 traegt die 403 keinen Body.
+pub async fn require_local_origin(req: Request, next: Next) -> Result<Response, StatusCode> {
+    let origin = req
+        .headers()
+        .get(axum::http::header::ORIGIN)
+        .and_then(|value| value.to_str().ok());
+    if origin_allowed(origin) {
+        Ok(next.run(req).await)
+    } else {
+        Err(StatusCode::FORBIDDEN)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,6 +128,28 @@ mod tests {
         assert!(!token_matches("abc", "abd"));
         assert!(!token_matches("abc", "ab"));
         assert!(!token_matches("abc", ""));
+    }
+
+    #[test]
+    fn a_missing_origin_is_allowed() {
+        // Native MCP-Clients und curl schicken keinen Origin; nur Browser tun es.
+        assert!(origin_allowed(None));
+    }
+
+    #[test]
+    fn the_local_origins_are_allowed() {
+        assert!(origin_allowed(Some("http://127.0.0.1:4319")));
+        assert!(origin_allowed(Some("http://localhost:4319")));
+    }
+
+    #[test]
+    fn a_foreign_origin_is_rejected() {
+        // Der Fall DNS-Rebinding: die Seite laeuft auf evil.example, ihr Host
+        // zeigt auf 127.0.0.1, aber die Origin bleibt fremd.
+        assert!(!origin_allowed(Some("http://evil.example")));
+        assert!(!origin_allowed(Some("https://127.0.0.1:4319")));
+        assert!(!origin_allowed(Some("http://127.0.0.1:1234")));
+        assert!(!origin_allowed(Some("null")));
     }
 
     /// Muss dem echten Schema aus Migration 8 entsprechen.

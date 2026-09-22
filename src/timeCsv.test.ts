@@ -83,6 +83,50 @@ describe("buildCsv", () => {
     );
   });
 
+  it("entschaerft eine Notiz, die wie eine Formel beginnt, mit einem Apostroph", () => {
+    const csv = buildCsv(
+      ["2026-08-31"],
+      { "2026-08-31": [slot(36, 7, "=HYPERLINK(\"http://evil\")")] },
+      categoryName,
+      kindOf
+    );
+    // Fuehrendes = wuerde Excel/LibreOffice als Formel auswerten; der Apostroph
+    // zwingt Text. Anfuehrungszeichen im Wert loesen zusaetzlich das Einfassen aus.
+    expect(lines(csv)[1]).toBe(
+      '2026-08-31;09:00;09:15;0:15;15;Alpha;extern;"\'=HYPERLINK(""http://evil"")"'
+    );
+  });
+
+  it("entschaerft auch die anderen Formel-Trigger + - @ am Zellenanfang", () => {
+    const csv = buildCsv(
+      ["2026-08-31"],
+      {
+        "2026-08-31": [
+          slot(36, 7, "+1"),
+          slot(37, 7, "+1"),
+          slot(40, 9, "-2"),
+          slot(44, 9, "@ref"),
+        ],
+      },
+      categoryName,
+      kindOf
+    );
+    const rows = lines(csv);
+    expect(rows[1].endsWith(";'+1")).toBe(true);
+    expect(rows[2].endsWith(";'-2")).toBe(true);
+    expect(rows[3].endsWith(";'@ref")).toBe(true);
+  });
+
+  it("laesst eine harmlose Notiz unveraendert", () => {
+    const csv = buildCsv(
+      ["2026-08-31"],
+      { "2026-08-31": [slot(36, 7, "normaler Text")] },
+      categoryName,
+      kindOf
+    );
+    expect(lines(csv)[1].endsWith(";normaler Text")).toBe(true);
+  });
+
   it("benennt eine geloeschte Kategorie ueber die uebergebene Funktion", () => {
     const csv = buildCsv(["2026-08-31"], { "2026-08-31": [slot(36, 99)] }, categoryName, kindOf);
     expect(lines(csv)[1]).toContain("Unbekannt");
