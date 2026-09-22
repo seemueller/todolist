@@ -447,6 +447,44 @@ pub async fn resolve_category(pool: &Pool<Sqlite>, name: &str) -> Result<Categor
     ))
 }
 
+/// Erkennt eine Fremdschluessel-Verletzung von SQLite. Der erweiterte Code 787
+/// ist `SQLITE_CONSTRAINT_FOREIGNKEY`; aeltere Bindings melden nur den primaeren
+/// Code 19 (`SQLITE_CONSTRAINT`), darum zusaetzlich der Blick in den Text.
+fn is_foreign_key_violation(error: &sqlx::Error) -> bool {
+    match error {
+        sqlx::Error::Database(db) => {
+            matches!(db.code().as_deref(), Some("787") | Some("19"))
+                || db.message().contains("FOREIGN KEY")
+        }
+        _ => false,
+    }
+}
+
+/// Uebersetzt eine Fremdschluessel-Verletzung beim Schreiben einer Aufgabe in
+/// einen Aufrufer-Fehler. Der einzige Fremdschluessel auf `todos` ist
+/// `category_id`; `resolve_category` und der Schreibvorgang sind zwei getrennte,
+/// nicht-transaktionale Aufrufe. Wird die Kategorie in dem Fenster dazwischen
+/// geloescht, scheitert der Write am Constraint. Statt des opaken `Db`-Fehlers,
+/// den der Aufrufer nur als Protokollfehlschlag sieht, wird daraus dieselbe Art
+/// von `Request`-Meldung wie bei einer unbekannten Kategorie -- mit den noch
+/// vorhandenen Namen, damit der naechste Versuch treffen kann. Ein Fehler, der
+/// keine Fremdschluessel-Verletzung ist, bleibt `Db`.
+async fn map_category_fk_error(pool: &Pool<Sqlite>, error: sqlx::Error) -> StoreError {
+    if !is_foreign_key_violation(&error) {
+        return StoreError::Db(error);
+    }
+    let known: Vec<String> = list_categories(pool)
+        .await
+        .map(|categories| categories.into_iter().map(|c| c.name).collect())
+        .unwrap_or_default();
+    let hint = if known.is_empty() {
+        "Es ist bisher keine Kategorie angelegt.".to_string()
+    } else {
+        format!("Vorhanden sind: {}.", known.join(", "))
+    };
+    StoreError::Request(format!("Die angegebene Kategorie gibt es nicht mehr. {hint}"))
+}
+
 // --- Aufgaben ---------------------------------------------------------------
 
 const TODO_COLUMNS: &str = "t.id, t.title, t.description, t.done, t.status, t.type, t.priority,
@@ -575,7 +613,7 @@ pub async fn add_todo(
     // `strftime` statt einer Zeit-Crate: dasselbe ISO-Format mit Millisekunden
     // und Z, das `new Date().toISOString()` im Frontend schreibt, und ohne neue
     // Abhaengigkeit.
-    let id: i64 = sqlx::query_scalar(
+    let insert = sqlx::query_scalar(
         "INSERT INTO todos (title, description, done, status, type, priority, created_at, due_date, category_id)
          VALUES (?, ?, 0, 'todo', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?)
          RETURNING id",
@@ -587,7 +625,15 @@ pub async fn add_todo(
     .bind(due_date)
     .bind(category_id)
     .fetch_one(pool)
-    .await?;
+    .await;
+    let id: i64 = match insert {
+        Ok(id) => id,
+        // Nur wenn eine Kategorie im Spiel war, kann der Fremdschluessel greifen.
+        Err(error) if category_id.is_some() => {
+            return Err(map_category_fk_error(pool, error).await);
+        }
+        Err(error) => return Err(error.into()),
+    };
 
     select_todo(pool, id).await
 }
@@ -693,7 +739,15 @@ pub async fn update_todo(
     if let Some(category_id) = category_id {
         query = query.bind(category_id);
     }
-    query.bind(existing.id).execute(pool).await?;
+    if let Err(error) = query.bind(existing.id).execute(pool).await {
+        // Setzt der Aufruf eine Kategorie und ist sie zwischen Aufloesen und
+        // Schreiben verschwunden, wird aus dem Fremdschluessel-Fehler eine
+        // brauchbare Meldung; sonst bleibt es ein Db-Fehler.
+        if category_id.is_some() {
+            return Err(map_category_fk_error(pool, error).await);
+        }
+        return Err(error.into());
+    }
 
     select_todo(pool, id).await
 }
@@ -890,8 +944,10 @@ pub(crate) const SCHEMA: &[&str] = &[
         name TEXT NOT NULL UNIQUE COLLATE NOCASE,
         color TEXT NOT NULL DEFAULT '#a78bfa',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        time_kind TEXT NOT NULL DEFAULT 'internal'
+        time_kind TEXT NOT NULL DEFAULT 'internal',
+        name_key TEXT
     );",
+    "CREATE UNIQUE INDEX idx_categories_name_key ON categories(name_key);",
     "CREATE TABLE todos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -2231,5 +2287,41 @@ mod tests {
         assert_eq!(unchanged.len(), 1);
         assert_eq!(unchanged[0].title, "Bleibt");
         assert_eq!(unchanged[0].r#type, "bug");
+    }
+
+    #[tokio::test]
+    async fn a_missing_category_becomes_a_request_error_not_a_db_error() {
+        let pool = setup().await;
+        category(&pool, "Arbeit").await;
+        // Das, was der Race zwischen resolve_category und dem INSERT
+        // hinterliesse: ein Write gegen eine Kategorie-Id, die es nicht gibt.
+        let error = sqlx::query("INSERT INTO todos (title, category_id) VALUES ('x', 9999)")
+            .execute(&pool)
+            .await
+            .expect_err("the foreign key must reject a missing category");
+        assert!(is_foreign_key_violation(&error));
+        match map_category_fk_error(&pool, error).await {
+            StoreError::Request(message) => {
+                assert!(message.contains("gibt es nicht mehr"), "message was: {message}");
+                assert!(message.contains("Arbeit"), "should list the surviving names: {message}");
+            }
+            other => panic!("expected a Request error, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_non_foreign_key_error_stays_a_db_error() {
+        let pool = setup().await;
+        // NOT NULL auf title ist ein anderer Constraint, keine FK-Verletzung --
+        // der Text des Aufrufers darf davon nichts mitbekommen.
+        let error = sqlx::query("INSERT INTO todos (title) VALUES (NULL)")
+            .execute(&pool)
+            .await
+            .expect_err("a null title must be rejected");
+        assert!(!is_foreign_key_violation(&error));
+        assert!(matches!(
+            map_category_fk_error(&pool, error).await,
+            StoreError::Db(_)
+        ));
     }
 }

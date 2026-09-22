@@ -88,12 +88,15 @@ export async function migrateLocalStorage(): Promise<void> {
 
   for (const category of seenByNameKey.values()) {
     await db.execute(
-      "INSERT OR IGNORE INTO categories (id, name, color, created_at) VALUES ($1, $2, $3, $4)",
+      "INSERT OR IGNORE INTO categories (id, name, color, created_at, name_key) VALUES ($1, $2, $3, $4, $5)",
       [
         category.id,
         category.name,
         typeof category.color === "string" ? category.color : "#a78bfa",
         typeof category.created_at === "string" ? category.created_at : new Date().toISOString(),
+        // Denselben Schluessel wie Migration 15 mitschreiben, damit der eindeutige
+        // Index umgezogene Kategorien exakt statt ASCII-gefaltet unterscheidet.
+        categoryNameKey(typeof category.name === "string" ? category.name : ""),
       ]
     );
   }

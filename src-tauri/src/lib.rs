@@ -409,6 +409,27 @@ pub fn run() {
             sql: "ALTER TABLE todos ADD COLUMN type TEXT NOT NULL DEFAULT 'task';",
             kind: MigrationKind::Up,
         },
+        // Ein DB-Backstop fuer die Eindeutigkeit von Kategorienamen. Bisher haelt
+        // sie allein `assertNameAvailable` in src/todoStoreSql.ts (JavaScript,
+        // Unicode-bewusst ueber `categoryNameKey`) -- ein Check-then-Act ohne
+        // umspannende Transaktion, und der alte `UNIQUE COLLATE NOCASE` faltet
+        // nur ASCII, laesst also "Ärzte"/"ärzte" nebeneinander zu. Diese Spalte
+        // traegt den von JavaScript berechneten Schluessel; die Anwendung
+        // schreibt ihn bei jedem Anlegen und Umbenennen mit, der eindeutige Index
+        // macht ihn zur Invariante. Bestandszeilen werden mit `lower(trim(name))`
+        // vorbefuellt -- das Beste, was SQLite ohne ICU kann; da bestehende
+        // Namen bereits den JS-Check bestanden haben, kann der Index dabei nicht
+        // an einem echten Duplikat scheitern. Fuer Namen mit Nicht-ASCII-Grosz-
+        // schreibung wird der Schluessel erst beim naechsten Schreiben durch
+        // JavaScript exakt; der JS-Check bleibt bis dahin die genaue Pruefung.
+        Migration {
+            version: 15,
+            description: "add_name_key_to_categories",
+            sql: "ALTER TABLE categories ADD COLUMN name_key TEXT;
+            UPDATE categories SET name_key = lower(trim(name));
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name_key ON categories(name_key);",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

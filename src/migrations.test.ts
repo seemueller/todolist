@@ -55,4 +55,12 @@ describe("sql migrations", () => {
     expect(source).toContain("add_type_to_todos");
     expect(source).toContain("ALTER TABLE todos ADD COLUMN type TEXT NOT NULL DEFAULT 'task';");
   });
+
+  it("gives categories a name_key column with a unique index (dedup backstop)", () => {
+    expect(source).toContain("add_name_key_to_categories");
+    expect(source).toContain("ALTER TABLE categories ADD COLUMN name_key TEXT;");
+    expect(source).toContain(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name_key ON categories(name_key);"
+    );
+  });
 });

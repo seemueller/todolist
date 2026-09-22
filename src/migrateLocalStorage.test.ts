@@ -165,7 +165,9 @@ describe("migrateLocalStorage", () => {
       String(c[0]).includes("INSERT OR IGNORE INTO categories")
     );
     expect(categoryCalls).toHaveLength(1);
-    expect(categoryCalls[0][1]).toEqual([1, "Arbeit", "#111", "2026-01-01"]);
+    // Fuenfter Wert: der Unicode-Schluessel fuer den eindeutigen Index aus
+    // Migration 15. categoryNameKey("Arbeit") = "arbeit".
+    expect(categoryCalls[0][1]).toEqual([1, "Arbeit", "#111", "2026-01-01", "arbeit"]);
 
     const slotCall = execute.mock.calls.find((c) => String(c[0]).includes("INSERT OR IGNORE INTO time_slots"));
     expect(slotCall).toBeDefined();

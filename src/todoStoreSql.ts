@@ -262,9 +262,12 @@ async function addCategory(
 ): Promise<Category> {
   await assertNameAvailable(name);
   const db = await getDb();
+  // name_key ist der DB-Backstop aus Migration 15: derselbe Unicode-bewusste
+  // Schluessel, den assertNameAvailable prueft, damit der eindeutige Index die
+  // Eindeutigkeit haelt, falls der JS-Check je uebersprungen wird.
   const result = await db.execute(
-    "INSERT INTO categories (name, color, created_at, time_kind) VALUES ($1, $2, $3, $4)",
-    [canonicalCategoryName(name), color, new Date().toISOString(), timeKind]
+    "INSERT INTO categories (name, color, created_at, time_kind, name_key) VALUES ($1, $2, $3, $4, $5)",
+    [canonicalCategoryName(name), color, new Date().toISOString(), timeKind, categoryNameKey(name)]
   );
   return selectCategory(result.lastInsertId as number);
 }
@@ -278,8 +281,8 @@ async function updateCategory(
   await assertNameAvailable(name, id);
   const db = await getDb();
   await db.execute(
-    "UPDATE categories SET name = $1, color = $2, time_kind = $3 WHERE id = $4",
-    [canonicalCategoryName(name), color, timeKind, id]
+    "UPDATE categories SET name = $1, color = $2, time_kind = $3, name_key = $4 WHERE id = $5",
+    [canonicalCategoryName(name), color, timeKind, categoryNameKey(name), id]
   );
   return selectCategory(id);
 }

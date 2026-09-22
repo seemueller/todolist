@@ -297,6 +297,36 @@ describe("sqlTodoStore", () => {
     expect(params).toContain("none");
   });
 
+  it("schreibt beim Anlegen den Unicode-Schluessel als name_key mit", async () => {
+    select.mockResolvedValueOnce([]);
+    execute.mockResolvedValue({ lastInsertId: 1, rowsAffected: 1 });
+    select.mockResolvedValueOnce([
+      { id: 1, name: "Ärzte", color: "#000000", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    await sqlTodoStore.addCategory("Ärzte", "#000000");
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("name_key");
+    // categoryNameKey faltet "Ärzte" Unicode-bewusst auf "ärzte" -- genau der
+    // Schluessel, den der eindeutige Index aus Migration 15 haelt.
+    expect(params).toContain("ärzte");
+  });
+
+  it("schreibt beim Umbenennen den name_key neu", async () => {
+    select.mockResolvedValueOnce([]);
+    execute.mockResolvedValue({ rowsAffected: 1 });
+    select.mockResolvedValueOnce([
+      { id: 1, name: "Ärzte", color: "#111111", created_at: "2026-09-03T08:00:00.000Z" },
+    ]);
+
+    await sqlTodoStore.updateCategory(1, "Ärzte", "#111111", "internal");
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("name_key = ");
+    expect(params).toContain("ärzte");
+  });
+
   it("liest time_kind aus der Zeile", async () => {
     select.mockResolvedValue([
       {
