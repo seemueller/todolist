@@ -23,7 +23,7 @@ describe("db backend selection", () => {
   it("uses the localStorage store outside Tauri", async () => {
     isTauri.mockReturnValue(false);
     const db = await import("./db");
-    const created = await db.addTodo("Browser", "low", null, null);
+    const created = await db.addTodo("Browser", null, null);
     expect(localStorage.getItem("todolist_todos")).toContain("Browser");
     expect(created.title).toBe("Browser");
     expect(getDb).not.toHaveBeenCalled();
@@ -41,7 +41,7 @@ describe("db backend selection", () => {
   it("forwards updateTodoBoardOrder to the localStorage store outside Tauri", async () => {
     isTauri.mockReturnValue(false);
     const db = await import("./db");
-    const created = await db.addTodo("Browser", "low", null, null);
+    const created = await db.addTodo("Browser", null, null);
 
     const moved = await db.updateTodoBoardOrder(created.id, -1.5);
 
@@ -52,7 +52,7 @@ describe("db backend selection", () => {
   it("forwards updateTodoStatusAndOrder to the localStorage store outside Tauri", async () => {
     isTauri.mockReturnValue(false);
     const db = await import("./db");
-    const created = await db.addTodo("Browser", "low", null, null);
+    const created = await db.addTodo("Browser", null, null);
 
     const moved = await db.updateTodoStatusAndOrder(created.id, "done", 2);
 
@@ -61,14 +61,14 @@ describe("db backend selection", () => {
     expect(getDb).not.toHaveBeenCalled();
   });
 
-  it("forwards the type as addTodo's sixth argument to the store", async () => {
+  it("forwards the type as addTodo's fifth argument to the store", async () => {
     // Der Compiler deckt diese Stelle nicht ab: eine Fassade mit weniger
     // Parametern bleibt zuweisbar, ein vergessenes Argument faellt also still
     // unter den Tisch und jede Aufgabe entstuende als "task".
     isTauri.mockReturnValue(false);
     const db = await import("./db");
 
-    const created = await db.addTodo("Login kaputt", "high", null, null, "", "bug");
+    const created = await db.addTodo("Login kaputt", null, null, "", "bug");
 
     expect(created.type).toBe("bug");
     expect(localStorage.getItem("todolist_todos")).toContain('"type":"bug"');
@@ -78,7 +78,7 @@ describe("db backend selection", () => {
     isTauri.mockReturnValue(false);
     const db = await import("./db");
 
-    const created = await db.addTodo("Ohne Typ", "low", null);
+    const created = await db.addTodo("Ohne Typ", null);
 
     expect(created.type).toBe("task");
   });

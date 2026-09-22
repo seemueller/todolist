@@ -21,11 +21,6 @@
   --info: #7cc3f7;
   --success: #6fcf7f;
 
-  /* Prioritäten */
-  --prio-high: var(--accent);
-  --prio-medium: var(--highlight);
-  --prio-low: var(--ink-line);
-
   /* Aufgabentyp. Aliase auf die Akzente statt eigener Hexwerte: die Palette
      soll nicht wachsen, nur weil ein Feld dazukommt. contrast.test.ts belegt,
      dass die Tinte auf allen dreien lesbar bleibt. */
@@ -37,6 +32,7 @@
   --border: 2.5px solid var(--ink);
   --border-thin: 2px solid var(--ink);
   --border-muted: 2.5px solid var(--ink-ghost);
+  /* Breite der farbigen Typkante an der Listenzeile. */
   --edge: 12px;
 
   --radius-sm: 4px;
@@ -274,7 +270,6 @@ a:hover {
 
 .add-form .date-input,
 .add-form .category-select,
-.add-form .priority-select,
 .add-form .type-select {
   border: none;
   border-left: var(--border);
@@ -294,7 +289,6 @@ a:hover {
 
 .add-form .date-input:hover,
 .add-form .category-select:hover,
-.add-form .priority-select:hover,
 .add-form .type-select:hover {
   background: var(--highlight);
 }
@@ -596,7 +590,7 @@ a:hover {
   padding: 13px 16px;
   border: var(--border);
   border-left-width: var(--edge);
-  border-left-color: var(--prio-low);
+  border-left-color: var(--type-task);
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: var(--shadow-md);
@@ -609,16 +603,16 @@ a:hover {
   box-shadow: var(--shadow-lg);
 }
 
-.todo-list li.priority-high {
-  border-left-color: var(--prio-high);
+.todo-list li.type-bug {
+  border-left-color: var(--type-bug);
 }
 
-.todo-list li.priority-medium {
-  border-left-color: var(--prio-medium);
+.todo-list li.type-task {
+  border-left-color: var(--type-task);
 }
 
-.todo-list li.priority-low {
-  border-left-color: var(--prio-low);
+.todo-list li.type-story {
+  border-left-color: var(--type-story);
 }
 
 .todo-list li.done {
@@ -800,7 +794,6 @@ a:hover {
   color: var(--ink-faint);
 }
 
-.priority-select-inline,
 .todo-select {
   flex-shrink: 0;
   max-width: 96px;
@@ -818,7 +811,6 @@ a:hover {
   outline: none;
 }
 
-.priority-select-inline:hover,
 .todo-select:hover {
   background: var(--highlight);
 }
@@ -1081,8 +1073,8 @@ a:hover {
   min-height: 0;
 }
 
-/* Das Feld, das die gewonnene Hoehe bekommt: die Beschreibung. Titel,
-   Prioritaet und Datum behalten ihre Hoehe. */
+/* Das Feld, das die gewonnene Hoehe bekommt: die Beschreibung. Titel, Typ
+   und Datum behalten ihre Hoehe. */
 .todo-modal-field-grow {
   flex: 1;
   min-height: 0;
@@ -1706,7 +1698,7 @@ a:hover {
   padding: 11px 12px;
   border: var(--border);
   border-top-width: 9px;
-  border-top-color: var(--prio-low);
+  border-top-color: var(--type-task);
   border-radius: 5px;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
@@ -1727,16 +1719,16 @@ a:hover {
   background: var(--accent);
 }
 
-.kanban-card.priority-high {
-  border-top-color: var(--prio-high);
+.kanban-card.type-bug {
+  border-top-color: var(--type-bug);
 }
 
-.kanban-card.priority-medium {
-  border-top-color: var(--prio-medium);
+.kanban-card.type-task {
+  border-top-color: var(--type-task);
 }
 
-.kanban-card.priority-low {
-  border-top-color: var(--prio-low);
+.kanban-card.type-story {
+  border-top-color: var(--type-story);
 }
 
 .kanban-card:hover {
@@ -2425,7 +2417,6 @@ a:hover {
 
   .add-form .date-input,
   .add-form .category-select,
-  .add-form .priority-select,
   .add-form .type-select {
     flex: 1 1 0;
     border-top: var(--border);

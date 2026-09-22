@@ -1,4 +1,4 @@
-import { Category, Priority, TimeKind, Todo, TodoStatus, TodoType } from "./types";
+import { Category, TimeKind, Todo, TodoStatus, TodoType } from "./types";
 import { DaySlot } from "./timeSlots";
 import { TimeSettings, TimeSlotRecord } from "./timeTypes";
 
@@ -24,7 +24,6 @@ import { TimeSettings, TimeSlotRecord } from "./timeTypes";
 export interface TodoFieldsPatch {
   title?: string;
   description?: string;
-  priority?: Priority;
   type?: TodoType;
   dueDate?: string | null;
   categoryId?: number | null;
@@ -47,7 +46,6 @@ export interface TodoStore {
    */
   addTodo(
     title: string,
-    priority: Priority,
     dueDate: string | null,
     categoryId?: number | null,
     description?: string,
@@ -55,8 +53,6 @@ export interface TodoStore {
   ): Promise<Todo>;
   /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo>;
-  /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
-  updateTodoPriority(id: number, priority: Priority): Promise<Todo>;
   /** Aktualisiert category_id und denormalisiert category_name/category_color neu; lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoCategory(id: number, categoryId: number | null): Promise<Todo>;
   /**

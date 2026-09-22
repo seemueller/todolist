@@ -2,6 +2,15 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.17.0] - 2026-09-22
+
+### Entfernt
+- Die **Priorität** gibt es nicht mehr. Zwei Felder, die beide eine Rangfolge behaupten, waren eines zu viel: der Typ sagt, um welche Art Arbeit es geht, die Fälligkeit sagt, wann sie dran ist. Das Auswahlfeld verschwindet aus dem Formular, aus der Zeile und aus dem Aufgaben-Fenster, und `add_todo`/`update_todo` nehmen über MCP keine Priorität mehr an.
+
+### Geändert
+- Die farbige Kante an Listenzeile und Karte zeigt jetzt den **Typ** statt der Priorität — Bug rot, Task blau, Story grün, dieselben Farben wie das Kürzel daneben.
+- Im Brett entscheidet bei gleichem Platz und gleicher Fälligkeit nur noch das Alter, nicht mehr die Priorität.
+
 ## [0.16.0] - 2026-09-22
 
 ### Hinzugefügt

@@ -5,7 +5,6 @@
 import {
   Category,
   CategoryRow,
-  Priority,
   Todo,
   TodoRow,
   TodoStatus,
@@ -21,7 +20,7 @@ import { getDb } from "./sqlClient";
 import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
 const TODO_COLUMNS = `
-  t.id, t.title, t.description, t.done, t.status, t.type, t.priority, t.created_at,
+  t.id, t.title, t.description, t.done, t.status, t.type, t.created_at,
   t.due_date, t.category_id, t.board_order,
   c.name AS category_name, c.color AS category_color
 `;
@@ -60,7 +59,6 @@ async function listTodos(categoryId?: number | null): Promise<Todo[]> {
 
 async function addTodo(
   title: string,
-  priority: Priority,
   dueDate: string | null,
   categoryId?: number | null,
   description = "",
@@ -68,9 +66,9 @@ async function addTodo(
 ): Promise<Todo> {
   const db = await getDb();
   const result = await db.execute(
-    `INSERT INTO todos (title, description, done, status, type, priority, created_at, due_date, category_id)
-     VALUES ($1, $2, 0, 'todo', $3, $4, $5, $6, $7)`,
-    [title, description, type, priority, new Date().toISOString(), dueDate, categoryId ?? null]
+    `INSERT INTO todos (title, description, done, status, type, created_at, due_date, category_id)
+     VALUES ($1, $2, 0, 'todo', $3, $4, $5, $6)`,
+    [title, description, type, new Date().toISOString(), dueDate, categoryId ?? null]
   );
   return selectTodo(result.lastInsertId as number);
 }
@@ -86,10 +84,6 @@ async function updateColumn(id: number, sql: string, params: unknown[]): Promise
 
 function updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo> {
   return updateColumn(id, "UPDATE todos SET due_date = $1 WHERE id = $2", [dueDate]);
-}
-
-function updateTodoPriority(id: number, priority: Priority): Promise<Todo> {
-  return updateColumn(id, "UPDATE todos SET priority = $1 WHERE id = $2", [priority]);
 }
 
 function updateTodoCategory(id: number, categoryId: number | null): Promise<Todo> {
@@ -110,7 +104,6 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
 
   if (patch.title !== undefined) set("title", patch.title);
   if (patch.description !== undefined) set("description", patch.description);
-  if (patch.priority !== undefined) set("priority", patch.priority);
   if (patch.type !== undefined) set("type", patch.type);
   if (patch.dueDate !== undefined) set("due_date", patch.dueDate);
   if (patch.categoryId !== undefined) set("category_id", patch.categoryId);
@@ -299,7 +292,6 @@ export const sqlTodoStore: TodoStore = {
   listTodos,
   addTodo,
   updateTodoDueDate,
-  updateTodoPriority,
   updateTodoCategory,
   updateTodoFields,
   updateTodoStatus,

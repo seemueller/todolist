@@ -145,7 +145,6 @@ export async function migrateLocalStorage(): Promise<void> {
     if (typeof todo?.id !== "number" || typeof todo?.title !== "string") continue;
     const status =
       typeof todo.status === "string" ? todo.status : todo.done ? "done" : "todo";
-    const priority = typeof todo.priority === "string" ? todo.priority : "medium";
     // Ohne diese Zeile faenden Browser-Aufgaben beim ersten Start in Tauri
     // allesamt als "task" wieder zusammen. Ueber `toTodoType` statt einer
     // Typpruefung von Hand: der Wert kommt aus localStorage, und ein
@@ -161,8 +160,8 @@ export async function migrateLocalStorage(): Promise<void> {
     const boardOrder = typeof todo.board_order === "number" ? todo.board_order : 0;
 
     await db.execute(
-      `INSERT OR IGNORE INTO todos (id, title, description, done, status, type, priority, created_at, due_date, category_id, board_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      `INSERT OR IGNORE INTO todos (id, title, description, done, status, type, created_at, due_date, category_id, board_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         todo.id,
         todo.title,
@@ -170,7 +169,6 @@ export async function migrateLocalStorage(): Promise<void> {
         status === "done" ? 1 : 0,
         status,
         type,
-        priority,
         createdAt,
         dueDate,
         categoryId,

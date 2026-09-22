@@ -43,9 +43,6 @@ export type { FilterChipProps, FilterChipVariant } from "./FilterChip";
 export { CategorySelect } from "./CategorySelect";
 export type { CategorySelectProps } from "./CategorySelect";
 
-export { PrioritySelect } from "./PrioritySelect";
-export type { PrioritySelectProps, PrioritySelectVariant } from "./PrioritySelect";
-
 export { TypeSelect } from "./TypeSelect";
 export type { TypeSelectProps } from "./TypeSelect";
 

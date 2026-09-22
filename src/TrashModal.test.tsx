@@ -19,7 +19,6 @@ const makeTodo = (id: number, title: string) => ({
   description: "",
   done: false,
   status: "todo" as const,
-  priority: "medium" as const,
   type: "task" as const,
   created_at: "2026-01-01T00:00:00Z",
   due_date: null,

@@ -24,7 +24,6 @@ import {
   updateCategory,
   updateTodoCategory,
   updateTodoFields,
-  updateTodoPriority,
   updateTodoBoardOrder,
   updateTodoStatusAndOrder,
 } from "./db";
@@ -39,7 +38,7 @@ import {
 } from "./listPrefs";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, Priority, TODO_TYPES, TODO_TYPE_LABELS, computeBoardOrder, needsRebalance, rebalanceBoardOrders, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus, type TodoType } from "./types";
+import { CATEGORY_COLORS, Category, TODO_TYPES, TODO_TYPE_LABELS, computeBoardOrder, needsRebalance, rebalanceBoardOrders, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus, type TodoType } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
@@ -77,7 +76,6 @@ import {
   NoteIcon,
   PencilIcon,
   PlusIcon,
-  PrioritySelect,
   TagIcon,
   TimeKindSelect,
   TrashIcon,
@@ -153,7 +151,6 @@ type AppProps = {
 function App({ migrationError = null }: AppProps) {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
-  const [newPriority, setNewPriority] = useState<Priority>("medium");
   const [newType, setNewType] = useState<TodoType>("task");
   const [newDueDate, setNewDueDate] = useState("");
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
@@ -375,10 +372,9 @@ function App({ migrationError = null }: AppProps) {
     if (!title) return;
     try {
       const dueDate = newDueDate || null;
-      const todo = await addTodo(title, newPriority, dueDate, newCategoryId, undefined, newType);
+      const todo = await addTodo(title, dueDate, newCategoryId, undefined, newType);
       setTodos((prev) => [todo, ...prev]);
       setNewTitle("");
-      setNewPriority("medium");
       setNewType("task");
       setNewDueDate("");
       setNewCategoryId(null);
@@ -423,16 +419,6 @@ function App({ migrationError = null }: AppProps) {
       setError(null);
     } catch (err) {
       setError(`Wiederherstellen fehlgeschlagen: ${String(err)}`);
-    }
-  }
-
-  async function handlePriorityChange(id: number, priority: Priority) {
-    try {
-      const updated = await updateTodoPriority(id, priority);
-      setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      setError(null);
-    } catch (err) {
-      setError(String(err));
     }
   }
 
@@ -842,7 +828,6 @@ function App({ migrationError = null }: AppProps) {
             placeholderLabel="Keine Kategorie"
           />
           <TypeSelect value={newType} onValueChange={setNewType} aria-label="Typ" />
-          <PrioritySelect value={newPriority} onValueChange={setNewPriority} aria-label="Priorität" />
           <button type="submit" aria-label="Aufgabe hinzufügen">
             <PlusIcon />
           </button>
@@ -1010,7 +995,7 @@ function App({ migrationError = null }: AppProps) {
                   todo.done ? "done" : "",
                   overdue ? "overdue" : "",
                   today && !todo.done ? "due-today" : "",
-                  `priority-${todo.priority}`,
+                  `type-${todo.type}`,
                 ]
                   .filter(Boolean)
                   .join(" ")}
@@ -1037,13 +1022,6 @@ function App({ migrationError = null }: AppProps) {
                     {formatDate(todo.due_date)}
                   </DueDateBadge>
                 )}
-
-                <PrioritySelect
-                  variant="inline"
-                  value={todo.priority}
-                  onValueChange={(priority) => handlePriorityChange(todo.id, priority)}
-                  aria-label="Priorität ändern"
-                />
 
                 <TypeBadge type={todo.type} />
 
@@ -1177,7 +1155,7 @@ function App({ migrationError = null }: AppProps) {
                         <Fragment key={todo.id}>
                         {showIndicator && <div className="kanban-drop-indicator" />}
                         <div
-                          className={`kanban-card priority-${todo.priority} ${todo.done ? "done" : ""} ${overdue ? "overdue" : ""} ${today && !todo.done ? "due-today" : ""} ${
+                          className={`kanban-card type-${todo.type} ${todo.done ? "done" : ""} ${overdue ? "overdue" : ""} ${today && !todo.done ? "due-today" : ""} ${
                             draggedTodoId === todo.id ? "dragging" : ""
                           }`}
                           draggable

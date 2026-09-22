@@ -39,7 +39,7 @@ ausschließlich über diese Variablen angesprochen.
 | `--ink-soft` | `#6b6152` | Sekundärtext und ruhende Icon-Farbe in Aktionsknöpfen. |
 | `--ink-faint` | `#8a806f` | Platzhaltertext und durchgestrichene Titel erledigter Aufgaben. |
 | `--ink-ghost` | `#a89e8c` | Rahmen erledigter Elemente und Text, der fast verschwindet. |
-| `--ink-line` | `#c9bfa8` | Hellste Linie; zugleich die Kantenfarbe niedriger Priorität. |
+| `--ink-line` | `#c9bfa8` | Hellste Linie, etwa die Rasterlinie der Zeiterfassung. |
 
 ### Akzente
 
@@ -51,14 +51,6 @@ ausschließlich über diese Variablen angesprochen.
 | `--info` | `#7cc3f7` | Neutrale Kennzeichnung, z. B. der Kopf der Spalte „Zu tun". |
 | `--success` | `#6fcf7f` | Erledigt: Kopf der Spalte „Erledigt" und das Signal beim Abhaken. |
 
-### Prioritäten
-
-| Token | Wert | Wofür |
-|---|---|---|
-| `--prio-high` | `var(--accent)` | Hohe Priorität — farbige Kante der Zeile bzw. Karte. |
-| `--prio-medium` | `var(--highlight)` | Mittlere Priorität. |
-| `--prio-low` | `var(--ink-line)` | Niedrige Priorität; bewusst zurückhaltend. |
-
 ### Aufgabentyp
 
 | Token | Wert | Wofür |
@@ -67,6 +59,9 @@ ausschließlich über diese Variablen angesprochen.
 | `--type-task` | `var(--info)` | Task, die Vorgabe. |
 | `--type-story` | `var(--success)` | Story. |
 
+Diese drei Token färben nicht nur das Badge: dieselbe Farbe trägt die farbige
+Kante links an der Listenzeile und oben auf der Kanban-Karte.
+
 ### Rahmen, Radien, Schatten
 
 | Token | Wert | Wofür |
@@ -74,7 +69,7 @@ ausschließlich über diese Variablen angesprochen.
 | `--border` | `2.5px solid var(--ink)` | Standardrahmen für alles Bedienbare. |
 | `--border-thin` | `2px solid var(--ink)` | Rahmen für kleine Elemente: Badges, 24–30 px große Knöpfe. |
 | `--border-muted` | `2.5px solid var(--ink-ghost)` | Rahmen für Leerzustände und Erledigtes. |
-| `--edge` | `12px` | Breite der farbigen Prioritätskante an der Listenzeile. |
+| `--edge` | `12px` | Breite der farbigen Typkante an der Listenzeile. |
 | `--radius-sm` | `4px` | Badges, kleine Knöpfe, Eingabefelder in Zeilen. |
 | `--radius-md` | `6px` | Karten, Zeilen, Formulare, Spalten. |
 | `--radius-lg` | `8px` | Modal-Panels. |
@@ -110,9 +105,11 @@ und keines im TSX. Ausnahme sind Werte aus den Daten, etwa `category_color` —
 die kommen als Inline-Style aus der Datenbank. Fehlt eine Farbe, wird ein neues
 Token angelegt, statt einen Wert einzustreuen.
 
-**Priorität zeigt die farbige Kante, sonst nichts.** In der Liste die 12 px
-breite linke Kante, auf der Kanban-Karte die Kante oben. Kein zusätzlicher Punkt,
-kein zweites Abzeichen — doppelte Kodierung derselben Information ist Rauschen.
+**Die farbige Kante zeigt den Aufgabentyp.** In der Liste die 12 px breite linke
+Kante, auf der Kanban-Karte die Kante oben, beide in `--type-bug`/`--type-task`/
+`--type-story`. Benannt wird der Typ zusätzlich vom `TypeBadge` — Farbe allein
+trägt keine Information, die nur farbig vorliegt. Ein dritter Träger derselben
+Information, etwa ein zusätzlicher Punkt, kommt nicht dazu.
 
 **Abstände über `flex`/`grid` und `gap`.** Keine Ketten aus `margin` zwischen
 Geschwistern und kein Abstand über Leerraum im Quelltext. `gap` überlebt
@@ -191,21 +188,11 @@ leerem Optionswert und `null`.
 | `onValueChange` | `(id: number \| null) => void` | Neue Id oder `null`. |
 | `placeholderLabel` | `string` | Erste Option, z. B. `"Keine Kategorie"`. |
 
-### `PrioritySelect`
-
-Auswahlfeld mit den drei festen Optionen Niedrig / Mittel / Hoch.
-
-| Prop | Typ | Bedeutung |
-|---|---|---|
-| `value` | `Priority` | Gewählte Priorität. |
-| `onValueChange` | `(p: Priority) => void` | Neue Priorität. |
-| `variant` | `"form" \| "inline"` | Im Hinzufügen-Formular oder in der Todo-Zeile. |
-
 ### `TypeSelect`
 
-Auswahlfeld für den Aufgabentyp, gebaut wie `PrioritySelect`: drei feste
-Optionen Bug / Task / Story, deren Reihenfolge aus `TODO_TYPES` kommt. Anders
-als `PrioritySelect` ohne Varianten — der Typ wird nur im Hinzufüge-Formular
+Auswahlfeld für den Aufgabentyp: die drei festen Optionen Bug / Task / Story,
+deren Bestand und Reihenfolge aus `TODO_TYPES` kommen und nicht im Baustein
+ausgeschrieben stehen. Ohne Varianten — der Typ wird nur im Hinzufüge-Formular
 und im Detailfenster gewählt, beide tragen `.type-select`. In der Listenzeile
 steht er als `TypeBadge`, nicht als Auswahlfeld.
 
@@ -471,9 +458,9 @@ erst, wenn ein Muster zum zweiten Mal auftaucht.**
    npx playwright test
    ```
 
-   Die E2E-Tests selektieren über CSS-Klassen (`.filter-btn`,
-   `.priority-select-inline`, `.todo-select`, `.category-item`, `.todo-list li`)
-   und über `aria-label`. Wer eine dieser Klassen oder Beschriftungen umbenennt,
+   Die E2E-Tests selektieren über CSS-Klassen (`.filter-btn`, `.todo-select`,
+   `.type-select`, `.type-badge` samt `--bug`/`--task`/`--story`,
+   `.category-item`, `.todo-list li`) und über `aria-label`. Wer eine dieser Klassen oder Beschriftungen umbenennt,
    zieht den Test mit.
 
 ---
@@ -483,8 +470,9 @@ erst, wenn ein Muster zum zweiten Mal auftaucht.**
 Das frühere dunkle Thema mit Glassmorphismus, violettem Akzent (`#7f5af0`),
 weichen Schatten und `backdrop-filter` ist vollständig ersetzt. **Inter** ist
 nicht mehr die Schrift der App. Das Emoji-Konfetti beim Abhaken ist einem
-gezeichneten Haken gewichen, und der Prioritätspunkt ist ersatzlos entfallen.
-Der binäre Umschalter `.view-toggle` mit seinen `::after`-Beschriftungen ist durch
+gezeichneten Haken gewichen. Die Priorität einer Aufgabe gibt es nicht mehr —
+weder als Punkt noch als Auswahlfeld noch als Feld an der Aufgabe; die farbige
+Kante trägt heute den Aufgabentyp. Der binäre Umschalter `.view-toggle` mit seinen `::after`-Beschriftungen ist durch
 die Segmentleiste `.view-switch` ersetzt.
 
 Wer einen alten Stand braucht, findet ihn in der git history — im Arbeitsbaum

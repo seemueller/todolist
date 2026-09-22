@@ -1,5 +1,5 @@
-// Detail-Fenster einer Aufgabe: Titel, Beschreibung, Typ, Prioritaet,
-// Faelligkeit und Kategorie an einer Stelle. Die Beschreibung hat zwei Zustaende: gelesen
+// Detail-Fenster einer Aufgabe: Titel, Beschreibung, Typ, Faelligkeit und
+// Kategorie an einer Stelle. Die Beschreibung hat zwei Zustaende: gelesen
 // wird sie als gesetztes Markdown (`src/ui/Markdown.tsx`), geschrieben im
 // Textfeld daneben -- der Knopf ueber dem Feld schaltet um. Eigene Datei, weil
 // App.tsx schon zu gross ist, um noch ein Formular mit eigenem Entwurfszustand
@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 import type { KeyboardEvent } from "react";
-import { Category, Priority, Todo, type TodoType } from "./types";
+import { Category, Todo, type TodoType } from "./types";
 import type { TodoFieldsPatch } from "./storeTypes";
 import { loadTodoModalSize, saveTodoModalSize } from "./listPrefs";
 import {
@@ -21,7 +21,6 @@ import {
   Markdown,
   Modal,
   PencilIcon,
-  PrioritySelect,
   TypeSelect,
   EyeIcon,
 } from "./ui";
@@ -47,7 +46,6 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
   const [original] = useState(todo);
   const [title, setTitle] = useState(todo.title);
   const [description, setDescription] = useState(todo.description);
-  const [priority, setPriority] = useState<Priority>(todo.priority);
   const [type, setType] = useState<TodoType>(todo.type);
   const [dueDate, setDueDate] = useState(todo.due_date ?? "");
   const [categoryId, setCategoryId] = useState<number | null>(todo.category_id);
@@ -85,7 +83,6 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
     // auch fuehrende/abschliessende Umbrueche gehoeren zum Text.
     const nextDescription = description.trim() === "" ? "" : description;
     if (nextDescription !== original.description) patch.description = nextDescription;
-    if (priority !== original.priority) patch.priority = priority;
     if (type !== original.type) patch.type = type;
     const nextDueDate = dueDate || null;
     if (nextDueDate !== original.due_date) patch.dueDate = nextDueDate;
@@ -199,19 +196,10 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
         <div className="todo-modal-row">
           <div className="todo-modal-field">
             <label htmlFor="todo-detail-type">Typ</label>
-            {/* .type-select hat wie .priority-select ausserhalb von .add-form
-                keine eigene Regel: beide Felder stehen hier nackt und gleich
-                breit nebeneinander. */}
+            {/* .type-select hat ausserhalb von .add-form keine eigene Regel:
+                die Felder der Zeile stehen hier nackt und gleich breit
+                nebeneinander. */}
             <TypeSelect id="todo-detail-type" value={type} onValueChange={setType} />
-          </div>
-
-          <div className="todo-modal-field">
-            <label htmlFor="todo-detail-priority">Priorität</label>
-            <PrioritySelect
-              id="todo-detail-priority"
-              value={priority}
-              onValueChange={setPriority}
-            />
           </div>
 
           <div className="todo-modal-field">

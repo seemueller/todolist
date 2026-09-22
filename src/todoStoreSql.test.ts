@@ -16,7 +16,6 @@ const ROW = {
   description: "Vorbereitung fuer den Kunden",
   done: 0,
   status: "todo",
-  priority: "high",
   created_at: "2026-09-03T08:00:00.000Z",
   due_date: null,
   category_id: 2,
@@ -52,7 +51,7 @@ describe("sqlTodoStore", () => {
     execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
     select.mockResolvedValue([ROW]);
 
-    const created = await sqlTodoStore.addTodo("Schreiben", "high", null, 2);
+    const created = await sqlTodoStore.addTodo("Schreiben", null, 2);
 
     expect(execute.mock.calls[0][0]).toContain("INSERT INTO todos");
     expect(created.id).toBe(7);
@@ -108,7 +107,7 @@ describe("sqlTodoStore", () => {
       execute.mockResolvedValue({ rowsAffected: 0 });
       select.mockResolvedValue([ROW]);
 
-      await sqlTodoStore.updateTodoPriority(7, "low");
+      await sqlTodoStore.updateTodoDueDate(7, "2026-10-01");
       expect(execute.mock.calls[0][0]).toContain("AND deleted_at IS NULL");
 
       execute.mockClear();
@@ -385,31 +384,40 @@ describe("sqlTodoStore", () => {
     execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
     select.mockResolvedValue([ROW]);
 
-    await sqlTodoStore.addTodo("Mit Text", "medium", null, null, "Zeile eins\nZeile zwei");
+    await sqlTodoStore.addTodo("Mit Text", null, null, "Zeile eins\nZeile zwei");
 
     expect(execute.mock.calls[0][0]).toContain("description");
     expect(execute.mock.calls[0][1]).toEqual([
       "Mit Text",
       "Zeile eins\nZeile zwei",
       "task",
-      "medium",
       expect.any(String),
       null,
       null,
     ]);
   });
 
+  it("schreibt die Prioritaetsspalte nicht mehr mit", async () => {
+    // Die Spalte bleibt in der Tabelle stehen und traegt ihren Vorgabewert;
+    // geschrieben wird sie von dieser App nicht mehr.
+    execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
+    select.mockResolvedValue([ROW]);
+
+    await sqlTodoStore.addTodo("Ohne Prio", null);
+
+    expect(execute.mock.calls[0][0]).not.toContain("priority");
+  });
+
   it("writes an empty description when none was given", async () => {
     execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
     select.mockResolvedValue([ROW]);
 
-    await sqlTodoStore.addTodo("Ohne Text", "medium", null);
+    await sqlTodoStore.addTodo("Ohne Text", null);
 
     expect(execute.mock.calls[0][1]).toEqual([
       "Ohne Text",
       "",
       "task",
-      "medium",
       expect.any(String),
       null,
       null,
@@ -615,7 +623,7 @@ describe("Aufgabentyp", () => {
     execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
     select.mockResolvedValue([ROW]);
 
-    await sqlTodoStore.addTodo("Ohne Typ", "medium", null);
+    await sqlTodoStore.addTodo("Ohne Typ", null);
 
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toContain("INSERT INTO todos");
@@ -627,7 +635,7 @@ describe("Aufgabentyp", () => {
     execute.mockResolvedValue({ lastInsertId: 7, rowsAffected: 1 });
     select.mockResolvedValue([ROW]);
 
-    await sqlTodoStore.addTodo("Login kaputt", "high", null, null, "", "bug");
+    await sqlTodoStore.addTodo("Login kaputt", null, null, "", "bug");
 
     const params = execute.mock.calls[0][1] as unknown[];
     expect(params).toContain("bug");
