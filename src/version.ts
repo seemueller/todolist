@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.15.0";
+export const APP_VERSION = "0.16.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.16.0",
+    date: "2026-09-22",
+    changes: [
+      "Jede Aufgabe hat neben ihrer Kategorie einen Typ: Bug, Task oder Story — als farbiges Kürzel in der Zeile und auf der Karte, wählbar beim Anlegen und im Aufgaben-Fenster",
+      "Über der Liste filtert eine zweite Leiste nach dem Typ; die Wahl gilt beim nächsten Start wieder",
+      "Über MCP liefert list_todos den Typ mit, add_todo und update_todo nehmen ihn an — ohne Angabe gilt „task\"",
+    ],
+  },
   {
     version: "0.15.0",
     date: "2026-09-21",
