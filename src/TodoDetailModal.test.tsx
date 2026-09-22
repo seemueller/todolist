@@ -15,7 +15,6 @@ function makeTodo(overrides: Partial<Todo> = {}): Todo {
     description: "",
     done: false,
     status: "todo",
-    priority: "medium",
     type: "task",
     created_at: "2026-09-13T10:00:00.000Z",
     due_date: null,
@@ -85,11 +84,11 @@ describe("TodoDetailModal — Fenstergroesse", () => {
 
 describe("TodoDetailModal", () => {
   it("shows the current values of the todo", () => {
-    renderModal({ description: "Belege holen", priority: "high", due_date: "2026-09-20" });
+    renderModal({ description: "Belege holen", type: "bug", due_date: "2026-09-20" });
 
     expect(screen.getByLabelText(/Titel/i)).toHaveValue("Steuererklärung");
     expect(descriptionInput()).toHaveValue("Belege holen");
-    expect(screen.getByLabelText(/Priorität/i)).toHaveValue("high");
+    expect(screen.getByLabelText(/Typ/i)).toHaveValue("bug");
     expect(screen.getByLabelText(/Fällig/i)).toHaveValue("2026-09-20");
   });
 
@@ -260,11 +259,11 @@ describe("TodoDetailModal", () => {
     fireEvent.change(descriptionInput(), { target: { value: "Belege holen" } });
 
     // Waehrend das Fenster offen ist, aendert sich die Aufgabe von aussen --
-    // z. B. weil der MCP-Server die Prioritaet setzt und die App neu laedt.
-    // Der Entwurf im Fenster hat die Prioritaet nie angefasst.
+    // z. B. weil der MCP-Server den Titel setzt und die App neu laedt.
+    // Der Entwurf im Fenster hat den Titel nie angefasst.
     rerender(
       <TodoDetailModal
-        todo={{ ...original, priority: "high" }}
+        todo={{ ...original, title: "Von aussen umbenannt" }}
         categories={categories}
         onSave={onSave}
         onClose={onClose}
@@ -278,14 +277,14 @@ describe("TodoDetailModal", () => {
     });
   });
 
-  it("puts the changed priority alone in the patch", async () => {
+  it("puts the changed title alone in the patch", async () => {
     const { onSave } = renderModal();
 
-    fireEvent.change(screen.getByLabelText(/Priorität/i), { target: { value: "high" } });
+    fireEvent.change(screen.getByLabelText(/Titel/i), { target: { value: "Steuer 2026" } });
     fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
 
     await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith(7, { priority: "high" });
+      expect(onSave).toHaveBeenCalledWith(7, { title: "Steuer 2026" });
     });
   });
 

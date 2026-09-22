@@ -1073,8 +1073,8 @@ a:hover {
   min-height: 0;
 }
 
-/* Das Feld, das die gewonnene Hoehe bekommt: die Beschreibung. Titel,
-   Prioritaet und Datum behalten ihre Hoehe. */
+/* Das Feld, das die gewonnene Hoehe bekommt: die Beschreibung. Titel, Typ
+   und Datum behalten ihre Hoehe. */
 .todo-modal-field-grow {
   flex: 1;
   min-height: 0;

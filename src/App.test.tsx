@@ -55,7 +55,6 @@ vi.mock("./db", () => ({
   purgeDeletedBefore: vi.fn(() => Promise.resolve(0)),
   toggleTodoDone: vi.fn(),
   updateTodoDueDate: vi.fn(),
-  updateTodoPriority: vi.fn(),
   updateTodoStatus: vi.fn(),
   updateTodoBoardOrder: vi.fn(),
   updateTodoStatusAndOrder: vi.fn(),
