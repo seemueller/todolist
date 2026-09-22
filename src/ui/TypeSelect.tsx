@@ -1,8 +1,8 @@
 // Auswahlfeld fuer den Aufgabentyp mit den drei festen Optionen
-// Bug / Task / Story. Zwilling von PrioritySelect, aber ohne dessen
-// Varianten: der Typ wird nur im Hinzufuegen-Formular und im Detail-Fenster
-// gewaehlt, und beide tragen dieselbe Klasse .type-select. In der Listenzeile
-// steht der Typ als Badge, nicht als Auswahlfeld.
+// Bug / Task / Story. Ohne Varianten: der Typ wird nur im Hinzufuegen-Formular
+// und im Detail-Fenster gewaehlt, und beide tragen dieselbe Klasse
+// .type-select. In der Listenzeile steht der Typ als Badge, nicht als
+// Auswahlfeld.
 
 import type { SelectHTMLAttributes } from "react";
 import { TODO_TYPES, TODO_TYPE_LABELS, type TodoType } from "../types";
@@ -23,8 +23,9 @@ export function TypeSelect({ value, onValueChange, className, ...rest }: TypeSel
       onChange={(e) => onValueChange(e.currentTarget.value as TodoType)}
       {...rest}
     >
-      {/* Anders als PrioritySelect ueber die Liste statt woertlich: die
-          Reihenfolge der Typen steht schon in TODO_TYPES. */}
+      {/* Ueber die Liste statt woertlich ausgeschrieben: Bestand und
+          Reihenfolge der Typen stehen schon in TODO_TYPES, und ein vierter
+          Typ waere hier sonst still vergessen. */}
       {TODO_TYPES.map((type) => (
         <option key={type} value={type}>
           {TODO_TYPE_LABELS[type]}
