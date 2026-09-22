@@ -245,8 +245,6 @@ pub struct AddTodo {
     /// Zeilenumbrueche sind erlaubt und als \n zu schicken; andere
     /// Steuerzeichen werden abgelehnt. Ohne Angabe bleibt sie leer.
     pub description: Option<String>,
-    /// Prioritaet: "low", "medium" oder "high". Vorgabe ist "medium".
-    pub priority: Option<String>,
     /// Typ der Aufgabe: "bug", "task" oder "story". Vorgabe ist "task".
     pub r#type: Option<String>,
     /// Faelligkeitstag, ISO-Format YYYY-MM-DD. Ohne Angabe hat die Aufgabe
@@ -274,8 +272,6 @@ pub struct UpdateTodo {
     pub description: Option<String>,
     /// Neuer Status: "todo", "in_progress" oder "done".
     pub status: Option<String>,
-    /// Neue Prioritaet: "low", "medium" oder "high".
-    pub priority: Option<String>,
     /// Neuer Typ der Aufgabe: "bug", "task" oder "story". Weglassen, null und
     /// "" lassen den bestehenden Typ unveraendert. Es gibt kein "clear_type"
     /// -- eine Aufgabe ohne Typ gibt es nicht.
@@ -375,7 +371,7 @@ impl TodoServer {
     }
 
     #[tool(
-        description = "Legt eine neue Aufgabe an und gibt sie samt ihrer Id zurueck. Ohne weitere Angaben bekommt sie die Prioritaet \"medium\", den Status \"todo\", den Typ \"task\", keine Faelligkeit und keine Kategorie. Eine Beschreibung ist optional und darf mehrere Zeilen haben."
+        description = "Legt eine neue Aufgabe an und gibt sie samt ihrer Id zurueck. Ohne weitere Angaben bekommt sie den Status \"todo\", den Typ \"task\", keine Faelligkeit und keine Kategorie. Eine Beschreibung ist optional und darf mehrere Zeilen haben."
     )]
     async fn add_todo(
         &self,
@@ -397,7 +393,6 @@ impl TodoServer {
             store::add_todo(
                 &self.pool,
                 params.title.trim(),
-                non_empty(&params.priority),
                 non_empty(&params.due_date),
                 non_empty(&params.category),
                 params.description.as_deref(),
@@ -467,7 +462,6 @@ impl TodoServer {
             title: params.title.as_deref().map(str::trim).map(str::to_string),
             description: set_or_clear(description, params.clear_description),
             status: non_empty(&params.status).map(str::to_string),
-            priority: non_empty(&params.priority).map(str::to_string),
             r#type: non_empty(&params.r#type).map(str::to_string),
             due_date: set_or_clear(due_date, params.clear_due_date),
             category: set_or_clear(category, params.clear_category),
@@ -705,7 +699,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Rechnung pruefen".into(),
                 description: None,
-                priority: Some("high".into()),
                 due_date: Some("2026-04-01".into()),
                 category: Some("intern".into()),
                 r#type: None,
@@ -714,7 +707,6 @@ mod tests {
             .expect("no protocol error");
         let json = ok_json(&result);
         assert_eq!(json["title"], "Rechnung pruefen");
-        assert_eq!(json["priority"], "high");
         assert_eq!(json["status"], "todo");
         assert_eq!(json["due_date"], "2026-04-01");
         assert_eq!(json["category_name"], "Intern");
@@ -728,7 +720,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Rechnung pruefen".into(),
                 description: None,
-                priority: None,
                 due_date: None,
                 category: Some("Urlaub".into()),
                 r#type: None,
@@ -750,8 +741,8 @@ mod tests {
     async fn update_todo_changes_only_the_given_fields() {
         let (server, pool) = server().await;
         let id: i64 = sqlx::query_scalar(
-            "INSERT INTO todos (title, created_at, priority, due_date)
-             VALUES ('Alt', '2026-01-02T00:00:00.000Z', 'low', '2026-05-05') RETURNING id",
+            "INSERT INTO todos (title, created_at, description, due_date)
+             VALUES ('Alt', '2026-01-02T00:00:00.000Z', 'bleibt stehen', '2026-05-05') RETURNING id",
         )
         .fetch_one(&pool)
         .await
@@ -767,7 +758,10 @@ mod tests {
             .expect("no protocol error");
         let json = ok_json(&result);
         assert_eq!(json["title"], "Alt", "title must be untouched");
-        assert_eq!(json["priority"], "low", "priority must be untouched");
+        assert_eq!(
+            json["description"], "bleibt stehen",
+            "description must be untouched"
+        );
         assert_eq!(json["due_date"], "2026-05-05");
         assert_eq!(json["status"], "done");
         assert_eq!(json["done"], true);
@@ -1234,7 +1228,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Rechnung pruefen".into(),
                 description: None,
-                priority: None,
                 due_date: None,
                 category: None,
                 r#type: None,
@@ -1313,7 +1306,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Rechnung pruefen".into(),
                 description: None,
-                priority: None,
                 due_date: None,
                 category: Some("Kundenprojekt".into()),
                 r#type: None,
@@ -1378,7 +1370,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "   ".into(),
                 description: None,
-                priority: None,
                 due_date: None,
                 category: None,
                 r#type: None,
@@ -1542,7 +1533,6 @@ mod tests {
         super::AddTodo {
             title: title.to_string(),
             description: None,
-            priority: None,
             due_date: None,
             category: None,
             r#type: None,
@@ -1726,7 +1716,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Angebot".to_string(),
                 description: None,
-                priority: None,
                 due_date: None,
                 category: Some("Kunden\u{0}projekt".to_string()),
                 r#type: None,
@@ -1791,7 +1780,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Angebot".into(),
                 description: Some("Zeile eins\nZeile zwei".into()),
-                priority: None,
                 due_date: None,
                 category: None,
                 r#type: None,
@@ -1811,7 +1799,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Angebot".into(),
                 description: Some(long(super::MAX_DESCRIPTION_CHARS + 1)),
-                priority: None,
                 due_date: None,
                 category: None,
                 r#type: None,
@@ -1838,7 +1825,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Angebot".into(),
                 description: Some("a\rb".into()),
-                priority: None,
                 due_date: None,
                 category: None,
                 r#type: None,
@@ -1916,7 +1902,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Login kaputt".to_string(),
                 description: None,
-                priority: None,
                 due_date: None,
                 category: None,
                 r#type: Some("bug".to_string()),
@@ -1933,7 +1918,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Ohne Typ".to_string(),
                 description: None,
-                priority: None,
                 due_date: None,
                 category: None,
                 r#type: None,
@@ -1950,7 +1934,6 @@ mod tests {
             .add_todo(Parameters(super::AddTodo {
                 title: "Egal".to_string(),
                 description: None,
-                priority: None,
                 due_date: None,
                 category: None,
                 r#type: Some("epic".to_string()),
@@ -1965,7 +1948,7 @@ mod tests {
     #[tokio::test]
     async fn update_todo_changes_the_type() {
         let (server, pool) = server().await;
-        let todo = store::add_todo(&pool, "Wird Story", None, None, None, None, None)
+        let todo = store::add_todo(&pool, "Wird Story", None, None, None, None)
             .await
             .expect("add");
         let result = server
@@ -1982,7 +1965,7 @@ mod tests {
     #[tokio::test]
     async fn update_todo_keeps_the_type_when_it_arrives_as_null() {
         let (server, pool) = server().await;
-        let todo = store::add_todo(&pool, "Bleibt Bug", None, None, None, None, Some("bug"))
+        let todo = store::add_todo(&pool, "Bleibt Bug", None, None, None, Some("bug"))
             .await
             .expect("add");
         let result = server
