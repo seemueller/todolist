@@ -116,33 +116,24 @@ test.describe("TodoList App", () => {
     await expect(page.getByText("Original title")).not.toBeVisible();
   });
 
-  test("can change priority of a todo", async ({ page }) => {
+  test("can change the type of a todo", async ({ page }) => {
     const input = page.getByPlaceholder(/Was steht an/i);
     const addButton = page.getByRole("button", { name: /Aufgabe hinzufügen/i });
 
-    await input.fill("Priority test");
+    await input.fill("Type test");
     await addButton.click();
 
-    // Change priority to high
-    const prioritySelect = page.locator(".priority-select-inline").first();
-    await prioritySelect.selectOption("high");
-
-    // Todo item should have high priority class
+    // Die Zeile startet auf dem Vorgabetyp.
     const todoItem = page.locator(".todo-list li").first();
-    await expect(todoItem).toHaveClass(/priority-high/);
-  });
+    await expect(todoItem).toHaveClass(/type-task/);
 
-  test("can set priority when adding a todo", async ({ page }) => {
-    const input = page.getByPlaceholder(/Was steht an/i);
-    const prioritySelect = page.locator(".add-form .priority-select");
-    const addButton = page.getByRole("button", { name: /Aufgabe hinzufügen/i });
+    // Den Typ gibt es in der Zeile nicht mehr als eigenes Feld, nur im
+    // Detailfenster.
+    await page.getByText("Type test").dblclick();
+    await page.locator("#todo-detail-type").selectOption("story");
+    await page.getByRole("button", { name: "Sichern" }).click();
 
-    await input.fill("High priority task");
-    await prioritySelect.selectOption("high");
-    await addButton.click();
-
-    const todoItem = page.locator(".todo-list li").first();
-    await expect(todoItem).toHaveClass(/priority-high/);
+    await expect(todoItem).toHaveClass(/type-story/);
   });
 
   test("shows remaining count correctly", async ({ page }) => {
@@ -550,8 +541,8 @@ test.describe("Layout and UI", () => {
     // Should have title
     await expect(todoItem.locator(".title")).toBeVisible();
 
-    // Should have priority select
-    await expect(todoItem.locator(".priority-select-inline")).toBeVisible();
+    // Should have type badge
+    await expect(todoItem.locator(".type-badge")).toBeVisible();
 
     // Should have category select
     await expect(todoItem.locator(".todo-select")).toBeVisible();
@@ -888,6 +879,14 @@ test.describe("Aufgabentyp", () => {
     // Das Badge traegt die Farbklasse des Typs.
     await expect(page.locator(".type-badge--bug")).toHaveText("Bug");
     await expect(page.locator(".type-badge--task")).toHaveText("Task");
+
+    // Und die Kante der Zeile traegt seine Farbe. Der Hexwert steht in
+    // App.css als --type-bug (ein Alias auf --accent, #e5401a); faellt die
+    // Regel weg, bleibt die Zeile auf der Vorgabefarbe --type-task stehen.
+    await expect(page.locator(".todo-list li.type-bug")).toHaveCSS(
+      "border-left-color",
+      "rgb(229, 64, 26)",
+    );
 
     const typeGroup = page.getByRole("group", { name: "Typ filtern" });
     await typeGroup.getByRole("button", { name: "Typ Bug", exact: true }).click();
