@@ -59,6 +59,14 @@ ausschließlich über diese Variablen angesprochen.
 | `--prio-medium` | `var(--highlight)` | Mittlere Priorität. |
 | `--prio-low` | `var(--ink-line)` | Niedrige Priorität; bewusst zurückhaltend. |
 
+### Aufgabentyp
+
+| Token | Wert | Wofür |
+|---|---|---|
+| `--type-bug` | `var(--accent)` | Bug — Fläche des Typ-Badges. |
+| `--type-task` | `var(--info)` | Task, die Vorgabe. |
+| `--type-story` | `var(--success)` | Story. |
+
 ### Rahmen, Radien, Schatten
 
 | Token | Wert | Wofür |
@@ -193,6 +201,19 @@ Auswahlfeld mit den drei festen Optionen Niedrig / Mittel / Hoch.
 | `onValueChange` | `(p: Priority) => void` | Neue Priorität. |
 | `variant` | `"form" \| "inline"` | Im Hinzufügen-Formular oder in der Todo-Zeile. |
 
+### `TypeSelect`
+
+Auswahlfeld für den Aufgabentyp, gebaut wie `PrioritySelect`: drei feste
+Optionen Bug / Task / Story, deren Reihenfolge aus `TODO_TYPES` kommt. Anders
+als `PrioritySelect` ohne Varianten — der Typ wird nur im Hinzufüge-Formular
+und im Detailfenster gewählt, beide tragen `.type-select`. In der Listenzeile
+steht er als `TypeBadge`, nicht als Auswahlfeld.
+
+| Prop | Typ | Bedeutung |
+|---|---|---|
+| `value` | `TodoType` | Gewählter Typ. |
+| `onValueChange` | `(t: TodoType) => void` | Neuer Typ. |
+
 ### `DueDateBadge`
 
 Fälligkeits-Abzeichen. Der bereits formatierte Text kommt als `children` herein.
@@ -211,6 +232,17 @@ Kategoriename auf eingefärbtem Grund, inklusive Ersatzfarbe.
 |---|---|---|
 | `variant` | `"list" \| "kanban"` | Größe je nach Umgebung. |
 | `color` | `string \| null` | Farbe der Kategorie; `null` nutzt `CATEGORY_BADGE_FALLBACK`. |
+
+### `TypeBadge`
+
+Der Aufgabentyp als farbige Fläche. Die Farbe kommt aus einer der drei Klassen
+`type-badge--bug` / `--task` / `--story`, nicht aus einem Inline-Style: anders
+als bei der Kategorie stehen die drei Werte fest.
+
+| Prop | Typ | Bedeutung |
+|---|---|---|
+| `variant` | `"list" \| "kanban"` | Größe je nach Umgebung. |
+| `type` | `TodoType` | Bug, Task oder Story; bestimmt Text und Farbklasse. |
 
 ### `Modal`
 

@@ -3,6 +3,8 @@
 // Store-Interface in beiden Backends wachsen und das Lesen asynchron werden,
 // womit die Liste beim Start kurz im falschen Filter stuende.
 
+import { TODO_TYPES, type TodoType } from "./types";
+
 /** Die drei Zustaende der Statusleiste ueber der Liste. */
 export type StatusFilter = "all" | "open" | "done";
 
@@ -21,6 +23,28 @@ export function loadStatusFilter(): StatusFilter {
 
 export function saveStatusFilter(value: StatusFilter): void {
   localStorage.setItem(STATUS_FILTER_KEY, value);
+}
+
+/** Die Zustaende der Typleiste ueber der Liste: "alle" oder genau ein Typ.
+ *  Ueber TodoType statt woertlich, damit der Filter mitwaechst, falls je ein
+ *  vierter Typ dazukommt. */
+export type TypeFilter = "all" | TodoType;
+
+export const TYPE_FILTER_KEY = "todolist.typeFilter";
+
+// "Alle" als Vorgabe: anders als beim Status gibt es keinen Typ, den man
+// ueblicherweise ausblenden will.
+const DEFAULT_TYPE_FILTER: TypeFilter = "all";
+
+export function loadTypeFilter(): TypeFilter {
+  const stored = localStorage.getItem(TYPE_FILTER_KEY);
+  // find statt includes: es liefert den Wert schon als TodoType zurueck und
+  // spart die Typzusicherung.
+  return TODO_TYPES.find((type) => type === stored) ?? DEFAULT_TYPE_FILTER;
+}
+
+export function saveTypeFilter(value: TypeFilter): void {
+  localStorage.setItem(TYPE_FILTER_KEY, value);
 }
 
 /** Groesse eines Modal-Panels in Pixeln. */

@@ -1,6 +1,36 @@
 export type Priority = "low" | "medium" | "high";
 export type TodoStatus = "todo" | "in_progress" | "done";
 
+/**
+ * Was fuer eine Art Arbeit eine Aufgabe ist -- unabhaengig von ihrer Kategorie.
+ * Drei feste Werte, kein Stammdatum: waere der Typ frei definierbar, waere er
+ * eine zweite Kategorie.
+ */
+export type TodoType = "bug" | "task" | "story";
+
+/** Die Typen in der Reihenfolge, in der die Oberflaeche sie anbietet: nach
+ *  Dringlichkeit, nicht mit der Vorgabe zuerst -- ein Fehler steht oben. */
+export const TODO_TYPES: TodoType[] = ["bug", "task", "story"];
+
+/** Beschriftungen der Typen fuer die Oberflaeche. */
+export const TODO_TYPE_LABELS: Record<TodoType, string> = {
+  bug: "Bug",
+  task: "Task",
+  story: "Story",
+};
+
+/**
+ * Liest einen gespeicherten Wert als Typ, mit "task" als Rueckfall.
+ *
+ * Gebaut wie `toTimeKind`: der Rueckfall trifft zwei Faelle zugleich --
+ * Eintraege aus der Zeit vor der Spalte (localStorage-Speicher) und Werte, die
+ * nicht zu den drei bekannten gehoeren. "task" ist die Vorgabe, weil die
+ * grosse Mehrheit der Aufgaben weder Fehler noch Anforderung ist.
+ */
+export function toTodoType(value: string | null | undefined): TodoType {
+  return value === "bug" || value === "story" ? value : "task";
+}
+
 export interface Todo {
   id: number;
   title: string;
@@ -8,6 +38,7 @@ export interface Todo {
   description: string;
   done: boolean;
   status: TodoStatus;
+  type: TodoType;
   priority: Priority;
   created_at: string;
   due_date: string | null;
@@ -34,6 +65,9 @@ export interface TodoRow {
   category_name: string | null;
   category_color: string | null;
   status?: TodoStatus;
+  /** Optional, weil der localStorage-Speicher Eintraege aus der Zeit vor
+   *  dieser Spalte liefert; `toTodoType` setzt dann "task". */
+  type?: string;
   board_order?: number;
 }
 
@@ -45,6 +79,7 @@ export function fromRow(row: TodoRow): Todo {
     description: row.description ?? "",
     done: status === "done",
     status,
+    type: toTodoType(row.type),
     priority: row.priority,
     created_at: row.created_at,
     due_date: row.due_date,

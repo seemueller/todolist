@@ -1,4 +1,4 @@
-import { Category, Priority, TimeKind, Todo, TodoStatus } from "./types";
+import { Category, Priority, TimeKind, Todo, TodoStatus, TodoType } from "./types";
 import { DaySlot } from "./timeSlots";
 import { TimeSettings, TimeSlotRecord } from "./timeTypes";
 
@@ -14,11 +14,18 @@ import { TimeSettings, TimeSlotRecord } from "./timeTypes";
  * `description` kennt hier keine Längen- oder Zeichenbeschränkung — die
  * 4000-Zeichen-Grenze samt Verbot von `\r`, Tabulator und Nullbyte gilt nur an
  * der MCP-Werkzeuggrenze (`src-tauri/src/mcp/tools.rs`), nicht am Store.
+ *
+ * `type` fehlt hier aus demselben Grund wie jedes andere Feld: fehlend heisst
+ * unveraendert. Ein Vorgabewert darf in dieser Struktur nicht auftauchen --
+ * `updateCategory(id, name, color, timeKind = "internal")` hat genau so still
+ * Werte zurueckgestuft (siehe AGENTS.md). Hier gibt es keine
+ * Positionsparameter, also auch keine Vorgabe.
  */
 export interface TodoFieldsPatch {
   title?: string;
   description?: string;
   priority?: Priority;
+  type?: TodoType;
   dueDate?: string | null;
   categoryId?: number | null;
 }
@@ -35,13 +42,16 @@ export interface TodoStore {
    * Legt ein neues Todo im Status "todo" an; category_name/category_color
    * werden aus der Kategorie denormalisiert. `description` ist frei
    * formulierter Text; ohne Angabe bleibt sie leer (`""`, nie null).
+   * Ohne Angabe ist der Typ "task" -- wie bei `addCategory` und der Zeitart
+   * ist die Vorgabe hier unkritisch, und der MCP-Pfad verlaesst sich darauf.
    */
   addTodo(
     title: string,
     priority: Priority,
     dueDate: string | null,
     categoryId?: number | null,
-    description?: string
+    description?: string,
+    type?: TodoType
   ): Promise<Todo>;
   /** Lehnt mit `Todo <id> not found` ab, wenn `id` kein bestehendes Todo referenziert — als Promise-Rejection, nie als synchroner throw. */
   updateTodoDueDate(id: number, dueDate: string | null): Promise<Todo>;

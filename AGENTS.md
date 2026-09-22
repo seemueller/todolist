@@ -58,6 +58,8 @@ Beschriftung umbenennt, zieht den Test mit.
 - `src/TodoDetailModal.test.tsx` — the detail window, isolated from `App`
 - `src/markdown.test.ts` — the markdown parser for the description (blocks and inline)
 - `src/ui/Markdown.test.tsx` — the renderer: elements, not HTML — raw markup stays text
+- `src/ui/TypeBadge.test.tsx` — das Badge des Aufgabentyps: Farbklasse statt Inline-Style
+- `src/ui/TypeSelect.test.tsx` — das Auswahlfeld des Aufgabentyps
 - `src/main.test.tsx` — checks that the migration runs before the first render
 - `src/db.test.ts` / `src/timeDb.test.ts` — which backend each dispatcher picks
 - `src/todoStoreLocal.test.ts` / `src/timeStoreLocal.test.ts` — the localStorage stores
@@ -82,7 +84,8 @@ Playwright-Suite. `db.ts` und `timeDb.ts` sind dünne Dispatcher, die pro Aufruf
 Interfaces aus `src/storeTypes.ts`.
 
 **Oberflächen-Vorlieben gehören nicht in den Store.** Was nur die Ansicht betrifft
-— etwa der Statusfilter der Liste (`todolist.statusFilter`) — liegt in
+— der Statusfilter der Liste (`todolist.statusFilter`) und ihr Typfilter
+(`todolist.typeFilter`) — liegt in
 `localStorage` und wird über `src/listPrefs.ts` gelesen und geschrieben, nicht
 über `app_settings`. Sonst müsste das Store-Interface in beiden Backends wachsen
 und das Lesen asynchron werden, womit die Liste beim Start kurz im falschen
@@ -149,6 +152,12 @@ Fälligkeit (`clear_due_date`) und Kategorie (`clear_category`). Ein Feld zuglei
 zu setzen und zu leeren ist ein Tool-Fehler. Der Grund ist Issue #35: `null` als
 Löschbefehl hat Aufgaben die Kategorie und die Fälligkeit gekostet, weil ein
 Modell sein Parameterobjekt vollständig ausfüllt.
+
+Eine Aufgabe trägt außerdem einen **Typ**: `bug`, `task` oder `story`, Vorgabe
+`task`. `add_todo` nimmt ihn optional, `update_todo` ändert ihn nur, wenn er
+angegeben ist — ein `clear_type` gibt es nicht, weil es keine Aufgabe ohne Typ
+gibt. Ein anderer Wert ist ein Tool-Fehler und die Meldung nennt die drei
+erlaubten.
 
 **Der Token steht in der Datenbank**, in `app_settings` unter dem Schlüssel
 `mcp_token`, und entsteht beim ersten Start (32 Zufallsbytes, base64url). Die

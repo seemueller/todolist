@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   loadStatusFilter,
   loadTodoModalSize,
+  loadTypeFilter,
   saveStatusFilter,
   saveTodoModalSize,
+  saveTypeFilter,
   STATUS_FILTER_KEY,
   TODO_MODAL_SIZE_KEY,
+  TYPE_FILTER_KEY,
 } from "./listPrefs";
 
 describe("listPrefs", () => {
@@ -64,5 +67,29 @@ describe("listPrefs — Fenstergroesse", () => {
   it("hebt eine unbedienbar kleine Groesse auf das Mindestmass", () => {
     saveTodoModalSize({ width: 40, height: 20 });
     expect(loadTodoModalSize()).toEqual({ width: 360, height: 320 });
+  });
+});
+
+describe("typeFilter", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("faellt ohne gespeicherten Wert auf 'all' zurueck", () => {
+    expect(loadTypeFilter()).toBe("all");
+  });
+
+  it("liest einen gespeicherten Wert", () => {
+    localStorage.setItem(TYPE_FILTER_KEY, "bug");
+    expect(loadTypeFilter()).toBe("bug");
+  });
+
+  it("faellt bei unbekanntem Wert auf 'all' zurueck", () => {
+    localStorage.setItem(TYPE_FILTER_KEY, "epic");
+    expect(loadTypeFilter()).toBe("all");
+  });
+
+  it("liest zurueck, was geschrieben wurde", () => {
+    saveTypeFilter("story");
+    expect(localStorage.getItem(TYPE_FILTER_KEY)).toBe("story");
+    expect(loadTypeFilter()).toBe("story");
   });
 });

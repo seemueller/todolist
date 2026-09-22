@@ -50,4 +50,9 @@ describe("sql migrations", () => {
       "ALTER TABLE todos ADD COLUMN board_order REAL NOT NULL DEFAULT 0;"
     );
   });
+
+  it("gives todos a type column defaulting to task", () => {
+    expect(source).toContain("add_type_to_todos");
+    expect(source).toContain("ALTER TABLE todos ADD COLUMN type TEXT NOT NULL DEFAULT 'task';");
+  });
 });

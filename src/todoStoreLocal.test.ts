@@ -514,3 +514,87 @@ describe("localTodoStore", () => {
     );
   });
 });
+
+describe("Aufgabentyp", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("legt ohne Angabe eine Aufgabe vom Typ task an", async () => {
+    const todo = await localTodoStore.addTodo("Ohne Typ", "medium", null);
+    expect(todo.type).toBe("task");
+  });
+
+  it("legt mit Angabe den gewuenschten Typ an", async () => {
+    const todo = await localTodoStore.addTodo("Login kaputt", "high", null, null, "", "bug");
+    expect(todo.type).toBe("bug");
+    const [listed] = await localTodoStore.listTodos();
+    expect(listed.type).toBe("bug");
+  });
+
+  it("aendert den Typ ueber den Patch", async () => {
+    const todo = await localTodoStore.addTodo("Wird Story", "medium", null);
+    const updated = await localTodoStore.updateTodoFields(todo.id, { type: "story" });
+    expect(updated.type).toBe("story");
+    const [listed] = await localTodoStore.listTodos();
+    expect(listed.type).toBe("story");
+  });
+
+  it("laesst den Typ stehen, wenn der Patch ihn nicht nennt", async () => {
+    const todo = await localTodoStore.addTodo("Bleibt Bug", "medium", null, null, "", "bug");
+    const updated = await localTodoStore.updateTodoFields(todo.id, { title: "Neuer Titel" });
+    expect(updated.type).toBe("bug");
+  });
+
+  it("macht einen Altbestand ohne Typ zur Aufgabe", async () => {
+    // Eintrag aus der Zeit vor der Spalte, direkt in den Speicher geschrieben.
+    localStorage.setItem(
+      "todolist_todos",
+      JSON.stringify([
+        {
+          id: 7,
+          title: "Alt",
+          description: "",
+          done: false,
+          status: "todo",
+          priority: "medium",
+          created_at: "2026-01-01T00:00:00.000Z",
+          due_date: null,
+          category_id: null,
+          category_name: null,
+          category_color: null,
+          board_order: 0,
+        },
+      ])
+    );
+    const [listed] = await localTodoStore.listTodos();
+    expect(listed.type).toBe("task");
+  });
+
+  it("macht einen unbekannten Typ zur Aufgabe", async () => {
+    // Von Hand geschriebener localStorage -- der Wert gehoert zu keinem der
+    // drei Typen. Ohne Rueckfall liefe "epic" bis in die Oberflaeche durch.
+    localStorage.setItem(
+      "todolist_todos",
+      JSON.stringify([
+        {
+          id: 8,
+          title: "Krumm",
+          description: "",
+          done: false,
+          status: "todo",
+          type: "epic",
+          priority: "medium",
+          created_at: "2026-01-01T00:00:00.000Z",
+          due_date: null,
+          category_id: null,
+          category_name: null,
+          category_color: null,
+          board_order: 0,
+        },
+      ])
+    );
+    const [listed] = await localTodoStore.listTodos();
+    expect(listed.type).toBe("task");
+  });
+});

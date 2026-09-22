@@ -247,6 +247,8 @@ pub struct AddTodo {
     pub description: Option<String>,
     /// Prioritaet: "low", "medium" oder "high". Vorgabe ist "medium".
     pub priority: Option<String>,
+    /// Typ der Aufgabe: "bug", "task" oder "story". Vorgabe ist "task".
+    pub r#type: Option<String>,
     /// Faelligkeitstag, ISO-Format YYYY-MM-DD. Ohne Angabe hat die Aufgabe
     /// keine Faelligkeit.
     pub due_date: Option<String>,
@@ -274,6 +276,10 @@ pub struct UpdateTodo {
     pub status: Option<String>,
     /// Neue Prioritaet: "low", "medium" oder "high".
     pub priority: Option<String>,
+    /// Neuer Typ der Aufgabe: "bug", "task" oder "story". Weglassen, null und
+    /// "" lassen den bestehenden Typ unveraendert. Es gibt kein "clear_type"
+    /// -- eine Aufgabe ohne Typ gibt es nicht.
+    pub r#type: Option<String>,
     /// Neuer Faelligkeitstag, ISO-Format YYYY-MM-DD. Weglassen, null und ""
     /// lassen die bestehende Faelligkeit unveraendert; entfernt wird sie
     /// ausschliesslich ueber "clear_due_date".
@@ -369,7 +375,7 @@ impl TodoServer {
     }
 
     #[tool(
-        description = "Legt eine neue Aufgabe an und gibt sie samt ihrer Id zurueck. Ohne weitere Angaben bekommt sie die Prioritaet \"medium\", den Status \"todo\", keine Faelligkeit und keine Kategorie. Eine Beschreibung ist optional und darf mehrere Zeilen haben."
+        description = "Legt eine neue Aufgabe an und gibt sie samt ihrer Id zurueck. Ohne weitere Angaben bekommt sie die Prioritaet \"medium\", den Status \"todo\", den Typ \"task\", keine Faelligkeit und keine Kategorie. Eine Beschreibung ist optional und darf mehrere Zeilen haben."
     )]
     async fn add_todo(
         &self,
@@ -395,13 +401,14 @@ impl TodoServer {
                 non_empty(&params.due_date),
                 non_empty(&params.category),
                 params.description.as_deref(),
+                non_empty(&params.r#type),
             )
             .await,
         )
     }
 
     #[tool(
-        description = "Aendert eine bestehende Aufgabe und gibt sie danach zurueck. Es aendern sich ausschliesslich die angegebenen Felder; alles Weggelassene bleibt, wie es war -- auch ein Feld, das als null oder als leerer Text ankommt. Um eine Aufgabe abzuhaken, ist der Status auf \"done\" zu setzen. Geleert wird ausschliesslich ueber \"clear_description\", \"clear_due_date\" und \"clear_category\"."
+        description = "Aendert eine bestehende Aufgabe und gibt sie danach zurueck. Es aendern sich ausschliesslich die angegebenen Felder; alles Weggelassene bleibt, wie es war -- auch ein Feld, das als null oder als leerer Text ankommt. Um eine Aufgabe abzuhaken, ist der Status auf \"done\" zu setzen. Geleert wird ausschliesslich ueber \"clear_description\", \"clear_due_date\" und \"clear_category\". Der Typ (\"bug\", \"task\", \"story\") laesst sich setzen, aber nicht leeren."
     )]
     async fn update_todo(
         &self,
@@ -461,6 +468,7 @@ impl TodoServer {
             description: set_or_clear(description, params.clear_description),
             status: non_empty(&params.status).map(str::to_string),
             priority: non_empty(&params.priority).map(str::to_string),
+            r#type: non_empty(&params.r#type).map(str::to_string),
             due_date: set_or_clear(due_date, params.clear_due_date),
             category: set_or_clear(category, params.clear_category),
         };
@@ -538,6 +546,7 @@ impl TodoServer {
 #[cfg(test)]
 mod tests {
     use super::super::TodoServer;
+    use super::super::store;
     use super::super::store::SCHEMA;
     use rmcp::handler::server::wrapper::Parameters;
     use rmcp::model::CallToolResult;
@@ -699,6 +708,7 @@ mod tests {
                 priority: Some("high".into()),
                 due_date: Some("2026-04-01".into()),
                 category: Some("intern".into()),
+                r#type: None,
             }))
             .await
             .expect("no protocol error");
@@ -721,6 +731,7 @@ mod tests {
                 priority: None,
                 due_date: None,
                 category: Some("Urlaub".into()),
+                r#type: None,
             }))
             .await
             .expect("an unknown category is not a protocol error");
@@ -1226,6 +1237,7 @@ mod tests {
                 priority: None,
                 due_date: None,
                 category: None,
+                r#type: None,
             }))
             .await
             .expect("no protocol error");
@@ -1304,6 +1316,7 @@ mod tests {
                 priority: None,
                 due_date: None,
                 category: Some("Kundenprojekt".into()),
+                r#type: None,
             }))
             .await
             .expect("an unknown category is not a protocol error");
@@ -1368,6 +1381,7 @@ mod tests {
                 priority: None,
                 due_date: None,
                 category: None,
+                r#type: None,
             }))
             .await
             .expect("no protocol error");
@@ -1531,6 +1545,7 @@ mod tests {
             priority: None,
             due_date: None,
             category: None,
+            r#type: None,
         }
     }
 
@@ -1714,6 +1729,7 @@ mod tests {
                 priority: None,
                 due_date: None,
                 category: Some("Kunden\u{0}projekt".to_string()),
+                r#type: None,
             }))
             .await
             .expect("no protocol error");
@@ -1778,6 +1794,7 @@ mod tests {
                 priority: None,
                 due_date: None,
                 category: None,
+                r#type: None,
             }))
             .await
             .expect("no protocol error");
@@ -1797,6 +1814,7 @@ mod tests {
                 priority: None,
                 due_date: None,
                 category: None,
+                r#type: None,
             }))
             .await
             .expect("no protocol error");
@@ -1823,6 +1841,7 @@ mod tests {
                 priority: None,
                 due_date: None,
                 category: None,
+                r#type: None,
             }))
             .await
             .expect("no protocol error");
@@ -1888,5 +1907,93 @@ mod tests {
             .await
             .expect("description");
         assert_eq!(description, "alt", "nothing should have been written");
+    }
+
+    #[tokio::test]
+    async fn add_todo_creates_a_todo_with_a_type() {
+        let (server, _pool) = server().await;
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                title: "Login kaputt".to_string(),
+                description: None,
+                priority: None,
+                due_date: None,
+                category: None,
+                r#type: Some("bug".to_string()),
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["type"], "bug");
+    }
+
+    #[tokio::test]
+    async fn add_todo_defaults_the_type_to_task() {
+        let (server, _pool) = server().await;
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                title: "Ohne Typ".to_string(),
+                description: None,
+                priority: None,
+                due_date: None,
+                category: None,
+                r#type: None,
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["type"], "task");
+    }
+
+    #[tokio::test]
+    async fn add_todo_reports_an_unknown_type_as_a_tool_error() {
+        let (server, _pool) = server().await;
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                title: "Egal".to_string(),
+                description: None,
+                priority: None,
+                due_date: None,
+                category: None,
+                r#type: Some("epic".to_string()),
+            }))
+            .await
+            .expect("no protocol error");
+        // Ein Tool-Fehler, kein McpError: nur so liest das Modell, was erlaubt ist.
+        let message = tool_error(&result, "epic");
+        assert!(message.contains("bug, task, story"), "{message}");
+    }
+
+    #[tokio::test]
+    async fn update_todo_changes_the_type() {
+        let (server, pool) = server().await;
+        let todo = store::add_todo(&pool, "Wird Story", None, None, None, None, None)
+            .await
+            .expect("add");
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id: todo.id,
+                r#type: Some("story".to_string()),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["type"], "story");
+    }
+
+    #[tokio::test]
+    async fn update_todo_keeps_the_type_when_it_arrives_as_null() {
+        let (server, pool) = server().await;
+        let todo = store::add_todo(&pool, "Bleibt Bug", None, None, None, None, Some("bug"))
+            .await
+            .expect("add");
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id: todo.id,
+                title: Some("Neuer Titel".to_string()),
+                r#type: None,
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["type"], "bug");
     }
 }

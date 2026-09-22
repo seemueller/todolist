@@ -16,6 +16,7 @@ function makeTodo(overrides: Partial<Todo> = {}): Todo {
     done: false,
     status: "todo",
     priority: "medium",
+    type: "task",
     created_at: "2026-09-13T10:00:00.000Z",
     due_date: null,
     category_id: null,
@@ -350,6 +351,31 @@ describe("TodoDetailModal", () => {
 
     await act(async () => {
       resolveSave();
+    });
+  });
+  describe("Aufgabentyp", () => {
+    it("zeigt den Typ der Aufgabe", () => {
+      renderModal({ type: "bug" });
+
+      expect(screen.getByLabelText("Typ")).toHaveValue("bug");
+    });
+
+    it("schickt den geänderten Typ im Patch", async () => {
+      const { onSave } = renderModal({ type: "task" });
+
+      fireEvent.change(screen.getByLabelText("Typ"), { target: { value: "story" } });
+      fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+      await waitFor(() => expect(onSave).toHaveBeenCalledWith(7, { type: "story" }));
+    });
+
+    it("lässt den Typ aus dem Patch, wenn er sich nicht geändert hat", async () => {
+      const { onSave } = renderModal({ type: "bug" });
+
+      fireEvent.change(screen.getByLabelText(/Titel/i), { target: { value: "Neu" } });
+      fireEvent.click(screen.getByRole("button", { name: /Sichern/i }));
+
+      await waitFor(() => expect(onSave).toHaveBeenCalledWith(7, { title: "Neu" }));
     });
   });
 });

@@ -2,6 +2,13 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.16.0] - 2026-09-22
+
+### Hinzugefügt
+- Jede Aufgabe hat neben ihrer Kategorie einen **Typ**: Bug, Task oder Story. Er steht als farbiges Kürzel in der Zeile und auf der Karte — Bug rot, Task blau, Story grün — und ist beim Anlegen und im Aufgaben-Fenster wählbar. Bestehende Aufgaben werden Tasks.
+- Über der Liste filtert eine zweite Leiste nach dem Typ. Die Wahl merkt sich die App bis zum nächsten Start, wie den Statusfilter daneben.
+- `list_todos` liefert den Typ über MCP mit, `add_todo` und `update_todo` nehmen ihn an. Ohne Angabe gilt „task"; ein anderer Wert als `bug`, `task` oder `story` ist ein Fehler, dessen Meldung die erlaubten nennt. Leeren lässt sich der Typ nicht — eine Aufgabe ohne Typ gibt es nicht.
+
 ## [0.15.0] - 2026-09-21
 
 ### Geändert

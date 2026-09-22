@@ -13,7 +13,7 @@
 
 import { getDb, isTauri } from "./sqlClient";
 import { clampTarget } from "./timeSlots";
-import { categoryNameKey } from "./types";
+import { categoryNameKey, toTodoType } from "./types";
 
 export const MIGRATED_FLAG = "todolist_migrated_to_sqlite";
 
@@ -143,6 +143,11 @@ export async function migrateLocalStorage(): Promise<void> {
     const status =
       typeof todo.status === "string" ? todo.status : todo.done ? "done" : "todo";
     const priority = typeof todo.priority === "string" ? todo.priority : "medium";
+    // Ohne diese Zeile faenden Browser-Aufgaben beim ersten Start in Tauri
+    // allesamt als "task" wieder zusammen. Ueber `toTodoType` statt einer
+    // Typpruefung von Hand: der Wert kommt aus localStorage, und ein
+    // unbekannter Text soll nicht in eine Spalte mit drei erlaubten Werten.
+    const type = toTodoType(typeof todo.type === "string" ? todo.type : null);
     const createdAt = typeof todo.created_at === "string" ? todo.created_at : new Date().toISOString();
     const dueDate = typeof todo.due_date === "string" ? todo.due_date : null;
     const categoryId = todo.category_id == null ? null : resolveCategory(todo.category_id);
@@ -153,14 +158,15 @@ export async function migrateLocalStorage(): Promise<void> {
     const boardOrder = typeof todo.board_order === "number" ? todo.board_order : 0;
 
     await db.execute(
-      `INSERT OR IGNORE INTO todos (id, title, description, done, status, priority, created_at, due_date, category_id, board_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT OR IGNORE INTO todos (id, title, description, done, status, type, priority, created_at, due_date, category_id, board_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         todo.id,
         todo.title,
         description,
         status === "done" ? 1 : 0,
         status,
+        type,
         priority,
         createdAt,
         dueDate,

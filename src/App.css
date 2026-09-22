@@ -26,6 +26,13 @@
   --prio-medium: var(--highlight);
   --prio-low: var(--ink-line);
 
+  /* Aufgabentyp. Aliase auf die Akzente statt eigener Hexwerte: die Palette
+     soll nicht wachsen, nur weil ein Feld dazukommt. contrast.test.ts belegt,
+     dass die Tinte auf allen dreien lesbar bleibt. */
+  --type-bug: var(--accent);
+  --type-task: var(--info);
+  --type-story: var(--success);
+
   /* Rahmen und Schatten */
   --border: 2.5px solid var(--ink);
   --border-thin: 2px solid var(--ink);
@@ -267,7 +274,8 @@ a:hover {
 
 .add-form .date-input,
 .add-form .category-select,
-.add-form .priority-select {
+.add-form .priority-select,
+.add-form .type-select {
   border: none;
   border-left: var(--border);
   border-radius: 0;
@@ -286,7 +294,8 @@ a:hover {
 
 .add-form .date-input:hover,
 .add-form .category-select:hover,
-.add-form .priority-select:hover {
+.add-form .priority-select:hover,
+.add-form .type-select:hover {
   background: var(--highlight);
 }
 
@@ -348,15 +357,27 @@ a:hover {
   color: var(--canvas);
 }
 
-.status-filter {
+/* Statusleiste und Typleiste sind dieselbe Segmentleiste, darum eine Regel
+   fuer beide -- wie .time-kind-select einen eigenen Namen traegt und sich den
+   Stil trotzdem teilt. */
+.status-filter,
+.type-filter {
   display: flex;
-  margin-left: auto;
   border: var(--border);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
 
-.status-filter button {
+/* Nur die erste Leiste schiebt sich nach rechts. Zwei auto-Raender in
+   derselben Flex-Zeile teilen den freien Platz unter sich auf: die
+   Statusleiste schwaemme dann bei mittlerer Fensterbreite zwischen zwei
+   Loechern statt am rechten Rand zu stehen. */
+.status-filter {
+  margin-left: auto;
+}
+
+.status-filter button,
+.type-filter button {
   padding: 7px 13px;
   border: none;
   border-left: var(--border);
@@ -371,15 +392,18 @@ a:hover {
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.status-filter button:first-child {
+.status-filter button:first-child,
+.type-filter button:first-child {
   border-left: none;
 }
 
-.status-filter button:hover {
+.status-filter button:hover,
+.type-filter button:hover {
   background: var(--highlight);
 }
 
-.status-filter button.active {
+.status-filter button.active,
+.type-filter button.active {
   background: var(--ink);
   color: var(--canvas);
 }
@@ -738,6 +762,41 @@ a:hover {
 .done .category-badge {
   border-color: var(--ink-ghost);
   background: transparent !important;
+  color: var(--ink-faint);
+}
+
+/* Typ-Badge. Anders als das Kategorie-Badge kommt die Flaeche nicht aus den
+   Daten, sondern aus einer der drei Klassen -- kein Inline-Style. Form und
+   Masse sind die des Kategorie-Badges: die beiden stehen nebeneinander. */
+.type-badge {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.type-badge--bug {
+  background: var(--type-bug);
+}
+
+.type-badge--task {
+  background: var(--type-task);
+}
+
+.type-badge--story {
+  background: var(--type-story);
+}
+
+/* Kein !important noetig wie beim Kategorie-Badge: dessen Flaeche steht als
+   Inline-Style, hier ist sie eine Klasse und verliert gegen diesen Selektor. */
+.done .type-badge {
+  border-color: var(--ink-ghost);
+  background: transparent;
   color: var(--ink-faint);
 }
 
@@ -1709,6 +1768,7 @@ a:hover {
 }
 
 .kanban-card.done .kanban-category-badge,
+.kanban-card.done .kanban-type-badge,
 .kanban-card.done .kanban-due-badge {
   border-color: var(--ink-ghost);
   background: transparent !important;
@@ -1758,6 +1818,19 @@ a:hover {
 }
 
 .kanban-category-badge {
+  padding: 3px 8px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Typ-Badge auf der Karte -- dieselben Masse wie das Kategorie-Badge daneben.
+   Die Flaeche kommt aus .type-badge--bug/--task/--story. */
+.kanban-type-badge {
   padding: 3px 8px;
   border: var(--border-thin);
   border-radius: var(--radius-sm);
@@ -2352,7 +2425,8 @@ a:hover {
 
   .add-form .date-input,
   .add-form .category-select,
-  .add-form .priority-select {
+  .add-form .priority-select,
+  .add-form .type-select {
     flex: 1 1 0;
     border-top: var(--border);
     padding: 10px 12px;

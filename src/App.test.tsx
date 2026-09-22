@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act, within } from "@testing-librar
 import App from "./App";
 import * as db from "./db";
 import { debugLogs, clearDebugLogs, installDebugInterceptor } from "./debug";
-import type { Category } from "./types";
+import type { Category, TodoType } from "./types";
 
 const invokeMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -75,7 +75,7 @@ vi.mock("./CustomTitleBar", () => ({
   CustomTitleBar: () => null,
 }));
 
-const todoBase = { description: "", priority: "medium" as const, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null, status: "todo" as const, board_order: 0 };
+const todoBase = { description: "", priority: "medium" as const, type: "task" as TodoType, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null, status: "todo" as const, board_order: 0 };
 
 const makeTodo = (overrides = {}) => ({
   id: 1,
@@ -165,7 +165,7 @@ describe("App", () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(db.addTodo).toHaveBeenCalledWith("New task", "medium", null, null);
+      expect(db.addTodo).toHaveBeenCalledWith("New task", "medium", null, null, undefined, "task");
     });
   });
 
@@ -259,12 +259,12 @@ describe("App", () => {
   });
 
   it("toggles to kanban view", async () => {
-    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ title: "Task" })]);
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ title: "Testaufgabe" })]);
 
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText("Task")).toBeInTheDocument();
+      expect(screen.getByText("Testaufgabe")).toBeInTheDocument();
     });
 
     const toggleBtn = screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i });
@@ -282,15 +282,15 @@ describe("App", () => {
     // ersten Render; hier rendert der Test App direkt, also uebernimmt er das.
     installDebugInterceptor();
     clearDebugLogs();
-    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Testaufgabe" })]);
     vi.mocked(db.updateTodoStatusAndOrder).mockResolvedValue(
-      makeTodo({ id: 7, title: "Task", status: "in_progress" }),
+      makeTodo({ id: 7, title: "Testaufgabe", status: "in_progress" }),
     );
 
     const { container } = render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText("Task")).toBeInTheDocument();
+      expect(screen.getByText("Testaufgabe")).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
@@ -441,10 +441,10 @@ describe("App", () => {
   });
 
   it("opens the detail modal from the pencil button", async () => {
-    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Testaufgabe" })]);
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Testaufgabe")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
 
@@ -452,24 +452,24 @@ describe("App", () => {
   });
 
   it("opens the detail modal on a double click on the title", async () => {
-    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Testaufgabe" })]);
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Testaufgabe")).toBeInTheDocument());
 
-    fireEvent.doubleClick(screen.getByText("Task"));
+    fireEvent.doubleClick(screen.getByText("Testaufgabe"));
 
     expect(await screen.findByLabelText("Beschreibung")).toBeInTheDocument();
   });
 
   it("writes the changed fields through updateTodoFields", async () => {
-    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Testaufgabe" })]);
     vi.mocked(db.updateTodoFields).mockResolvedValue(
-      makeTodo({ id: 7, title: "Task", description: "Neuer Text" }),
+      makeTodo({ id: 7, title: "Testaufgabe", description: "Neuer Text" }),
     );
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Testaufgabe")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
     fireEvent.change(await screen.findByLabelText("Beschreibung"), {
@@ -488,10 +488,10 @@ describe("App", () => {
   });
 
   it("closes the detail modal and says so when the todo is deleted elsewhere", async () => {
-    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Testaufgabe" })]);
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Testaufgabe")).toBeInTheDocument());
     await waitFor(() => expect(listenMock).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
@@ -508,13 +508,13 @@ describe("App", () => {
   });
 
   it("renames a todo through the detail modal", async () => {
-    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Testaufgabe" })]);
     vi.mocked(db.updateTodoFields).mockResolvedValue(makeTodo({ id: 7, title: "Umbenannt" }));
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Testaufgabe")).toBeInTheDocument());
 
-    fireEvent.doubleClick(screen.getByText("Task"));
+    fireEvent.doubleClick(screen.getByText("Testaufgabe"));
     fireEvent.change(await screen.findByLabelText(/Titel/i), {
       target: { value: "Umbenannt" },
     });
@@ -539,13 +539,13 @@ describe("App", () => {
   });
 
   it("opens the detail modal on a double click on the kanban card", async () => {
-    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Task" })]);
+    vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 7, title: "Testaufgabe" })]);
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Testaufgabe")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
 
-    const card = await waitFor(() => screen.getByText("Task").closest(".kanban-card"));
+    const card = await waitFor(() => screen.getByText("Testaufgabe").closest(".kanban-card"));
     fireEvent.doubleClick(card!);
 
     expect(await screen.findByLabelText("Beschreibung")).toBeInTheDocument();
@@ -553,14 +553,14 @@ describe("App", () => {
 
   it("clears the description through the detail modal", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      makeTodo({ id: 7, title: "Task", description: "Belege holen" }),
+      makeTodo({ id: 7, title: "Testaufgabe", description: "Belege holen" }),
     ]);
     vi.mocked(db.updateTodoFields).mockResolvedValue(
-      makeTodo({ id: 7, title: "Task", description: "" }),
+      makeTodo({ id: 7, title: "Testaufgabe", description: "" }),
     );
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Testaufgabe")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe bearbeiten" }));
     // Mit gesetzter Beschreibung oeffnet das Fenster im Lesemodus; das Textfeld
@@ -578,11 +578,11 @@ describe("App", () => {
 
   it("previews the description on the kanban card", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      makeTodo({ id: 7, title: "Task", description: "Zeile eins\nZeile zwei" }),
+      makeTodo({ id: 7, title: "Testaufgabe", description: "Zeile eins\nZeile zwei" }),
     ]);
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Task")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Testaufgabe")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
 
     expect(await screen.findByText("Zeile eins Zeile zwei")).toBeInTheDocument();
@@ -1435,5 +1435,121 @@ describe("der Papierkorb-Knopf", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Rückgängig" })).not.toBeInTheDocument()
     );
+  });
+  describe("Aufgabentyp", () => {
+    it("legt eine Aufgabe mit dem gewählten Typ an", async () => {
+      vi.mocked(db.listTodos).mockResolvedValue([]);
+      vi.mocked(db.addTodo).mockResolvedValue(makeTodo({ title: "Login kaputt", type: "bug" }));
+
+      render(<App />);
+
+      fireEvent.change(screen.getByPlaceholderText(/Was steht an/i), {
+        target: { value: "Login kaputt" },
+      });
+      fireEvent.change(screen.getByLabelText("Typ"), { target: { value: "bug" } });
+      fireEvent.click(screen.getByRole("button", { name: /Aufgabe hinzufügen/i }));
+
+      await waitFor(() => {
+        expect(db.addTodo).toHaveBeenCalledWith(
+          "Login kaputt",
+          "medium",
+          null,
+          null,
+          undefined,
+          "bug",
+        );
+      });
+    });
+
+    it("fällt nach dem Anlegen auf Task zurück", async () => {
+      vi.mocked(db.listTodos).mockResolvedValue([]);
+      vi.mocked(db.addTodo).mockResolvedValue(makeTodo({ title: "Epos", type: "story" }));
+
+      render(<App />);
+
+      const select = screen.getByLabelText("Typ") as HTMLSelectElement;
+      fireEvent.change(screen.getByPlaceholderText(/Was steht an/i), {
+        target: { value: "Epos" },
+      });
+      fireEvent.change(select, { target: { value: "story" } });
+      expect(select.value).toBe("story");
+
+      fireEvent.click(screen.getByRole("button", { name: /Aufgabe hinzufügen/i }));
+
+      await waitFor(() => expect(select.value).toBe("task"));
+    });
+
+    it("zeigt den Typ als Badge in der Zeile", async () => {
+      vi.mocked(db.listTodos).mockResolvedValue([
+        makeTodo({ id: 1, title: "Login kaputt", type: "bug" }),
+      ]);
+
+      render(<App />);
+
+      // Innerhalb der Zeile suchen: "Bug" steht sonst auch in den Optionen des
+      // Auswahlfelds im Formular und in der Typleiste.
+      const row = await screen.findByRole("listitem");
+      const badge = within(row).getByText("Bug");
+      expect(badge).toHaveClass("type-badge");
+      expect(badge).toHaveClass("type-badge--bug");
+    });
+
+    it("filtert die Liste auf einen Typ", async () => {
+      vi.mocked(db.listTodos).mockResolvedValue([
+        makeTodo({ id: 1, title: "Login kaputt", type: "bug" }),
+        makeTodo({ id: 2, title: "Epos", type: "story" }),
+      ]);
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Login kaputt")).toBeInTheDocument());
+      expect(screen.getByText("Epos")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Typ Bug" }));
+
+      expect(screen.getByText("Login kaputt")).toBeInTheDocument();
+      expect(screen.queryByText("Epos")).not.toBeInTheDocument();
+    });
+
+    it("nimmt den gemerkten Typfilter beim naechsten Start wieder auf", async () => {
+      localStorage.setItem("todolist.typeFilter", "bug");
+      vi.mocked(db.listTodos).mockResolvedValue([
+        makeTodo({ id: 1, title: "Login kaputt", type: "bug" }),
+        makeTodo({ id: 2, title: "Epos", type: "story" }),
+      ]);
+
+      render(<App />);
+
+      expect(await screen.findByText("Login kaputt")).toBeInTheDocument();
+      expect(screen.queryByText("Epos")).not.toBeInTheDocument();
+    });
+
+    it("merkt sich den Typfilter", async () => {
+      vi.mocked(db.listTodos).mockResolvedValue([makeTodo({ id: 2, title: "Epos", type: "story" })]);
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Epos")).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole("button", { name: "Typ Story" }));
+
+      expect(localStorage.getItem("todolist.typeFilter")).toBe("story");
+    });
+
+    it("setzt den Typfilter mit zurueck", async () => {
+      vi.mocked(db.listTodos).mockResolvedValue([
+        makeTodo({ id: 1, title: "Login kaputt", type: "bug" }),
+        makeTodo({ id: 2, title: "Epos", type: "story" }),
+      ]);
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByText("Login kaputt")).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole("button", { name: "Typ Bug" }));
+      expect(screen.queryByText("Epos")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Zurücksetzen" }));
+
+      expect(screen.getByText("Epos")).toBeInTheDocument();
+      expect(localStorage.getItem("todolist.typeFilter")).toBe("all");
+    });
   });
 });

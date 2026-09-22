@@ -29,10 +29,17 @@ import {
   updateTodoStatusAndOrder,
 } from "./db";
 import { DATA_CHANGED_EVENT } from "./events";
-import { loadStatusFilter, saveStatusFilter, type StatusFilter } from "./listPrefs";
+import {
+  loadStatusFilter,
+  loadTypeFilter,
+  saveStatusFilter,
+  saveTypeFilter,
+  type StatusFilter,
+  type TypeFilter,
+} from "./listPrefs";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, Priority, computeBoardOrder, needsRebalance, rebalanceBoardOrders, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus } from "./types";
+import { CATEGORY_COLORS, Category, Priority, TODO_TYPES, TODO_TYPE_LABELS, computeBoardOrder, needsRebalance, rebalanceBoardOrders, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus, type TodoType } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
@@ -74,6 +81,8 @@ import {
   TagIcon,
   TimeKindSelect,
   TrashIcon,
+  TypeBadge,
+  TypeSelect,
   UpdateIcon,
 } from "./ui";
 import "./App.css";
@@ -145,6 +154,7 @@ function App({ migrationError = null }: AppProps) {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState<Priority>("medium");
+  const [newType, setNewType] = useState<TodoType>("task");
   const [newDueDate, setNewDueDate] = useState("");
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -173,6 +183,7 @@ function App({ migrationError = null }: AppProps) {
   );
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(loadStatusFilter);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(loadTypeFilter);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Category state
@@ -215,6 +226,12 @@ function App({ migrationError = null }: AppProps) {
   const changeStatusFilter = useCallback((value: StatusFilter) => {
     setStatusFilter(value);
     saveStatusFilter(value);
+  }, []);
+
+  // Dasselbe fuer die Typleiste.
+  const changeTypeFilter = useCallback((value: TypeFilter) => {
+    setTypeFilter(value);
+    saveTypeFilter(value);
   }, []);
 
   /**
@@ -358,10 +375,11 @@ function App({ migrationError = null }: AppProps) {
     if (!title) return;
     try {
       const dueDate = newDueDate || null;
-      const todo = await addTodo(title, newPriority, dueDate, newCategoryId);
+      const todo = await addTodo(title, newPriority, dueDate, newCategoryId, undefined, newType);
       setTodos((prev) => [todo, ...prev]);
       setNewTitle("");
       setNewPriority("medium");
+      setNewType("task");
       setNewDueDate("");
       setNewCategoryId(null);
       setError(null);
@@ -756,6 +774,7 @@ function App({ migrationError = null }: AppProps) {
     if (dueDateFilter === "overdue" && (!isOverdue(todo.due_date) || todo.done)) return false;
     if (dueDateFilter === "upcoming" && !isDueUpcoming(todo.due_date)) return false;
     if (dueDateFilter === "none" && todo.due_date) return false;
+    if (typeFilter !== "all" && todo.type !== typeFilter) return false;
     if (statusFilter === "open" && todo.done) return false;
     if (statusFilter === "done" && !todo.done) return false;
     if (categoryFilter !== null && todo.category_id !== categoryFilter) return false;
@@ -770,7 +789,7 @@ function App({ migrationError = null }: AppProps) {
 
   // "Offen" ist die Voreinstellung und damit kein gesetzter Filter, ueber den
   // das Band informieren muesste.
-  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "open" || searchQuery || categoryFilter !== null;
+  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "open" || typeFilter !== "all" || searchQuery || categoryFilter !== null;
 
   // Beide Ansichten teilen sich diese eine Fehlermeldung -- die Liste zeigt
   // sie an ihrer angestammten Stelle, das Brett hat sonst keine.
@@ -822,6 +841,7 @@ function App({ migrationError = null }: AppProps) {
             onValueChange={setNewCategoryId}
             placeholderLabel="Keine Kategorie"
           />
+          <TypeSelect value={newType} onValueChange={setNewType} aria-label="Typ" />
           <PrioritySelect value={newPriority} onValueChange={setNewPriority} aria-label="Priorität" />
           <button type="submit" aria-label="Aufgabe hinzufügen">
             <PlusIcon />
@@ -870,6 +890,30 @@ function App({ migrationError = null }: AppProps) {
                 Erledigt
               </FilterChip>
             </div>
+            {/* Eigene Leiste neben dem Statusfilter. Die Beschriftungen tragen
+                "Typ" im aria-label, weil "Alle" sonst dreimal auf der Seite
+                steht -- Faelligkeit, Status und hier. */}
+            <div className="type-filter" role="group" aria-label="Typ filtern">
+              <FilterChip
+                variant="segment"
+                active={typeFilter === "all"}
+                onClick={() => changeTypeFilter("all")}
+                aria-label="Typ Alle"
+              >
+                Alle
+              </FilterChip>
+              {TODO_TYPES.map((type) => (
+                <FilterChip
+                  key={type}
+                  variant="segment"
+                  active={typeFilter === type}
+                  onClick={() => changeTypeFilter(type)}
+                  aria-label={`Typ ${TODO_TYPE_LABELS[type]}`}
+                >
+                  {TODO_TYPE_LABELS[type]}
+                </FilterChip>
+              ))}
+            </div>
           </div>
           <div className="filter-row">
             <input
@@ -907,6 +951,7 @@ function App({ migrationError = null }: AppProps) {
               {statusFilter !== "open"
                 ? ` • ${statusFilter === "all" ? "Alle Status" : "Erledigt"}`
                 : ""}
+              {typeFilter !== "all" ? ` • ${TODO_TYPE_LABELS[typeFilter]}` : ""}
               {categoryFilter !== null
                 ? ` • ${categories.find((c) => c.id === categoryFilter)?.name || "Kategorie"}`
                 : ""}
@@ -918,6 +963,7 @@ function App({ migrationError = null }: AppProps) {
               onClick={() => {
                 setDueDateFilter("all");
                 changeStatusFilter("open");
+                changeTypeFilter("all");
                 setSearchQuery("");
                 setCategoryFilter(null);
               }}
@@ -998,6 +1044,8 @@ function App({ migrationError = null }: AppProps) {
                   onValueChange={(priority) => handlePriorityChange(todo.id, priority)}
                   aria-label="Priorität ändern"
                 />
+
+                <TypeBadge type={todo.type} />
 
                 {todo.category_name && (
                   <CategoryBadge color={todo.category_color}>{todo.category_name}</CategoryBadge>
@@ -1151,6 +1199,7 @@ function App({ migrationError = null }: AppProps) {
                           )}
 
                           <div className="kanban-card-meta">
+                            <TypeBadge variant="kanban" type={todo.type} />
                             {todo.due_date && (
                               <DueDateBadge variant="kanban" overdue={overdue} today={today && !todo.done}>
                                 {formatDate(todo.due_date)}
