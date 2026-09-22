@@ -1,4 +1,3 @@
-export type Priority = "low" | "medium" | "high";
 export type TodoStatus = "todo" | "in_progress" | "done";
 
 /**
@@ -39,7 +38,6 @@ export interface Todo {
   done: boolean;
   status: TodoStatus;
   type: TodoType;
-  priority: Priority;
   created_at: string;
   due_date: string | null;
   category_id: number | null;
@@ -58,7 +56,6 @@ export interface TodoRow {
    *  dieser Spalte liefert; `fromRow` setzt dann den leeren String. */
   description?: string;
   done: number;
-  priority: Priority;
   created_at: string;
   due_date: string | null;
   category_id: number | null;
@@ -80,7 +77,6 @@ export function fromRow(row: TodoRow): Todo {
     done: status === "done",
     status,
     type: toTodoType(row.type),
-    priority: row.priority,
     created_at: row.created_at,
     due_date: row.due_date,
     category_id: row.category_id,
@@ -293,7 +289,7 @@ export function rebalanceBoardOrders<T extends { id: number; board_order: number
 
 /**
  * Die Reihenfolge einer Brett-Spalte: erst der gezogene Platz, dann -- bei
- * Gleichstand -- die Faelligkeit, die Prioritaet und zuletzt das Alter.
+ * Gleichstand -- die Faelligkeit und zuletzt das Alter.
  *
  * Der Tie-Breaker ist kein Beiwerk: solange niemand gezogen hat, stehen alle
  * Karten auf 0, und dann ist er die ganze Sortierung.
@@ -301,7 +297,6 @@ export function rebalanceBoardOrders<T extends { id: number; board_order: number
  * Sortiert auf einer Kopie: die Aufrufer reichen React-State herein.
  */
 export function sortBoardTodos(todos: Todo[]): Todo[] {
-  const priorityOrder: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
   return todos.slice().sort((a, b) => {
     if (a.board_order !== b.board_order) return a.board_order - b.board_order;
     if (a.due_date !== b.due_date) {
@@ -309,8 +304,6 @@ export function sortBoardTodos(todos: Todo[]): Todo[] {
       if (!b.due_date) return -1;
       return a.due_date.localeCompare(b.due_date);
     }
-    const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-    if (pDiff !== 0) return pDiff;
     return b.created_at.localeCompare(a.created_at);
   });
 }

@@ -30,7 +30,6 @@ describe("fromRow", () => {
       id: 1,
       title: "Test task",
       done: 1,
-      priority: "medium",
       created_at: "2026-01-01T00:00:00Z",
       due_date: null,
       category_id: null,
@@ -47,7 +46,6 @@ describe("fromRow", () => {
       done: true,
       status: "done",
       type: "task",
-      priority: "medium",
       created_at: "2026-01-01T00:00:00Z",
       due_date: null,
       category_id: null,
@@ -62,7 +60,6 @@ describe("fromRow", () => {
       id: 2,
       title: "Open task",
       done: 0,
-      priority: "low",
       created_at: "2026-06-15T12:00:00Z",
       due_date: null,
       category_id: null,
@@ -82,7 +79,6 @@ describe("fromRow", () => {
       id: 99,
       title: "Preserve fields",
       done: 1,
-      priority: "high",
       created_at: "2025-12-31T23:59:59Z",
       due_date: null,
       category_id: null,
@@ -102,7 +98,6 @@ describe("fromRow", () => {
       id: 3,
       title: "Edge case",
       done: 2,
-      priority: "medium",
       created_at: "2026-01-01T00:00:00Z",
       due_date: null,
       category_id: null,
@@ -120,7 +115,6 @@ describe("fromRow", () => {
       id: 1,
       title: "Ohne Beschreibung",
       done: 0,
-      priority: "medium",
       created_at: "2026-09-13T10:00:00.000Z",
       due_date: null,
       category_id: null,
@@ -136,7 +130,6 @@ describe("fromRow", () => {
       id: 2,
       title: "Mit Beschreibung",
       done: 0,
-      priority: "medium",
       created_at: "2026-09-13T10:00:00.000Z",
       due_date: null,
       category_id: null,
@@ -153,7 +146,6 @@ describe("fromRow", () => {
       id: 1,
       title: "Alt",
       done: 0,
-      priority: "medium",
       created_at: "2026-01-01T00:00:00.000Z",
       due_date: null,
       category_id: null,
@@ -245,7 +237,6 @@ describe("sortTodos", () => {
     done: false,
     status: "todo",
     type: "task",
-    priority: "medium",
     created_at,
     due_date: null,
     category_id: null,
@@ -351,7 +342,6 @@ describe("sortBoardTodos", () => {
     done: false,
     status: "todo",
     type: "task",
-    priority: "medium",
     created_at: "2026-01-01T00:00:00.000Z",
     due_date: null,
     category_id: null,
@@ -372,11 +362,18 @@ describe("sortBoardTodos", () => {
 
   it("falls back to the due date rule when the position is equal", () => {
     const sorted = sortBoardTodos([
-      card({ id: 1, title: "Ohne Datum", priority: "high" }),
+      card({ id: 1, title: "Ohne Datum" }),
       card({ id: 2, title: "Spaet", due_date: "2026-12-01" }),
-      card({ id: 3, title: "Frueh", due_date: "2026-01-15", priority: "low" }),
+      card({ id: 3, title: "Frueh", due_date: "2026-01-15" }),
     ]);
     expect(sorted.map((t) => t.title)).toEqual(["Frueh", "Spaet", "Ohne Datum"]);
+  });
+
+  it("sortiert bei gleichem Platz und gleicher Faelligkeit nach dem Alter", () => {
+    // Nach dem Wegfall der Prioritaet ist das Alter der letzte Tie-Breaker.
+    const alt = card({ id: 1, created_at: "2026-01-01T00:00:00.000Z" });
+    const neu = card({ id: 2, created_at: "2026-02-01T00:00:00.000Z" });
+    expect(sortBoardTodos([alt, neu]).map((t) => t.id)).toEqual([2, 1]);
   });
 
   it("lets a dragged card beat the due date rule", () => {
@@ -443,7 +440,6 @@ describe("fromRow mit Typ", () => {
       id: 1,
       title: "Login kaputt",
       done: 0,
-      priority: "medium",
       created_at: "2026-09-21T10:00:00.000Z",
       due_date: null,
       category_id: null,
@@ -459,7 +455,6 @@ describe("fromRow mit Typ", () => {
       id: 2,
       title: "Alt",
       done: 0,
-      priority: "medium",
       created_at: "2026-09-21T10:00:00.000Z",
       due_date: null,
       category_id: null,
