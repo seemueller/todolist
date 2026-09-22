@@ -75,7 +75,7 @@ vi.mock("./CustomTitleBar", () => ({
   CustomTitleBar: () => null,
 }));
 
-const todoBase = { description: "", priority: "medium" as const, type: "task" as TodoType, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null, status: "todo" as const, board_order: 0 };
+const todoBase = { description: "", type: "task" as TodoType, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null, status: "todo" as const, board_order: 0 };
 
 const makeTodo = (overrides = {}) => ({
   id: 1,
@@ -165,7 +165,7 @@ describe("App", () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(db.addTodo).toHaveBeenCalledWith("New task", "medium", null, null, undefined, "task");
+      expect(db.addTodo).toHaveBeenCalledWith("New task", null, null, undefined, "task");
     });
   });
 
@@ -590,9 +590,9 @@ describe("App", () => {
 
   it("sorts the kanban cards by due date, the furthest in the future at the bottom", async () => {
     vi.mocked(db.listTodos).mockResolvedValue([
-      makeTodo({ id: 1, title: "Ohne Datum", priority: "high" }),
+      makeTodo({ id: 1, title: "Ohne Datum" }),
       makeTodo({ id: 2, title: "Spaet", due_date: "2026-12-01" }),
-      makeTodo({ id: 3, title: "Frueh", due_date: "2026-01-15", priority: "low" }),
+      makeTodo({ id: 3, title: "Frueh", due_date: "2026-01-15" }),
     ]);
 
     const { container } = render(<App />);
@@ -1450,14 +1450,7 @@ describe("der Papierkorb-Knopf", () => {
       fireEvent.click(screen.getByRole("button", { name: /Aufgabe hinzufügen/i }));
 
       await waitFor(() => {
-        expect(db.addTodo).toHaveBeenCalledWith(
-          "Login kaputt",
-          "medium",
-          null,
-          null,
-          undefined,
-          "bug",
-        );
+        expect(db.addTodo).toHaveBeenCalledWith("Login kaputt", null, null, undefined, "bug");
       });
     });
 
@@ -1492,6 +1485,18 @@ describe("der Papierkorb-Knopf", () => {
       const badge = within(row).getByText("Bug");
       expect(badge).toHaveClass("type-badge");
       expect(badge).toHaveClass("type-badge--bug");
+    });
+
+    it("traegt die Typklasse an der Zeile", async () => {
+      // Die farbige Kante haengt an dieser Klasse; ohne sie ist die Zeile grau.
+      vi.mocked(db.listTodos).mockResolvedValue([
+        makeTodo({ id: 1, title: "Login kaputt", type: "bug" }),
+      ]);
+
+      render(<App />);
+
+      const row = await screen.findByRole("listitem");
+      expect(row).toHaveClass("type-bug");
     });
 
     it("filtert die Liste auf einen Typ", async () => {
