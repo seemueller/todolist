@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.16.0";
+export const APP_VERSION = "0.17.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.17.0",
+    date: "2026-09-22",
+    changes: [
+      "Die Priorität gibt es nicht mehr — der Typ sagt, um welche Art Arbeit es geht, die Fälligkeit, wann sie dran ist",
+      "Die farbige Kante an Zeile und Karte zeigt jetzt den Typ: Bug rot, Task blau, Story grün",
+      "Im Brett entscheidet bei gleichem Platz und gleicher Fälligkeit nur noch das Alter",
+    ],
+  },
   {
     version: "0.16.0",
     date: "2026-09-22",
