@@ -1617,6 +1617,15 @@ a:hover {
 }
 
 /* Kanban */
+/* Typleiste und Kategoriechips ueber dem Brett in einer Zeile, die bei
+   schmalem Fenster umbricht. */
+.board-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+}
+
 /* Chipleiste ueber dem Brett, im Muster der .filter-row der Liste. */
 .board-filter {
   display: flex;

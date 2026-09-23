@@ -896,4 +896,31 @@ test.describe("Aufgabentyp", () => {
     await typeGroup.getByRole("button", { name: "Typ Alle", exact: true }).click();
     await expect(page.locator(".todo-list .title").getByText("Ganz normale Aufgabe")).toBeVisible();
   });
+
+  test("filtert das Brett nach Typ, getrennt von der Liste", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "TodoList" })).toBeVisible();
+
+    const input = page.getByPlaceholder(/Was steht an/i);
+    const addButton = page.getByRole("button", { name: /Aufgabe hinzufügen/i });
+    await input.fill("Login kaputt");
+    await page.locator(".add-form .type-select").selectOption("bug");
+    await addButton.click();
+    await input.fill("Ganz normale Aufgabe");
+    await addButton.click();
+
+    await page.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }).click();
+    const board = page.locator(".kanban-wrapper");
+    await expect(board.getByText("Ganz normale Aufgabe")).toBeVisible();
+
+    await page
+      .locator(".board-filter-bar")
+      .getByRole("button", { name: "Typ Bug", exact: true })
+      .click();
+    await expect(board.getByText("Login kaputt")).toBeVisible();
+    await expect(board.getByText("Ganz normale Aufgabe")).toHaveCount(0);
+
+    await page.getByRole("button", { name: /Zur Ansicht Liste wechseln/i }).click();
+    await expect(page.locator(".todo-list .title").getByText("Ganz normale Aufgabe")).toBeVisible();
+  });
 });

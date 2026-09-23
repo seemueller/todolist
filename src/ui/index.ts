@@ -47,6 +47,9 @@ export type { CategorySelectProps } from "./CategorySelect";
 export { TypeSelect } from "./TypeSelect";
 export type { TypeSelectProps } from "./TypeSelect";
 
+export { TypeFilterBar } from "./TypeFilterBar";
+export type { TypeFilterBarProps, TypeFilterValue } from "./TypeFilterBar";
+
 export { DueDateBadge } from "./DueDateBadge";
 export type { BadgeVariant, DueDateBadgeProps } from "./DueDateBadge";
 

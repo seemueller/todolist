@@ -38,7 +38,7 @@ import {
 } from "./listPrefs";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, TODO_TYPES, TODO_TYPE_LABELS, computeBoardOrder, needsRebalance, rebalanceBoardOrders, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus, type TodoType } from "./types";
+import { CATEGORY_COLORS, Category, TODO_TYPE_LABELS, computeBoardOrder, needsRebalance, rebalanceBoardOrders, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus, type TodoType } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
@@ -81,7 +81,9 @@ import {
   TimeKindSelect,
   TrashIcon,
   TypeBadge,
+  TypeFilterBar,
   TypeSelect,
+  type TypeFilterValue,
   UpdateIcon,
 } from "./ui";
 import "./App.css";
@@ -205,6 +207,9 @@ function App({ migrationError = null }: AppProps) {
   // Leere Menge heisst "alles zeigen" -- kein Sonderwert, kein null-fuer-alle.
   // null als Element steht fuer Aufgaben ohne Kategorie.
   const [boardCategories, setBoardCategories] = useState<Set<number | null>>(new Set());
+  // Wie die Kategorien nur fuer die Sitzung und getrennt vom Typfilter der
+  // Liste: wer im Brett auf Bugs schaut, will die Liste nicht mit umstellen.
+  const [boardType, setBoardType] = useState<TypeFilterValue>("all");
 
   const toggleBoardCategory = useCallback((id: number | null) => {
     setBoardCategories((prev) => {
@@ -464,10 +469,12 @@ function App({ migrationError = null }: AppProps) {
   // vollstaendig vor, ein Nachladen je Klick waere nur traeger.
   const boardTodos = useMemo(
     () =>
-      boardCategories.size === 0
-        ? todos
-        : todos.filter((t) => boardCategories.has(t.category_id)),
-    [todos, boardCategories]
+      todos.filter(
+        (t) =>
+          (boardCategories.size === 0 || boardCategories.has(t.category_id)) &&
+          (boardType === "all" || t.type === boardType)
+      ),
+    [todos, boardCategories, boardType]
   );
 
   const kanbanLanes: { status: TodoStatus; label: string; icon: ReactNode; color: string }[] = [
@@ -877,30 +884,8 @@ function App({ migrationError = null }: AppProps) {
                 Erledigt
               </FilterChip>
             </div>
-            {/* Eigene Leiste neben dem Statusfilter. Die Beschriftungen tragen
-                "Typ" im aria-label, weil "Alle" sonst dreimal auf der Seite
-                steht -- Faelligkeit, Status und hier. */}
-            <div className="type-filter" role="group" aria-label="Typ filtern">
-              <FilterChip
-                variant="segment"
-                active={typeFilter === "all"}
-                onClick={() => changeTypeFilter("all")}
-                aria-label="Typ Alle"
-              >
-                Alle
-              </FilterChip>
-              {TODO_TYPES.map((type) => (
-                <FilterChip
-                  key={type}
-                  variant="segment"
-                  active={typeFilter === type}
-                  onClick={() => changeTypeFilter(type)}
-                  aria-label={`Typ ${TODO_TYPE_LABELS[type]}`}
-                >
-                  {TODO_TYPE_LABELS[type]}
-                </FilterChip>
-              ))}
-            </div>
+            {/* Eigene Leiste neben dem Statusfilter. */}
+            <TypeFilterBar value={typeFilter} onValueChange={changeTypeFilter} />
           </div>
           <div className="filter-row">
             <input
@@ -1086,6 +1071,8 @@ function App({ migrationError = null }: AppProps) {
           {/* Die Kategoriefarbe kommt als Inline-Style aus den Daten, wie bei
               CategoryBadge auch -- hier als Rahmen, damit der aktive Chip
               weiterhin die Tintenflaeche tragen kann. */}
+          <div className="board-filter-bar">
+          <TypeFilterBar value={boardType} onValueChange={setBoardType} />
           <div className="board-filter" role="group" aria-label="Kategorien filtern">
             <FilterChip
               active={boardCategories.size === 0}
@@ -1112,6 +1099,7 @@ function App({ migrationError = null }: AppProps) {
             >
               Ohne Kategorie
             </FilterChip>
+          </div>
           </div>
 
           <div className="kanban-wrapper">

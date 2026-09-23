@@ -201,6 +201,19 @@ steht er als `TypeBadge`, nicht als Auswahlfeld.
 | `value` | `TodoType` | Gewählter Typ. |
 | `onValueChange` | `(t: TodoType) => void` | Neuer Typ. |
 
+### `TypeFilterBar`
+
+Segmentleiste **Alle · Bug · Task · Story** zum Filtern nach Aufgabentyp, gebaut
+aus `FilterChip variant="segment"` in der Gruppe `.type-filter`. Steht über der
+Liste (gemerkt in `localStorage`) und über dem Brett (nur für die Sitzung, getrennt
+von der Liste). Die Knöpfe tragen „Typ …“ im `aria-label`, weil „Alle“ sonst
+mehrfach auf der Seite steht.
+
+| Prop | Typ | Bedeutung |
+|---|---|---|
+| `value` | `"all" \| TodoType` | Gewählter Filter. |
+| `onValueChange` | `(v: "all" \| TodoType) => void` | Neuer Filter. |
+
 ### `DueDateBadge`
 
 Fälligkeits-Abzeichen. Der bereits formatierte Text kommt als `children` herein.

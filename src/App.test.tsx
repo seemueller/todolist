@@ -1322,6 +1322,55 @@ describe("der Kategorie-Filter im Brett", () => {
   });
 });
 
+describe("der Typ-Filter im Brett", () => {
+  beforeEach(() => {
+    vi.mocked(db.listTodos).mockResolvedValue([
+      makeTodo({ id: 1, title: "Absturz", type: "bug", category_id: 1, category_name: "Arbeit" }),
+      makeTodo({ id: 2, title: "Aufraeumen", type: "task", category_id: 1, category_name: "Arbeit" }),
+      makeTodo({ id: 3, title: "Privat-Bug", type: "bug", category_id: 2, category_name: "Privat" }),
+    ]);
+  });
+
+  async function renderBoard() {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Absturz")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+    await screen.findByRole("button", { name: "Alle Kategorien" });
+  }
+
+  it("filtert das Brett auf einen Typ", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Typ Bug" }));
+
+    expect(screen.getByText("Absturz")).toBeInTheDocument();
+    expect(screen.getByText("Privat-Bug")).toBeInTheDocument();
+    expect(screen.queryByText("Aufraeumen")).not.toBeInTheDocument();
+  });
+
+  it("verbindet Typ und Kategorie", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Typ Bug" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+
+    expect(screen.getByText("Absturz")).toBeInTheDocument();
+    expect(screen.queryByText("Privat-Bug")).not.toBeInTheDocument();
+    expect(screen.queryByText("Aufraeumen")).not.toBeInTheDocument();
+  });
+
+  it("laesst den Typfilter der Liste unberuehrt", async () => {
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Typ Bug" }));
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Liste wechseln/i }));
+
+    expect(await screen.findByText("Aufraeumen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Typ Alle" })).toHaveClass("active");
+    expect(localStorage.getItem("todolist.typeFilter")).not.toBe("bug");
+  });
+});
+
 describe("die Zeitart im Kategorien-Fenster", () => {
   beforeEach(() => {
     vi.clearAllMocks();
