@@ -2,6 +2,11 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.19.0] - 2026-09-23
+
+### Hinzugefügt
+- Das Brett lässt sich nach **Typ** filtern: dieselbe Leiste Alle · Bug · Task · Story wie über der Liste, neben den Kategoriechips. Typ und Kategorie wirken zusammen. Die Wahl gilt nur für die Sitzung und verstellt den Typfilter der Liste nicht.
+
 ## [0.18.0] - 2026-09-23
 
 ### Hinzugefügt
