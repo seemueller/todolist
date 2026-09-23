@@ -345,7 +345,7 @@ die Checkliste, deren Haken den Aufzählungspunkt ersetzt.
 ### `icons.tsx`
 
 `CheckIcon`, `CloseIcon`, `PencilIcon`, `TrashIcon`, `TagIcon`, `PlusIcon`,
-`ChevronLeftIcon`, `LaneTodoIcon`, `LaneProgressIcon`, `LaneDoneIcon`,
+`ChevronLeftIcon`, `LaneWaitingIcon`, `LaneTodoIcon`, `LaneProgressIcon`, `LaneDoneIcon`,
 `ListViewIcon`, `BoardViewIcon`, `NoteIcon`, `ChartIcon`. Alle nehmen `size` und
 die üblichen SVG-Props.
 Ein neues Icon entsteht hier und nirgends sonst: strichbasiert, `currentColor`,

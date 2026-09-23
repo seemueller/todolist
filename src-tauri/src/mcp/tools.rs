@@ -223,7 +223,8 @@ fn set_or_clear(value: Option<&str>, clear: Option<bool>) -> Option<Option<Strin
 /// Filter fuer `list_todos`. Alle Felder sind optional; ohne Angabe kommt alles.
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ListTodos {
-    /// Nur Aufgaben in diesem Status: "todo", "in_progress" oder "done".
+    /// Nur Aufgaben in diesem Status: "waiting", "todo", "in_progress" oder
+    /// "done". "waiting" heisst: offen, aber blockiert -- wartet auf andere.
     pub status: Option<String>,
     /// Nur Aufgaben in dieser Kategorie, angesprochen ueber ihren Namen
     /// (Gross-/Kleinschreibung egal). "list_categories" nennt die vorhandenen.
@@ -270,7 +271,7 @@ pub struct UpdateTodo {
     /// Weglassen, null und "" lassen die bestehende Beschreibung unveraendert;
     /// geleert wird sie ausschliesslich ueber "clear_description".
     pub description: Option<String>,
-    /// Neuer Status: "todo", "in_progress" oder "done".
+    /// Neuer Status: "waiting", "todo", "in_progress" oder "done".
     pub status: Option<String>,
     /// Neuer Typ der Aufgabe: "bug", "task" oder "story". Weglassen, null und
     /// "" lassen den bestehenden Typ unveraendert. Es gibt kein "clear_type"

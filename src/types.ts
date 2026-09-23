@@ -1,4 +1,6 @@
-export type TodoStatus = "todo" | "in_progress" | "done";
+/** "waiting" heisst: blockiert, wartet auf jemand anderen -- offen, aber nicht
+ *  in Arbeit. Zaehlt wie "todo" und "in_progress" als nicht erledigt. */
+export type TodoStatus = "waiting" | "todo" | "in_progress" | "done";
 
 /**
  * Was fuer eine Art Arbeit eine Aufgabe ist -- unabhaengig von ihrer Kategorie.

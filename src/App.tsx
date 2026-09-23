@@ -70,6 +70,7 @@ import {
   InlineEditInput,
   LaneDoneIcon,
   LaneProgressIcon,
+  LaneWaitingIcon,
   LaneTodoIcon,
   ListViewIcon,
   Modal,
@@ -470,9 +471,10 @@ function App({ migrationError = null }: AppProps) {
   );
 
   const kanbanLanes: { status: TodoStatus; label: string; icon: ReactNode; color: string }[] = [
-    { status: "todo", label: "Zu tun", icon: <LaneTodoIcon />, color: "#7cc3f7" },
-    { status: "in_progress", label: "In Bearbeitung", icon: <LaneProgressIcon />, color: "#ffd43b" },
-    { status: "done", label: "Erledigt", icon: <LaneDoneIcon />, color: "#6fcf7f" },
+    { status: "waiting", label: "Wartend", icon: <LaneWaitingIcon />, color: "var(--ink-line)" },
+    { status: "todo", label: "Zu tun", icon: <LaneTodoIcon />, color: "var(--info)" },
+    { status: "in_progress", label: "In Bearbeitung", icon: <LaneProgressIcon />, color: "var(--highlight)" },
+    { status: "done", label: "Erledigt", icon: <LaneDoneIcon />, color: "var(--success)" },
   ];
 
   /**

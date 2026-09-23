@@ -213,7 +213,7 @@ pub struct Booking {
 // --- Pruefungen -------------------------------------------------------------
 
 const STATUS_DONE: &str = "done";
-const STATUSES: [&str; 3] = ["todo", "in_progress", STATUS_DONE];
+const STATUSES: [&str; 4] = ["waiting", "todo", "in_progress", STATUS_DONE];
 const TYPES: [&str; 3] = ["bug", "task", "story"];
 
 fn check_status(status: &str) -> Result<(), StoreError> {
@@ -1382,6 +1382,33 @@ mod tests {
         .await
         .expect("update");
         assert!(!back.done, "leaving done must clear the done column");
+    }
+
+    #[tokio::test]
+    async fn update_todo_accepts_waiting_as_an_open_status() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Rueckmeldung", None, None, None, None)
+            .await
+            .expect("add");
+
+        let waiting = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                status: Some("waiting".into()),
+                ..TodoUpdate::default()
+            },
+        )
+        .await
+        .expect("update");
+        assert_eq!(waiting.status, "waiting");
+        assert!(!waiting.done, "waiting is not done");
+
+        let listed = list_todos(&pool, Some("waiting"), None, None)
+            .await
+            .expect("list");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, todo.id);
     }
 
     #[tokio::test]

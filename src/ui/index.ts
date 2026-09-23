@@ -21,6 +21,7 @@ export {
   EyeOffIcon,
   LaneDoneIcon,
   LaneProgressIcon,
+  LaneWaitingIcon,
   LaneTodoIcon,
   ListViewIcon,
   MinusIcon,

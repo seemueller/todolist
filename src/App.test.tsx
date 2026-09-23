@@ -270,6 +270,7 @@ describe("App", () => {
     fireEvent.click(toggleBtn);
 
     await waitFor(() => {
+      expect(screen.getByText(/Wartend/i)).toBeInTheDocument();
       expect(screen.getByText(/Zu tun/i)).toBeInTheDocument();
       expect(screen.getByText(/In Bearbeitung/i)).toBeInTheDocument();
       expect(screen.getByText(/Erledigt/i)).toBeInTheDocument();
@@ -300,7 +301,7 @@ describe("App", () => {
       return found;
     });
     const lanes = container.querySelectorAll<HTMLElement>(".kanban-lane");
-    expect(lanes.length).toBe(3);
+    expect(lanes.length).toBe(4);
 
     let payload = "";
     const dataTransfer = {
@@ -313,7 +314,7 @@ describe("App", () => {
     };
 
     fireEvent.dragStart(card, { dataTransfer });
-    fireEvent.drop(lanes[1], { dataTransfer });
+    fireEvent.drop(lanes[2], { dataTransfer });
 
     await waitFor(() => {
       // Status und Platz gehen in einem Schreibvorgang weg -- die leere
@@ -672,6 +673,25 @@ describe("App", () => {
     return container;
   }
 
+  it("puts the waiting lane leftmost and moves a card into it", async () => {
+    const container = await renderBoard([makeTodo({ id: 7, title: "Rueckmeldung", board_order: 0 })]);
+    vi.mocked(db.updateTodoStatusAndOrder).mockResolvedValue(
+      makeTodo({ id: 7, title: "Rueckmeldung", status: "waiting" }),
+    );
+
+    const lanes = container.querySelectorAll<HTMLElement>(".kanban-lane");
+    expect(lanes[0].querySelector("h3")?.textContent).toBe("Wartend");
+
+    const [card] = container.querySelectorAll<HTMLElement>(".kanban-card");
+    const dataTransfer = makeDataTransfer();
+    fireDrag("dragstart", card, dataTransfer);
+    fireDrag("drop", lanes[0], dataTransfer);
+
+    await waitFor(() => {
+      expect(db.updateTodoStatusAndOrder).toHaveBeenCalledWith(7, "waiting", 0);
+    });
+  });
+
   it("moves a card above its neighbour inside the lane", async () => {
     const container = await renderBoard([
       makeTodo({ id: 1, title: "Erste", board_order: 0 }),
@@ -863,12 +883,12 @@ describe("App", () => {
     fireDrag("dragstart", card, dataTransfer);
     // "In Bearbeitung" ist leer -- dort gibt es keine Karte, ueber der die
     // Linie haengen koennte, also muss die Spalte selbst sie zeigen.
-    fireDrag("dragover", lanes[1], dataTransfer);
+    fireDrag("dragover", lanes[2], dataTransfer);
 
     await waitFor(() => {
-      expect(lanes[1].querySelectorAll(".kanban-drop-indicator").length).toBe(1);
+      expect(lanes[2].querySelectorAll(".kanban-drop-indicator").length).toBe(1);
     });
-    expect(lanes[0].querySelector(".kanban-drop-indicator")).toBeNull();
+    expect(lanes[1].querySelector(".kanban-drop-indicator")).toBeNull();
   });
 
   it("writes nothing when a card is dropped on its own place", async () => {

@@ -173,6 +173,16 @@ export function ChevronRightIcon(props: IconProps) {
   );
 }
 
+/** Kanban-Lane "Wartend": Sanduhr. */
+export function LaneWaitingIcon(props: IconProps) {
+  return (
+    <BaseIcon viewBox="0 0 14 14" strokeWidth={1.6} {...props}>
+      <path d="M3.5 1.5h7M3.5 12.5h7" />
+      <path d="M4.5 1.5c0 3 5 3.5 5 5.5s-5 2.5-5 5.5M9.5 1.5c0 3-5 3.5-5 5.5s5 2.5 5 5.5" />
+    </BaseIcon>
+  );
+}
+
 /** Kanban-Lane "Zu tun". */
 export function LaneTodoIcon(props: IconProps) {
   return (
