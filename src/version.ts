@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.17.0";
+export const APP_VERSION = "0.18.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.18.0",
+    date: "2026-09-23",
+    changes: [
+      "Neue Brett-Spalte \"Wartend\" ganz links für Aufgaben, die auf jemand anderen warten",
+    ],
+  },
   {
     version: "0.17.0",
     date: "2026-09-22",

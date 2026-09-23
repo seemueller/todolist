@@ -2,6 +2,11 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.18.0] - 2026-09-23
+
+### Hinzugefügt
+- Das Brett hat ganz links eine neue Spalte **„Wartend“** für Aufgaben, die offen sind, aber auf jemand anderen warten. Wartende Aufgaben zählen als offen und stehen im Listenfilter „Offen“. Über MCP nehmen `list_todos` und `update_todo` den Status `waiting` an.
+
 ## [0.17.0] - 2026-09-22
 
 ### Entfernt
