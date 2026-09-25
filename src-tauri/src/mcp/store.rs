@@ -897,7 +897,7 @@ pub async fn book_time(
     })
 }
 
-/// Muss dem echten Schema nach Migration 12 entsprechen -- insbesondere
+/// Muss dem echten Schema nach Migration 16 entsprechen -- insbesondere
 /// `categories.name` mit `UNIQUE COLLATE NOCASE` und `time_slots` OHNE
 /// Fremdschluessel auf die Kategorie. Ein Testschema, das vom echten
 /// abweicht, ist der Grund, warum das ON DELETE CASCADE aus Migration 7
@@ -931,6 +931,11 @@ pub(crate) const SCHEMA: &[&str] = &[
         deleted_at TEXT DEFAULT NULL,
         board_order REAL NOT NULL DEFAULT 0,
         type TEXT NOT NULL DEFAULT 'task'
+    );",
+    "CREATE TABLE todo_tags (
+        todo_id INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        PRIMARY KEY (todo_id, name)
     );",
     "CREATE TABLE time_slots (
         date TEXT NOT NULL,
