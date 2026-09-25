@@ -32,7 +32,7 @@ entfernt Dubletten und sortiert mit `compareCategoryNames` (gleiches Verhalten
 in WebKitGTK und Chromium).
 
 Tags haben keine eigene Existenz: ein Tag gibt es, solange mindestens eine
-Aufgabe ihn trägt. Die Vorschlagsliste entsteht aus den vorhandenen Tags.
+Aufgabe ihn trägt — auch eine im Papierkorb. Die Vorschlagsliste entsteht aus den vorhandenen Tags.
 
 ### Datenmodell
 
@@ -62,8 +62,11 @@ Aufgabe ihn trägt. Die Vorschlagsliste entsteht aus den vorhandenen Tags.
   SQL-Store als Tauri-Command `set_todo_tags` (DELETE + INSERT in einer
   Transaktion), weil `tauri-plugin-sql` keine Transaktion über mehrere Aufrufe
   kennt.
-- `listTags(): Promise<string[]>` — alle Tags nicht gelöschter Aufgaben,
-  sortiert, ohne Dubletten.
+- `listTags(): Promise<string[]>` — alle Tags aller Aufgaben **einschließlich
+  Papierkorb**, sortiert, ohne Dubletten. Grund: ein Tag soll nicht aus den
+  Vorschlägen verschwinden, nur weil seine letzte Aufgabe gerade im Papierkorb
+  liegt — sonst entstehen beim Neu-Tippen leicht Schreibvarianten. Erst das
+  endgültige Löschen der letzten Aufgabe lässt den Tag verschwinden.
 - `addTodo` nimmt `tags` optional (Vorgabe `[]`, unkritisch wie bei
   `addCategory`).
 - Papierkorb: Tags bleiben an der abgelegten Aufgabe und kommen beim
@@ -96,7 +99,7 @@ export function matchesTagFilter(tags: string[], filter: TagFilter): boolean;
   `tags.length === 0`.
 - `match: "all"` → jede Regel trifft; `"any"` → mindestens eine.
 - Leere Regelliste trifft jede Aufgabe (unabhängig von `match`).
-- Eine Regel auf einen Tag, den keine Aufgabe mehr trägt, bleibt stehen: `has`
+- Eine Regel auf einen Tag, der nicht in `listTags()` vorkommt, bleibt stehen: `has`
   trifft dann nichts, `lacks` alles. Der Editor zeigt sie als „unbekannt" an,
   löscht sie aber nicht still.
 
@@ -176,7 +179,7 @@ nur als Token.
 - `src/listPrefs.test.ts`: Laden/Speichern, kaputtes JSON, kaputte Einzelregel,
   aktive Id ohne passenden Filter.
 - `src/todoStoreLocal.test.ts` / `src/todoStoreSql.test.ts`: `setTodoTags`,
-  `listTags` (ohne Papierkorb), Tags an `addTodo`, Wiederherstellen.
+  `listTags` (mit Papierkorb, ohne endgültig gelöschte), Tags an `addTodo`, Wiederherstellen.
 - `src/migrateLocalStorage.test.ts`, `src/migrations.test.ts`.
 - `src/ui/TagChip.test.tsx`, `src/TagFilterEditor.test.tsx`,
   `src/TodoDetailModal.test.tsx` (Tag hinzufügen/entfernen),
