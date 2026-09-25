@@ -1085,7 +1085,8 @@ a:hover {
 .category-modal,
 .todo-modal,
 .trash-modal,
-.stats-modal {
+.stats-modal,
+.tag-filter-modal {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -1131,6 +1132,56 @@ a:hover {
 
 .stats-modal {
   max-width: 560px;
+}
+
+.tag-filter-modal {
+  max-width: 560px;
+}
+
+.tag-filter-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.tag-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag-rule-tag {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Eine Regel auf einen Tag, den keine Aufgabe mehr traegt. */
+.tag-rule-unknown {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Loeschen steht links, abgesetzt von Abbrechen und Speichern. */
+.tag-filter-delete {
+  margin-right: auto;
+}
+
+.tag-filter-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .todo-modal-body {
