@@ -4,6 +4,7 @@
 // womit die Liste beim Start kurz im falschen Filter stuende.
 
 import { TODO_TYPES, type TodoType } from "./types";
+import { parseTagFilter, type TagFilter } from "./tagFilter";
 
 /** Die drei Zustaende der Statusleiste ueber der Liste. */
 export type StatusFilter = "all" | "open" | "done";
@@ -45,6 +46,43 @@ export function loadTypeFilter(): TypeFilter {
 
 export function saveTypeFilter(value: TypeFilter): void {
   localStorage.setItem(TYPE_FILTER_KEY, value);
+}
+
+/** Die benannten Tag-Filter. Oberflaechen-Vorliebe wie der Statusfilter --
+ *  dieselbe Begruendung wie oben, ausserdem gibt es sie nur in dieser Ansicht. */
+export const TAG_FILTERS_KEY = "todolist.tagFilters";
+/** Id des gewaehlten Tag-Filters; fehlt, wenn keiner gewaehlt ist. */
+export const ACTIVE_TAG_FILTER_KEY = "todolist.activeTagFilter";
+
+export function loadTagFilters(): TagFilter[] {
+  const stored = localStorage.getItem(TAG_FILTERS_KEY);
+  if (!stored) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stored);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map(parseTagFilter).filter((filter): filter is TagFilter => filter !== null);
+}
+
+export function saveTagFilters(filters: TagFilter[]): void {
+  localStorage.setItem(TAG_FILTERS_KEY, JSON.stringify(filters));
+}
+
+/** Die gemerkte Id, aber nur, wenn es den Filter noch gibt. */
+export function loadActiveTagFilterId(filters: TagFilter[]): string | null {
+  const stored = localStorage.getItem(ACTIVE_TAG_FILTER_KEY);
+  return filters.some((filter) => filter.id === stored) ? stored : null;
+}
+
+export function saveActiveTagFilterId(id: string | null): void {
+  if (id === null) {
+    localStorage.removeItem(ACTIVE_TAG_FILTER_KEY);
+  } else {
+    localStorage.setItem(ACTIVE_TAG_FILTER_KEY, id);
+  }
 }
 
 /** Groesse eines Modal-Panels in Pixeln. */
