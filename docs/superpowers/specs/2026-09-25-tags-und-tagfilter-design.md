@@ -57,18 +57,26 @@ Aufgabe ihn trägt — auch eine im Papierkorb. Die Vorschlagsliste entsteht aus
 
 ### Store-Interface (`src/storeTypes.ts`)
 
-- `setTodoTags(id: number, tags: string[]): Promise<void>` — ersetzt die Menge
-  vollständig. Die Tags werden vorher mit `normalizeTags` bereinigt. Im
-  SQL-Store als Tauri-Command `set_todo_tags` (DELETE + INSERT in einer
-  Transaktion), weil `tauri-plugin-sql` keine Transaktion über mehrere Aufrufe
-  kennt.
+- `TodoFieldsPatch.tags?: string[]` — gesetzt ersetzt die Menge vollständig
+  (`[]` leert), fehlend lässt sie unverändert. Die Tags werden vorher mit
+  `normalizeTags` bereinigt. So bleibt das Detailfenster bei einem einzigen
+  `updateTodoFields`-Aufruf.
+- Im SQL-Store schreibt ein Tauri-Command `set_todo_tags` die Menge (DELETE +
+  INSERT in einer Transaktion), weil `tauri-plugin-sql` keine Transaktion über
+  mehrere Aufrufe kennt. **Begründete Abweichung vom Vertrag „alles oder
+  nichts"**: die übrigen Felder schreibt weiterhin ein einzelnes UPDATE über
+  das Plugin, die Tags danach der Command. Scheitert der Command, stehen die
+  Felder schon; der Fehler erreicht den Aufrufer, das Fenster bleibt offen, und
+  ein zweites Sichern schreibt dieselben Werte noch einmal — beide Schritte
+  sind idempotent. Das steht so im Doc-Kommentar in `storeTypes.ts`.
 - `listTags(): Promise<string[]>` — alle Tags aller Aufgaben **einschließlich
   Papierkorb**, sortiert, ohne Dubletten. Grund: ein Tag soll nicht aus den
   Vorschlägen verschwinden, nur weil seine letzte Aufgabe gerade im Papierkorb
   liegt — sonst entstehen beim Neu-Tippen leicht Schreibvarianten. Erst das
   endgültige Löschen der letzten Aufgabe lässt den Tag verschwinden.
-- `addTodo` nimmt `tags` optional (Vorgabe `[]`, unkritisch wie bei
-  `addCategory`).
+- `addTodo` im TypeScript-Store bekommt **keine** Tags: das Eingabefeld der
+  Liste hat keine, getaggt wird im Detailfenster. Tags beim Anlegen gibt es nur
+  über MCP (`add_todo`), dort in derselben Rust-Transaktion wie das INSERT.
 - Papierkorb: Tags bleiben an der abgelegten Aufgabe und kommen beim
   Wiederherstellen mit zurück. Endgültiges Löschen entfernt sie per
   `ON DELETE CASCADE` bzw. im localStorage-Store mit dem Eintrag.
@@ -135,7 +143,7 @@ nur als Token.
 - **Detailfenster**: Feld „Tags" mit den Chips und einem Eingabefeld;
   Enter oder Komma übernimmt, Backspace im leeren Feld entfernt den letzten
   Chip. Vorschläge über `<datalist>` aus `listTags()`. Speichert über
-  `setTodoTags`.
+  `updateTodoFields` mit `tags` im Patch.
 - **Listenzeile / Brett-Karte**: Tags als Chips ohne Entfernen-Knopf.
 - **Filterleiste in Liste und Brett**: Auswahl „Tag-Filter" (`Keiner` +
   gespeicherte Filter, `aria-label="Tag-Filter"`) und daneben zwei
@@ -160,8 +168,10 @@ nur als Token.
   angegeben ist; Weglassen, `null` und `[]` lassen sie unverändert.
   `clear_tags: true` leert sie. Beides zugleich ist ein Tool-Fehler — dieselbe
   Regel wie `clear_description` (Issue #35).
-- Ein Tag, der nach der Normalisierung leer oder länger als 40 Zeichen ist,
-  ist ein Tool-Fehler, und die Meldung nennt die Regel.
+- Ein Tag, der nach der Normalisierung leer oder länger als 40 Zeichen ist
+  oder Steuerzeichen enthält, ist ein Tool-Fehler, und die Meldung nennt die
+  Regel. Mehr als 20 Tags an einer Aufgabe sind ebenfalls ein Tool-Fehler —
+  dieselbe Art Grenze wie beim Titel: sie fängt Unsinn ab, keine echte Nutzung.
 - Die Normalisierung gibt es in Rust ein zweites Mal (`mcp/store.rs` oder
   eigenes Modul). Damit Browser- und MCP-Pfad nicht auseinanderlaufen, prüfen
   ein TS- und ein Rust-Test dieselbe Tabelle von Beispielfällen (inklusive
@@ -178,8 +188,8 @@ nur als Token.
   unbekannter Tag.
 - `src/listPrefs.test.ts`: Laden/Speichern, kaputtes JSON, kaputte Einzelregel,
   aktive Id ohne passenden Filter.
-- `src/todoStoreLocal.test.ts` / `src/todoStoreSql.test.ts`: `setTodoTags`,
-  `listTags` (mit Papierkorb, ohne endgültig gelöschte), Tags an `addTodo`, Wiederherstellen.
+- `src/todoStoreLocal.test.ts` / `src/todoStoreSql.test.ts`: `updateTodoFields` mit `tags`,
+  `listTags` (mit Papierkorb, ohne endgültig gelöschte), Wiederherstellen behält die Tags.
 - `src/migrateLocalStorage.test.ts`, `src/migrations.test.ts`.
 - `src/ui/TagChip.test.tsx`, `src/TagFilterEditor.test.tsx`,
   `src/TodoDetailModal.test.tsx` (Tag hinzufügen/entfernen),
