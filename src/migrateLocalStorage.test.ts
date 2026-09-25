@@ -148,6 +148,30 @@ describe("migrateLocalStorage", () => {
     expect((todoCall![1] as unknown[])[9]).toBe(-2.5);
   });
 
+  it("carries the tags over, normalized", async () => {
+    set(TODOS_KEY, [
+      {
+        id: 12,
+        title: "Getaggt",
+        done: false,
+        created_at: "2026-01-02",
+        due_date: null,
+        category_id: null,
+        tags: ["Frontend", "frontend", "UX Review"],
+      },
+    ]);
+
+    await migrateLocalStorage();
+
+    const tagCalls = execute.mock.calls.filter((c) =>
+      String(c[0]).includes("INSERT OR IGNORE INTO todo_tags")
+    );
+    expect(tagCalls.map((c) => c[1])).toEqual([
+      [12, "frontend"],
+      [12, "ux-review"],
+    ]);
+  });
+
   it("maps two categories differing only in case onto one id, and rewrites a slot referencing the second", async () => {
     set(CATEGORIES_KEY, [
       { id: 1, name: "Arbeit", color: "#111", created_at: "2026-01-01" },

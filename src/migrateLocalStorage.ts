@@ -13,7 +13,7 @@
 
 import { getDb, isTauri } from "./sqlClient";
 import { clampTarget } from "./timeSlots";
-import { categoryNameKey, toTodoType } from "./types";
+import { categoryNameKey, toTodoType, parseTags } from "./types";
 
 export const MIGRATED_FLAG = "todolist_migrated_to_sqlite";
 
@@ -175,6 +175,16 @@ export async function migrateLocalStorage(): Promise<void> {
         boardOrder,
       ]
     );
+
+    // Die Tags hinterher, mit derselben Id: der Eintrag behaelt sie oben per
+    // INSERT OR IGNORE. OR IGNORE auch hier -- ein zweiter Lauf nach einem
+    // abgebrochenen ersten darf nicht an schon geschriebenen Zeilen scheitern.
+    for (const tag of parseTags(todo.tags)) {
+      await db.execute("INSERT OR IGNORE INTO todo_tags (todo_id, name) VALUES ($1, $2)", [
+        todo.id,
+        tag,
+      ]);
+    }
   }
 
   // ── Zeitslots und Einstellungen ─────────────────────────────────────────

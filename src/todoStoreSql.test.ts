@@ -8,6 +8,12 @@ vi.mock("./sqlClient", () => ({
   isTauri: () => true,
 }));
 
+const invoke = vi.fn();
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invoke(...args),
+}));
+
 import { sqlTodoStore } from "./todoStoreSql";
 
 const ROW = {
@@ -669,5 +675,55 @@ describe("Aufgabentyp", () => {
     await sqlTodoStore.updateTodoFields(7, { title: "Neuer Titel" });
 
     expect(execute.mock.calls[0][0]).not.toContain("type =");
+  });
+});
+
+describe("sqlTodoStore tags", () => {
+  beforeEach(() => {
+    select.mockReset();
+    execute.mockReset();
+    invoke.mockReset();
+    execute.mockResolvedValue({ rowsAffected: 1 });
+    invoke.mockResolvedValue(undefined);
+  });
+
+  it("reads the tags from the json column", async () => {
+    select.mockResolvedValue([{ ...ROW, tags: '["zebra","alpha"]' }]);
+    const [todo] = await sqlTodoStore.listTodos();
+
+    expect(select.mock.calls[0][0] as string).toContain("todo_tags");
+    expect(todo.tags).toEqual(["alpha", "zebra"]);
+  });
+
+  it("writes the columns first, then the tags through set_todo_tags", async () => {
+    select.mockResolvedValue([ROW]);
+    await sqlTodoStore.updateTodoFields(7, { title: "Neu", tags: ["B", "a"] });
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith("set_todo_tags", { id: 7, tags: ["a", "b"] });
+    expect(execute.mock.invocationCallOrder[0]).toBeLessThan(invoke.mock.invocationCallOrder[0]);
+  });
+
+  it("skips the UPDATE for a tags-only patch", async () => {
+    select.mockResolvedValue([ROW]);
+    await sqlTodoStore.updateTodoFields(7, { tags: [] });
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith("set_todo_tags", { id: 7, tags: [] });
+  });
+
+  it("does not touch the tags when the patch does not name them", async () => {
+    select.mockResolvedValue([ROW]);
+    await sqlTodoStore.updateTodoFields(7, { title: "Neu" });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("lists tags straight from todo_tags, trash included", async () => {
+    select.mockResolvedValue([{ name: "b" }, { name: "a" }]);
+    expect(await sqlTodoStore.listTags()).toEqual(["a", "b"]);
+
+    const sql = select.mock.calls[0][0] as string;
+    expect(sql).toContain("FROM todo_tags");
+    expect(sql).not.toContain("deleted_at");
   });
 });
