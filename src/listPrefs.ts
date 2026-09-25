@@ -64,7 +64,17 @@ export function loadTagFilters(): TagFilter[] {
     return [];
   }
   if (!Array.isArray(parsed)) return [];
-  return parsed.map(parseTagFilter).filter((filter): filter is TagFilter => filter !== null);
+  // Doppelte Id: der erste gewinnt. Sonst waehlte die aktive Id zwei Filter
+  // zugleich, und Umbenennen oder Loeschen traefe beide.
+  const seen = new Set<string>();
+  const filters: TagFilter[] = [];
+  for (const entry of parsed) {
+    const filter = parseTagFilter(entry);
+    if (filter === null || seen.has(filter.id)) continue;
+    seen.add(filter.id);
+    filters.push(filter);
+  }
+  return filters;
 }
 
 export function saveTagFilters(filters: TagFilter[]): void {

@@ -74,6 +74,10 @@ function parseTagRule(value: unknown): TagRule | null {
  * Liest einen Filter aus einer unzuverlaessigen Quelle (localStorage).
  * `null`, wenn Id, Name, Verknuepfung oder Regelliste fehlen; einzelne
  * kaputte Regeln fallen weg, der Rest des Filters bleibt.
+ *
+ * Fallen dabei *alle* Regeln weg, ist der Filter ebenfalls `null`: er hat
+ * einmal eingeschraenkt, und als leere Liste liesse er still alles durch.
+ * Eine schon leer gespeicherte Regelliste bleibt gueltig.
  */
 export function parseTagFilter(value: unknown): TagFilter | null {
   if (typeof value !== "object" || value === null) return null;
@@ -82,10 +86,7 @@ export function parseTagFilter(value: unknown): TagFilter | null {
   if (typeof name !== "string" || name.trim() === "") return null;
   if (match !== "all" && match !== "any") return null;
   if (!Array.isArray(rules)) return null;
-  return {
-    id,
-    name: name.trim(),
-    match,
-    rules: rules.map(parseTagRule).filter((rule): rule is TagRule => rule !== null),
-  };
+  const parsed = rules.map(parseTagRule).filter((rule): rule is TagRule => rule !== null);
+  if (rules.length > 0 && parsed.length === 0) return null;
+  return { id, name: name.trim(), match, rules: parsed };
 }

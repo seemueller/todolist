@@ -86,6 +86,22 @@ describe("parseTagFilter", () => {
     expect(parsed?.rules).toEqual([{ kind: "lacks", tag: "b" }]);
   });
 
+  it("verwirft einen Filter, dessen Regeln alle kaputt waren", () => {
+    // Er hat einmal eingeschraenkt; als leere Liste liesse er still alles durch.
+    expect(
+      parseTagFilter({
+        id: "x",
+        name: "N",
+        match: "all",
+        rules: [{ kind: "has", tag: "" }, { kind: "sonstwas" }],
+      })
+    ).toBeNull();
+  });
+
+  it("behaelt einen Filter, der schon ohne Regeln gespeichert war", () => {
+    expect(parseTagFilter({ id: "x", name: "N", match: "any", rules: [] })?.rules).toEqual([]);
+  });
+
   it("verwirft einen Filter ohne Id, Name oder gueltige Verknuepfung", () => {
     expect(parseTagFilter(null)).toBeNull();
     expect(parseTagFilter({ name: "N", match: "all", rules: [] })).toBeNull();

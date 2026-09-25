@@ -127,8 +127,14 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
   // Zweiter, fuer sich atomarer Schritt -- die Abweichung steht im Vertrag
   // von TodoFieldsPatch.tags in storeTypes.ts. Der Command lehnt eine
   // unbekannte oder abgelegte Id selbst mit "Todo <id> not found" ab.
+  // invoke lehnt mit dem nackten String ab; als Error bekommt der Aufrufer
+  // dasselbe wie vom localStorage-Store.
   if (patch.tags !== undefined) {
-    await invoke("set_todo_tags", { id, tags: normalizeTags(patch.tags) });
+    try {
+      await invoke("set_todo_tags", { id, tags: normalizeTags(patch.tags) });
+    } catch (e) {
+      throw new Error(String(e));
+    }
   }
   // selectTodo prueft auch beim leeren Patch, ob es die Aufgabe gibt.
   return selectTodo(id);

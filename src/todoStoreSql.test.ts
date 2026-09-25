@@ -712,6 +712,17 @@ describe("sqlTodoStore tags", () => {
     expect(invoke).toHaveBeenCalledWith("set_todo_tags", { id: 7, tags: [] });
   });
 
+  it("turns a rejected set_todo_tags into an Error like the local store", async () => {
+    // invoke lehnt mit dem nackten String des Commands ab, nicht mit einem Error.
+    invoke.mockRejectedValue("Todo 7 not found");
+
+    const result = sqlTodoStore.updateTodoFields(7, { tags: ["a"] });
+
+    await expect(result).rejects.toBeInstanceOf(Error);
+    await expect(result).rejects.toThrow("Todo 7 not found");
+    expect(select).not.toHaveBeenCalled();
+  });
+
   it("does not touch the tags when the patch does not name them", async () => {
     select.mockResolvedValue([ROW]);
     await sqlTodoStore.updateTodoFields(7, { title: "Neu" });

@@ -130,6 +130,12 @@ describe("tag filters", () => {
     expect(loadTagFilters()).toEqual([FILTER]);
   });
 
+  it("behaelt bei doppelter Id nur den ersten Filter", () => {
+    const twin = { ...FILTER, name: "Zwilling" };
+    localStorage.setItem(TAG_FILTERS_KEY, JSON.stringify([FILTER, twin]));
+    expect(loadTagFilters()).toEqual([FILTER]);
+  });
+
   it("merkt sich den aktiven Filter und vergisst ihn", () => {
     saveActiveTagFilterId("f1");
     expect(loadActiveTagFilterId([FILTER])).toBe("f1");
