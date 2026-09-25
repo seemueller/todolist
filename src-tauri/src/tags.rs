@@ -15,9 +15,14 @@ pub const MAX_TAG_CHARS: usize = 40;
 
 /// NFC, getrimmt, kleingeschrieben, Leerraum im Inneren zu "-". `None`, wenn
 /// danach nichts uebrig ist oder es laenger als `MAX_TAG_CHARS` Zeichen ist.
+///
+/// Leerraum ist Unicodes White_Space (`char::is_whitespace`), also auch U+0085
+/// (NEL). U+FEFF (BOM) ist kein Leerraum, wird aber vorab ueberall entfernt --
+/// vor dem NFC, damit er keine Zeichenfolge auseinanderhaelt. So sieht es auch
+/// die JS-Seite, deren `\s` den BOM kennt und NEL nicht.
 pub fn normalize_tag(raw: &str) -> Option<String> {
-    let composed: String = raw.nfc().collect();
-    let lowered = composed.trim().to_lowercase();
+    let composed: String = raw.chars().filter(|c| *c != '\u{feff}').nfc().collect();
+    let lowered = composed.to_lowercase();
     let tag = lowered.split_whitespace().collect::<Vec<_>>().join("-");
     if tag.is_empty() || tag.chars().count() > MAX_TAG_CHARS {
         return None;

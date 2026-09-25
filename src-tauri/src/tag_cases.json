@@ -9,5 +9,12 @@
   { "input": "", "output": null },
   { "input": "   ", "output": null },
   { "input": "abcdefghijabcdefghijabcdefghijabcdefghij", "output": "abcdefghijabcdefghijabcdefghijabcdefghij" },
-  { "input": "abcdefghijabcdefghijabcdefghijabcdefghijk", "output": null }
+  { "input": "abcdefghijabcdefghijabcdefghijabcdefghijk", "output": null },
+  { "input": "﻿frontend", "output": "frontend" },
+  { "input": "a﻿b", "output": "ab" },
+  { "input": "﻿", "output": null },
+  { "input": "a\u0085b", "output": "a-b" },
+  { "input": "\u0085frontend\u0085", "output": "frontend" },
+  { "input": "a b", "output": "a-b" },
+  { "input": "a b", "output": "a-b" }
 ]

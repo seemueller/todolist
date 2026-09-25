@@ -215,12 +215,24 @@ export const MAX_TAG_CHARS = 40;
  * Folge von Leerraum im Inneren ein "-". Leer oder laenger als
  * MAX_TAG_CHARS heisst: kein Tag (`null`).
  *
+ * Leerraum ist hier genau Unicodes White_Space, damit Rust (`char::is_whitespace`)
+ * dasselbe sieht: JS' `\s` kennt zusaetzlich U+FEFF (BOM), aber nicht U+0085
+ * (NEL). Darum wird U+FEFF vorab ueberall entfernt -- vor dem NFC, damit er
+ * keine Zeichenfolge auseinanderhaelt -- und U+0085 zaehlt ausdruecklich als
+ * Leerraum.
+ *
  * `toLowerCase` statt SQLites `NOCASE`, das nur ASCII faltet -- sonst waeren
  * "Ärzte" und "ärzte" zwei Tags. Die Rust-Seite (`tags::normalize_tag`) prueft
  * sich gegen dieselbe Tabelle `src-tauri/src/tag_cases.json`.
  */
 export function normalizeTag(raw: string): string | null {
-  const tag = raw.normalize("NFC").trim().toLowerCase().split(/\s+/).join("-");
+  const tag = raw
+    .replace(/﻿/g, "")
+    .normalize("NFC")
+    .toLowerCase()
+    .split(/[\s\u0085]+/)
+    .filter((part) => part !== "")
+    .join("-");
   if (tag === "" || [...tag].length > MAX_TAG_CHARS) return null;
   return tag;
 }
