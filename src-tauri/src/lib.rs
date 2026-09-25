@@ -1,5 +1,6 @@
 mod config_migration;
 mod mcp;
+mod tags;
 
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite};
@@ -63,26 +64,56 @@ async fn replace_time_day_tx(
     tx.commit().await
 }
 
+/// Der Pool, den das JS-Plugin mit `Database.load` geoeffnet hat.
+async fn loaded_pool(app: &tauri::AppHandle) -> Result<Pool<Sqlite>, String> {
+    let instances = app.state::<DbInstances>();
+    let map = instances.0.read().await;
+    let db_pool = map
+        .get(DB_URL)
+        .ok_or_else(|| format!("database {DB_URL} not loaded"))?;
+    match db_pool {
+        DbPool::Sqlite(pool) => Ok(pool.clone()),
+    }
+}
+
 #[tauri::command]
 async fn replace_time_day(
     app: tauri::AppHandle,
     date: String,
     slots: Vec<TimeSlotInput>,
 ) -> Result<(), String> {
-    let instances = app.state::<DbInstances>();
-    let pool = {
-        let map = instances.0.read().await;
-        let db_pool = map
-            .get(DB_URL)
-            .ok_or_else(|| format!("database {DB_URL} not loaded"))?;
-        match db_pool {
-            DbPool::Sqlite(pool) => pool.clone(),
-        }
-    };
-
+    let pool = loaded_pool(&app).await?;
     replace_time_day_tx(&pool, &date, &slots)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Ersetzt die Tags einer Aufgabe in einer Transaktion auf einer gehaltenen
+/// Verbindung -- aus demselben Grund wie `replace_time_day_tx`. Eine
+/// unbekannte oder im Papierkorb liegende Id lehnt mit `Todo <id> not found`
+/// ab, derselben Meldung wie die Stores in src/.
+async fn set_todo_tags_tx(pool: &Pool<Sqlite>, id: i64, tags: &[String]) -> Result<(), String> {
+    let tags = tags::normalize_tags(tags);
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+    let live: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM todos WHERE id = ? AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+    if live.is_none() {
+        return Err(format!("Todo {id} not found"));
+    }
+    tags::replace_tags(&mut tx, id, &tags)
+        .await
+        .map_err(|e| e.to_string())?;
+    tx.commit().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_todo_tags(app: tauri::AppHandle, id: i64, tags: Vec<String>) -> Result<(), String> {
+    let pool = loaded_pool(&app).await?;
+    set_todo_tags_tx(&pool, id, &tags).await
 }
 
 /// Wird als Tauri-State gehalten, damit `RunEvent::ExitRequested` den
@@ -430,6 +461,24 @@ pub fn run() {
             CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name_key ON categories(name_key);",
             kind: MigrationKind::Up,
         },
+        // Tags haengen an der Aufgabe; eine Tabelle `tags` gibt es nicht, weil
+        // es ohne Farbe und ohne Umbenennen dort nichts zu speichern gaebe. Ein
+        // Tag existiert, solange eine Zeile ihn traegt -- auch die einer Aufgabe
+        // im Papierkorb. Endgueltiges Loeschen nimmt die Zeilen per CASCADE mit.
+        // Die Namen kommen normalisiert an (`normalizeTag` in src/types.ts,
+        // `tags::normalize_tag` hier), der Primaerschluessel verhindert darum
+        // auch Gross-/Kleinschreibungs-Dubletten.
+        Migration {
+            version: 16,
+            description: "add_todo_tags",
+            sql: "CREATE TABLE IF NOT EXISTS todo_tags (
+                todo_id INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                PRIMARY KEY (todo_id, name)
+            );
+            CREATE INDEX IF NOT EXISTS idx_todo_tags_name ON todo_tags(name);",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
@@ -444,7 +493,8 @@ pub fn run() {
             check_for_update,
             install_update,
             mcp_status,
-            replace_time_day
+            replace_time_day,
+            set_todo_tags
         ])
         .setup(|app| {
             let cancel = tokio_util::sync::CancellationToken::new();
@@ -652,5 +702,82 @@ mod tests {
             vec![(32, 1, "".to_string()), (33, 1, "".to_string())],
             "the day must be exactly what it held before the failed replace"
         );
+    }
+
+    async fn tag_pool() -> Pool<Sqlite> {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("in-memory pool");
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&pool)
+            .await
+            .expect("enable foreign keys");
+        for statement in crate::mcp::store::SCHEMA {
+            sqlx::query(statement)
+                .execute(&pool)
+                .await
+                .expect("create schema");
+        }
+        pool
+    }
+
+    async fn insert_todo(pool: &Pool<Sqlite>, deleted: bool) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO todos (title, created_at, deleted_at) VALUES ('A', '2026-01-01T00:00:00.000Z', ?) RETURNING id",
+        )
+        .bind(if deleted { Some("2026-01-02T00:00:00.000Z") } else { None })
+        .fetch_one(pool)
+        .await
+        .expect("insert todo")
+    }
+
+    async fn tag_names(pool: &Pool<Sqlite>, id: i64) -> Vec<String> {
+        sqlx::query_scalar("SELECT name FROM todo_tags WHERE todo_id = ? ORDER BY name")
+            .bind(id)
+            .fetch_all(pool)
+            .await
+            .expect("select tags")
+    }
+
+    #[tokio::test]
+    async fn set_todo_tags_replaces_and_normalizes() {
+        let pool = tag_pool().await;
+        let id = insert_todo(&pool, false).await;
+        set_todo_tags_tx(&pool, id, &["alt".to_string()]).await.expect("first");
+        set_todo_tags_tx(&pool, id, &["Zebra".to_string(), " alpha ".to_string()])
+            .await
+            .expect("second");
+        assert_eq!(tag_names(&pool, id).await, vec!["alpha", "zebra"]);
+    }
+
+    #[tokio::test]
+    async fn set_todo_tags_refuses_a_todo_in_the_trash() {
+        let pool = tag_pool().await;
+        let id = insert_todo(&pool, true).await;
+        let error = set_todo_tags_tx(&pool, id, &["a".to_string()])
+            .await
+            .expect_err("trash is not writable");
+        assert_eq!(error, format!("Todo {id} not found"));
+        assert!(tag_names(&pool, id).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_failure_mid_write_leaves_the_tags_unchanged() {
+        let pool = tag_pool().await;
+        let id = insert_todo(&pool, false).await;
+        set_todo_tags_tx(&pool, id, &["alt".to_string()]).await.expect("first");
+        sqlx::query(
+            "CREATE TRIGGER fail_on_kaputt BEFORE INSERT ON todo_tags
+             WHEN NEW.name = 'kaputt' BEGIN SELECT RAISE(ABORT, 'kaputt'); END;",
+        )
+        .execute(&pool)
+        .await
+        .expect("trigger");
+
+        let result =
+            set_todo_tags_tx(&pool, id, &["alpha".to_string(), "kaputt".to_string()]).await;
+
+        assert!(result.is_err());
+        assert_eq!(tag_names(&pool, id).await, vec!["alt"]);
     }
 }

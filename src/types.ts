@@ -40,6 +40,9 @@ export interface Todo {
   done: boolean;
   status: TodoStatus;
   type: TodoType;
+  /** Freie Schlagworte, immer normalisiert (`normalizeTag`) und sortiert.
+   *  Leeres Array heisst "keine Tags". */
+  tags: string[];
   created_at: string;
   due_date: string | null;
   category_id: number | null;
@@ -67,6 +70,10 @@ export interface TodoRow {
   /** Optional, weil der localStorage-Speicher Eintraege aus der Zeit vor
    *  dieser Spalte liefert; `toTodoType` setzt dann "task". */
   type?: string;
+  /** Der SQL-Store liefert die Tags als JSON-Text (json_group_array), der
+   *  localStorage-Store als Array; Eintraege aus der Zeit davor gar nicht.
+   *  `parseTags` nimmt alle drei. */
+  tags?: string | string[];
   board_order?: number;
 }
 
@@ -79,6 +86,7 @@ export function fromRow(row: TodoRow): Todo {
     done: status === "done",
     status,
     type: toTodoType(row.type),
+    tags: parseTags(row.tags),
     created_at: row.created_at,
     due_date: row.due_date,
     category_id: row.category_id,
@@ -196,6 +204,74 @@ export function categoryNameKey(name: string): string {
  */
 export function compareCategoryNames(a: string, b: string): number {
   return categoryNameKey(a).localeCompare(categoryNameKey(b), "de") || a.localeCompare(b, "de");
+}
+
+/** Laenger darf ein Tag nach der Normalisierung nicht sein. Dieselbe Grenze
+ *  steht als MAX_TAG_CHARS in src-tauri/src/tags.rs. */
+export const MAX_TAG_CHARS = 40;
+
+/**
+ * Die eine Regel, was ein Tag ist: NFC, getrimmt, kleingeschrieben, jede
+ * Folge von Leerraum im Inneren ein "-". Leer oder laenger als
+ * MAX_TAG_CHARS heisst: kein Tag (`null`).
+ *
+ * Leerraum ist hier genau Unicodes White_Space, damit Rust (`char::is_whitespace`)
+ * dasselbe sieht: JS' `\s` kennt zusaetzlich U+FEFF (BOM), aber nicht U+0085
+ * (NEL). Darum wird U+FEFF vorab ueberall entfernt -- vor dem NFC, damit er
+ * keine Zeichenfolge auseinanderhaelt -- und U+0085 zaehlt ausdruecklich als
+ * Leerraum.
+ *
+ * `toLowerCase` statt SQLites `NOCASE`, das nur ASCII faltet -- sonst waeren
+ * "Ärzte" und "ärzte" zwei Tags. Die Rust-Seite (`tags::normalize_tag`) prueft
+ * sich gegen dieselbe Tabelle `src-tauri/src/tag_cases.json`.
+ */
+export function normalizeTag(raw: string): string | null {
+  const tag = raw
+    .replace(/\uFEFF/g, "")
+    .normalize("NFC")
+    .toLowerCase()
+    .split(/[\s\u0085]+/)
+    .filter((part) => part !== "")
+    .join("-");
+  if (tag === "" || [...tag].length > MAX_TAG_CHARS) return null;
+  return tag;
+}
+
+/** Normalisiert eine Menge Tags: Unbrauchbares faellt weg, Dubletten auch,
+ *  sortiert wird wie bei Kategorien. */
+export function normalizeTags(raw: readonly string[]): string[] {
+  const tags = new Set<string>();
+  for (const value of raw) {
+    const tag = normalizeTag(value);
+    if (tag !== null) tags.add(tag);
+  }
+  return [...tags].sort(compareCategoryNames);
+}
+
+/**
+ * Die Tags, die ein getippter Entwurf ergaebe: eingefuegtes "a, b" sind zwei
+ * Tags, nicht einer mit Komma. Unbrauchbare Teile (leer, zu lang) fallen weg.
+ * Hier und nicht in TagInput.tsx, weil das Detailfenster ihn ebenfalls braucht.
+ */
+export function draftTags(draft: string): string[] {
+  return draft
+    .split(",")
+    .map(normalizeTag)
+    .filter((tag): tag is string => tag !== null);
+}
+
+/** Liest Tags aus einer Speicherquelle: JSON-Text, Array oder nichts. */
+export function parseTags(value: unknown): string[] {
+  let list: unknown = value;
+  if (typeof value === "string") {
+    try {
+      list = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return normalizeTags(list.filter((item): item is string => typeof item === "string"));
 }
 
 export const CATEGORY_COLORS = [

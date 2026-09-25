@@ -10,7 +10,7 @@ import type { ModalSize } from "../listPrefs";
 import { IconButton } from "./IconButton";
 import { CloseIcon } from "./icons";
 
-export type ModalVariant = "changelog" | "category" | "todo" | "trash" | "stats";
+export type ModalVariant = "changelog" | "category" | "todo" | "trash" | "stats" | "tagFilter";
 
 const VARIANT_CLASS: Record<ModalVariant, string> = {
   changelog: "changelog-modal",
@@ -18,6 +18,7 @@ const VARIANT_CLASS: Record<ModalVariant, string> = {
   todo: "todo-modal",
   trash: "trash-modal",
   stats: "stats-modal",
+  tagFilter: "tag-filter-modal",
 };
 
 export interface ModalProps extends Omit<HTMLAttributes<HTMLDivElement>, "title" | "onClick"> {

@@ -27,6 +27,19 @@ export interface TodoFieldsPatch {
   type?: TodoType;
   dueDate?: string | null;
   categoryId?: number | null;
+  /**
+   * Ersetzt die Tags vollstaendig; `[]` leert, fehlend laesst sie stehen. Die
+   * Stores bereinigen mit `normalizeTags` aus types.ts.
+   *
+   * Begruendete Abweichung vom "alles oder nichts" dieses Aufrufs: im
+   * SQL-Store schreibt ein UPDATE ueber das Plugin die Spalten, danach der
+   * Tauri-Command `set_todo_tags` die Tags -- tauri-plugin-sql kennt keine
+   * Transaktion ueber mehrere Aufrufe (siehe AGENTS.md). Scheitert der zweite
+   * Schritt, stehen die Spalten schon und der Fehler erreicht den Aufrufer;
+   * das Detail-Fenster bleibt dann offen, und ein zweites Sichern schreibt
+   * dieselben Werte noch einmal -- beide Schritte sind idempotent.
+   */
+  tags?: string[];
 }
 
 /**
@@ -95,6 +108,13 @@ export interface TodoStore {
    * hier ab, `restoreTodo` holt zurueck, `purgeTodo` raeumt endgueltig weg.
    */
   listDeletedTodos(): Promise<Todo[]>;
+  /**
+   * Alle Tags, die irgendeine Aufgabe traegt -- auch eine im Papierkorb, damit
+   * ein Tag nicht aus den Vorschlaegen faellt, nur weil seine letzte Aufgabe
+   * gerade dort liegt. Ohne Dubletten, sortiert wie Kategorien. Endgueltig
+   * geloeschte Aufgaben tragen nichts mehr bei.
+   */
+  listTags(): Promise<string[]>;
   /** Holt eine Aufgabe aus dem Papierkorb zurueck; lehnt mit `Todo <id> not found` ab, wenn `id` nicht im Papierkorb liegt — als Promise-Rejection, nie als synchroner throw. */
   restoreTodo(id: number): Promise<Todo>;
   /**

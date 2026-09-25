@@ -1,5 +1,5 @@
-// Detail-Fenster einer Aufgabe: Titel, Beschreibung, Typ, Faelligkeit und
-// Kategorie an einer Stelle. Die Beschreibung hat zwei Zustaende: gelesen
+// Detail-Fenster einer Aufgabe: Titel, Beschreibung, Typ, Faelligkeit,
+// Kategorie und Tags. Die Beschreibung hat zwei Zustaende: gelesen
 // wird sie als gesetztes Markdown (`src/ui/Markdown.tsx`), geschrieben im
 // Textfeld daneben -- der Knopf ueber dem Feld schaltet um. Eigene Datei, weil
 // App.tsx schon zu gross ist, um noch ein Formular mit eigenem Entwurfszustand
@@ -12,9 +12,10 @@
 
 import { useState } from "react";
 import type { KeyboardEvent } from "react";
-import { Category, Todo, type TodoType } from "./types";
+import { Category, Todo, draftTags, normalizeTags, type TodoType } from "./types";
 import type { TodoFieldsPatch } from "./storeTypes";
 import { loadTodoModalSize, saveTodoModalSize } from "./listPrefs";
+import { TagInput } from "./TagInput";
 import {
   CategorySelect,
   IconButton,
@@ -28,13 +29,21 @@ import {
 export interface TodoDetailModalProps {
   todo: Todo;
   categories: Category[];
+  /** Vorschlaege fuer das Tag-Feld; ohne Angabe keine. */
+  tagSuggestions?: string[];
   /** Schreibt den Patch. Wirft, wenn das Schreiben scheitert. */
   onSave: (id: number, patch: TodoFieldsPatch) => Promise<void>;
   /** Abbrechen, Escape, Schliessen-Knopf und der geglueckte Sichern-Lauf. */
   onClose: () => void;
 }
 
-export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetailModalProps) {
+export function TodoDetailModal({
+  todo,
+  categories,
+  tagSuggestions = [],
+  onSave,
+  onClose,
+}: TodoDetailModalProps) {
   // Der Stand beim Oeffnen, ein einziges Mal eingefroren. Waehrend das Fenster
   // offen ist, kann `todo` von aussen neue Werte bekommen -- etwa weil der
   // MCP-Server dieselbe Aufgabe aendert und die App ihre Liste neu laedt.
@@ -49,6 +58,12 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
   const [type, setType] = useState<TodoType>(todo.type);
   const [dueDate, setDueDate] = useState(todo.due_date ?? "");
   const [categoryId, setCategoryId] = useState<number | null>(todo.category_id);
+  const [tags, setTags] = useState<string[]>(todo.tags);
+  // Der getippte, noch nicht uebernommene Tag. Er liegt hier und nicht im
+  // Tag-Feld, damit Strg+Enter ihn mitsichert: das Feld wird dabei nicht
+  // verlassen, und ein setState im selben Tastendruck saehe `handleSave` noch
+  // nicht.
+  const [tagDraft, setTagDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   // Das Fenster oeffnet im Lesemodus: laengere Beschreibungen sind als
@@ -87,6 +102,14 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
     const nextDueDate = dueDate || null;
     if (nextDueDate !== original.due_date) patch.dueDate = nextDueDate;
     if (categoryId !== original.category_id) patch.categoryId = categoryId;
+    // Ein offener Entwurf zaehlt mit; ein unbrauchbarer (zu lang) faellt weg.
+    // Beide Seiten sind normalisiert und sortiert, ein Vergleich Stelle fuer
+    // Stelle reicht also.
+    const nextTags = normalizeTags([...tags, ...draftTags(tagDraft)]);
+    const tagsChanged =
+      nextTags.length !== original.tags.length ||
+      nextTags.some((tag, i) => tag !== original.tags[i]);
+    if (tagsChanged) patch.tags = nextTags;
     return patch;
   }
 
@@ -223,6 +246,18 @@ export function TodoDetailModal({ todo, categories, onSave, onClose }: TodoDetai
               placeholderLabel="Keine Kategorie"
             />
           </div>
+        </div>
+
+        <div className="todo-modal-field">
+          <label htmlFor="todo-detail-tags">Tags</label>
+          <TagInput
+            id="todo-detail-tags"
+            value={tags}
+            suggestions={tagSuggestions}
+            onValueChange={setTags}
+            draft={tagDraft}
+            onDraftChange={setTagDraft}
+          />
         </div>
 
         {error && <p className="todo-modal-error">{error}</p>}

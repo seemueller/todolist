@@ -794,6 +794,78 @@ a:hover {
   color: var(--ink-faint);
 }
 
+/* Tag-Etikett. Keine Datenfarbe wie beim Kategorie-Badge: Tags haben keine,
+   darum fest --surface-muted. Pille statt Rechteck und keine Versalien, damit
+   es neben Typ- und Kategorie-Badge als nachrangig liest. */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border: var(--border-thin);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.tag-chip--kanban {
+  padding: 2px 7px;
+  font-size: 10.5px;
+}
+
+.done .tag-chip {
+  border-color: var(--ink-ghost);
+  background: transparent;
+  color: var(--ink-faint);
+}
+
+.tag-chip-remove {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Mehrere Chips nebeneinander, in Zeile und Karte. */
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Tag-Eingabe im Detailfenster: Chips und Textfeld in einem gerahmten Feld,
+   im Rahmen von .edit-input. */
+.tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.tag-input:focus-within {
+  box-shadow: var(--shadow-sm);
+}
+
+.tag-input-field {
+  flex: 1 1 140px;
+  min-width: 140px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+
 .todo-select {
   flex-shrink: 0;
   max-width: 96px;
@@ -1013,7 +1085,8 @@ a:hover {
 .category-modal,
 .todo-modal,
 .trash-modal,
-.stats-modal {
+.stats-modal,
+.tag-filter-modal {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -1059,6 +1132,56 @@ a:hover {
 
 .stats-modal {
   max-width: 560px;
+}
+
+.tag-filter-modal {
+  max-width: 560px;
+}
+
+.tag-filter-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.tag-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag-rule-tag {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Eine Regel auf einen Tag, den keine Aufgabe mehr traegt. */
+.tag-rule-unknown {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Loeschen steht links, abgesetzt von Abbrechen und Speichern. */
+.tag-filter-delete {
+  margin-right: auto;
+}
+
+.tag-filter-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .todo-modal-body {

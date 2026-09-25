@@ -15,14 +15,20 @@ import {
   sortCategories,
   categoryNameKey,
   canonicalCategoryName,
+  normalizeTags,
 } from "./types";
+import { invoke } from "@tauri-apps/api/core";
 import { getDb } from "./sqlClient";
 import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
+// Die Tags kommen als JSON-Text einer Unterabfrage, nicht ueber einen JOIN:
+// ein JOIN auf todo_tags vervielfachte die Zeilen je Tag. json_group_array
+// liefert fuer eine Aufgabe ohne Tags "[]"; fromRow parst und sortiert.
 const TODO_COLUMNS = `
   t.id, t.title, t.description, t.done, t.status, t.type, t.created_at,
   t.due_date, t.category_id, t.board_order,
-  c.name AS category_name, c.color AS category_color
+  c.name AS category_name, c.color AS category_color,
+  (SELECT json_group_array(tt.name) FROM todo_tags tt WHERE tt.todo_id = t.id) AS tags
 `;
 
 // Die eine Stelle, an der steht, was "nicht im Papierkorb" heisst. Jede
@@ -108,16 +114,29 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
   if (patch.dueDate !== undefined) set("due_date", patch.dueDate);
   if (patch.categoryId !== undefined) set("category_id", patch.categoryId);
 
-  // Ein leerer Patch bekommt kein UPDATE ohne SET-Liste, das waere ein
-  // Syntaxfehler. selectTodo prueft trotzdem, ob es die Aufgabe gibt.
-  if (assignments.length === 0) return selectTodo(id);
-
   const db = await getDb();
-  // Selber Guard wie in updateColumn -- dieser Pfad geht nicht ueber sie.
-  await db.execute(
-    `UPDATE todos SET ${assignments.join(", ")} WHERE id = $${params.length + 1} AND ${NOT_DELETED_HERE}`,
-    [...params, id]
-  );
+  // Kein UPDATE ohne SET-Liste, das waere ein Syntaxfehler -- ein Patch nur
+  // mit Tags oder ganz ohne Felder springt darueber.
+  if (assignments.length > 0) {
+    // Selber Guard wie in updateColumn -- dieser Pfad geht nicht ueber sie.
+    await db.execute(
+      `UPDATE todos SET ${assignments.join(", ")} WHERE id = $${params.length + 1} AND ${NOT_DELETED_HERE}`,
+      [...params, id]
+    );
+  }
+  // Zweiter, fuer sich atomarer Schritt -- die Abweichung steht im Vertrag
+  // von TodoFieldsPatch.tags in storeTypes.ts. Der Command lehnt eine
+  // unbekannte oder abgelegte Id selbst mit "Todo <id> not found" ab.
+  // invoke lehnt mit dem nackten String ab; als Error bekommt der Aufrufer
+  // dasselbe wie vom localStorage-Store.
+  if (patch.tags !== undefined) {
+    try {
+      await invoke("set_todo_tags", { id, tags: normalizeTags(patch.tags) });
+    } catch (e) {
+      throw new Error(String(e));
+    }
+  }
+  // selectTodo prueft auch beim leeren Patch, ob es die Aufgabe gibt.
   return selectTodo(id);
 }
 
@@ -195,6 +214,14 @@ async function purgeTodo(id: number): Promise<number> {
   // folgenlos, siehe Vertrag in storeTypes.ts.
   await db.execute("DELETE FROM todos WHERE id = $1 AND deleted_at IS NOT NULL", [id]);
   return id;
+}
+
+// Ohne Papierkorb-Bedingung, mit Absicht: todo_tags haengt auch an abgelegten
+// Aufgaben, endgueltig geloeschte hat das CASCADE schon mitgenommen.
+async function listTags(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select<{ name: string }[]>("SELECT DISTINCT name FROM todo_tags");
+  return normalizeTags(rows.map((r) => r.name));
 }
 
 async function purgeDeletedBefore(cutoff: string): Promise<number> {
@@ -300,6 +327,7 @@ export const sqlTodoStore: TodoStore = {
   toggleTodoDone,
   deleteTodo,
   listDeletedTodos,
+  listTags,
   restoreTodo,
   purgeTodo,
   purgeDeletedBefore,

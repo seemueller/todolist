@@ -50,6 +50,9 @@ export type { TypeSelectProps } from "./TypeSelect";
 export { TypeFilterBar } from "./TypeFilterBar";
 export type { TypeFilterBarProps, TypeFilterValue } from "./TypeFilterBar";
 
+export { TagFilterSelect } from "./TagFilterSelect";
+export type { TagFilterSelectProps } from "./TagFilterSelect";
+
 export { DueDateBadge } from "./DueDateBadge";
 export type { BadgeVariant, DueDateBadgeProps } from "./DueDateBadge";
 
@@ -58,6 +61,9 @@ export type { CategoryBadgeProps, CategoryBadgeVariant } from "./CategoryBadge";
 
 export { TypeBadge } from "./TypeBadge";
 export type { TypeBadgeProps, TypeBadgeVariant } from "./TypeBadge";
+
+export { TagChip } from "./TagChip";
+export type { TagChipProps, TagChipVariant } from "./TagChip";
 
 export { Modal } from "./Modal";
 export type { ModalProps, ModalVariant } from "./Modal";

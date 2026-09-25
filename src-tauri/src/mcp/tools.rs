@@ -31,8 +31,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use super::TodoServer;
+use super::echo::quoted;
 use super::slots::parse_slot;
 use super::store::{self, StoreError, TodoUpdate};
+use crate::tags;
 
 // --- Antworten --------------------------------------------------------------
 
@@ -109,6 +111,14 @@ const MAX_CATEGORY_CHARS: usize = 100;
 /// Eine Beschreibung darf ein paar Absaetze lang sein, kein Dokument.
 /// 4000 Zeichen sind etwa anderthalb Seiten Prosa.
 const MAX_DESCRIPTION_CHARS: usize = 4000;
+/// Mehr Tags an einer Aufgabe sind kein Ordnungssystem mehr, sondern Unsinn.
+const MAX_TAGS: usize = 20;
+/// So viele Eintraege nimmt `check_tags` ueberhaupt an, bevor es normalisiert.
+/// Grosszuegig ueber `MAX_TAGS`, damit Dubletten nicht schon hier scheitern.
+const MAX_RAW_TAGS: usize = 100;
+/// So lang darf ein Tag vor der Normalisierung sein. Grosszuegig ueber
+/// `tags::MAX_TAG_CHARS`, weil Leerraum am Rand und im Inneren noch schrumpft.
+const MAX_RAW_TAG_CHARS: usize = 200;
 
 /// Prueft ein Textfeld auf Laenge und Steuerzeichen.
 ///
@@ -218,6 +228,58 @@ fn set_or_clear(value: Option<&str>, clear: Option<bool>) -> Option<Option<Strin
     value.map(|text| Some(text.to_string()))
 }
 
+/// Prueft die Tags eines Aufrufs und gibt sie normalisiert zurueck.
+///
+/// Anders als die Oberflaeche verwirft das hier nichts still: ein Tag, das nach
+/// der Normalisierung leer oder zu lang waere, ist ein Fehler -- der Aufrufer
+/// bekaeme sonst weniger zurueck, als er geschickt hat. Steuerzeichen werden
+/// abgelehnt statt zu "-" gemacht, dieselbe Entscheidung wie in `check_text`.
+fn check_tags(raw: &[String]) -> Result<Vec<String>, String> {
+    // Grenzen auf der Rohform, vor jeder NFC-Arbeit: sonst liesse sich
+    // beliebig viel Text durch die Normalisierung schicken, solange er am Ende
+    // auf wenige kurze Tags zusammenfaellt (Dubletten, entfernte BOMs).
+    if raw.len() > MAX_RAW_TAGS {
+        return Err(format!(
+            "Eine Aufgabe traegt hoechstens {MAX_TAGS} Tags; angegeben waren {} Eintraege.",
+            raw.len()
+        ));
+    }
+    let mut checked = Vec::new();
+    for tag in raw {
+        if tag.chars().nth(MAX_RAW_TAG_CHARS).is_some() {
+            return Err(format!(
+                "{} ist kein Tag: ein Tag darf nicht leer sein und hoechstens {} Zeichen haben.",
+                quoted(tag),
+                tags::MAX_TAG_CHARS
+            ));
+        }
+        if tag.chars().any(char::is_control) {
+            return Err(format!(
+                "Das Tag {} enthaelt Steuerzeichen; erlaubt sind Woerter, durch Leerzeichen getrennt.",
+                quoted(tag)
+            ));
+        }
+        match tags::normalize_tag(tag) {
+            Some(normalized) => checked.push(normalized),
+            None => {
+                return Err(format!(
+                    "{} ist kein Tag: ein Tag darf nicht leer sein und hoechstens {} Zeichen haben.",
+                    quoted(tag),
+                    tags::MAX_TAG_CHARS
+                ));
+            }
+        }
+    }
+    let checked = tags::normalize_tags(&checked);
+    if checked.len() > MAX_TAGS {
+        return Err(format!(
+            "Eine Aufgabe traegt hoechstens {MAX_TAGS} Tags; angegeben waren {}.",
+            checked.len()
+        ));
+    }
+    Ok(checked)
+}
+
 // --- Parameter --------------------------------------------------------------
 
 /// Filter fuer `list_todos`. Alle Felder sind optional; ohne Angabe kommt alles.
@@ -255,6 +317,11 @@ pub struct AddTodo {
     /// Ein unbekannter Name ist ein Fehler; ueber dieses Tool entsteht keine
     /// neue Kategorie. Ohne Angabe bleibt die Aufgabe ohne Kategorie.
     pub category: Option<String>,
+    /// Tags der Aufgabe, z.B. ["frontend", "ux review"]. Sie werden
+    /// kleingeschrieben, Leerraum im Inneren wird zu "-" (also "ux-review"),
+    /// doppelte fallen weg. Hoechstens 20 Tags, je hoechstens 40 Zeichen,
+    /// keine Steuerzeichen. Ohne Angabe hat die Aufgabe keine Tags.
+    pub tags: Option<Vec<String>>,
 }
 
 /// Eine Aenderung an einer Aufgabe. Nur die angegebenen Felder aendern sich.
@@ -287,6 +354,11 @@ pub struct UpdateTodo {
     /// unveraendert; herausgenommen wird die Aufgabe ausschliesslich ueber
     /// "clear_category".
     pub category: Option<String>,
+    /// Neue Tags. Sie ERSETZEN die bisherigen vollstaendig -- wer einen Tag
+    /// hinzufuegen will, schickt die bisherigen mit ("list_todos" nennt sie).
+    /// Dieselben Regeln wie bei "add_todo". Weglassen, null und [] lassen die
+    /// Tags unveraendert; geleert werden sie ausschliesslich ueber "clear_tags".
+    pub tags: Option<Vec<String>>,
     /// true leert die Beschreibung; false und Weglassen lassen sie stehen.
     /// Nicht zusammen mit "description" zu verwenden -- beides zugleich ist
     /// ein Fehler.
@@ -299,6 +371,9 @@ pub struct UpdateTodo {
     /// lassen sie darin. Nicht zusammen mit "category" zu verwenden -- beides
     /// zugleich ist ein Fehler.
     pub clear_category: Option<bool>,
+    /// true entfernt alle Tags; false und Weglassen lassen sie stehen. Nicht
+    /// zusammen mit "tags" zu verwenden -- beides zugleich ist ein Fehler.
+    pub clear_tags: Option<bool>,
 }
 
 /// Die zu loeschende Aufgabe.
@@ -352,7 +427,7 @@ pub struct BookTime {
 #[tool_router(vis = "pub(crate)")]
 impl TodoServer {
     #[tool(
-        description = "Listet die Aufgaben der TodoList-App, neueste zuerst, wahlweise nach Status, Kategorie und Faelligkeit gefiltert. Ohne Filter kommen alle Aufgaben. Jede Aufgabe enthaelt ihre Id, mit der \"update_todo\" und \"delete_todo\" arbeiten."
+        description = "Listet die Aufgaben der TodoList-App, neueste zuerst, wahlweise nach Status, Kategorie und Faelligkeit gefiltert. Ohne Filter kommen alle Aufgaben. Jede Aufgabe enthaelt ihre Id, mit der \"update_todo\" und \"delete_todo\" arbeiten, und ihre Tags."
     )]
     async fn list_todos(
         &self,
@@ -372,7 +447,7 @@ impl TodoServer {
     }
 
     #[tool(
-        description = "Legt eine neue Aufgabe an und gibt sie samt ihrer Id zurueck. Ohne weitere Angaben bekommt sie den Status \"todo\", den Typ \"task\", keine Faelligkeit und keine Kategorie. Eine Beschreibung ist optional und darf mehrere Zeilen haben."
+        description = "Legt eine neue Aufgabe an und gibt sie samt ihrer Id zurueck. Ohne weitere Angaben bekommt sie den Status \"todo\", den Typ \"task\", keine Faelligkeit und keine Kategorie. Eine Beschreibung ist optional und darf mehrere Zeilen haben. Tags sind optional."
     )]
     async fn add_todo(
         &self,
@@ -390,21 +465,26 @@ impl TodoServer {
         if let Err(message) = checked {
             return Ok(tool_error(message));
         }
+        let tags = match check_tags(params.tags.as_deref().unwrap_or_default()) {
+            Ok(tags) => tags,
+            Err(message) => return Ok(tool_error(message)),
+        };
         self.respond_write(
-            store::add_todo(
+            store::add_todo_tagged(
                 &self.pool,
                 params.title.trim(),
                 non_empty(&params.due_date),
                 non_empty(&params.category),
                 params.description.as_deref(),
                 non_empty(&params.r#type),
+                &tags,
             )
             .await,
         )
     }
 
     #[tool(
-        description = "Aendert eine bestehende Aufgabe und gibt sie danach zurueck. Es aendern sich ausschliesslich die angegebenen Felder; alles Weggelassene bleibt, wie es war -- auch ein Feld, das als null oder als leerer Text ankommt. Um eine Aufgabe abzuhaken, ist der Status auf \"done\" zu setzen. Geleert wird ausschliesslich ueber \"clear_description\", \"clear_due_date\" und \"clear_category\". Der Typ (\"bug\", \"task\", \"story\") laesst sich setzen, aber nicht leeren."
+        description = "Aendert eine bestehende Aufgabe und gibt sie danach zurueck. Es aendern sich ausschliesslich die angegebenen Felder; alles Weggelassene bleibt, wie es war -- auch ein Feld, das als null oder als leerer Text ankommt. Um eine Aufgabe abzuhaken, ist der Status auf \"done\" zu setzen. Geleert wird ausschliesslich ueber \"clear_description\", \"clear_due_date\", \"clear_category\" und \"clear_tags\". \"tags\" ersetzt die bisherigen Tags vollstaendig. Der Typ (\"bug\", \"task\", \"story\") laesst sich setzen, aber nicht leeren."
     )]
     async fn update_todo(
         &self,
@@ -418,6 +498,18 @@ impl TodoServer {
             .filter(|text| !text.is_empty());
         let due_date = non_empty(&params.due_date);
         let category = non_empty(&params.category);
+        // Ein leeres Array heisst "nicht angegeben", wie "" bei den Textfeldern.
+        let tags = params.tags.as_deref().filter(|tags| !tags.is_empty());
+        if tags.is_some() && params.clear_tags == Some(true) {
+            return Ok(tool_error(
+                "Die Tags koennen nicht zugleich gesetzt und geleert werden: \
+                 entweder \"tags\" angeben oder \"clear_tags\" setzen.",
+            ));
+        }
+        let checked_tags = match tags.map(check_tags).transpose() {
+            Ok(tags) => tags,
+            Err(message) => return Ok(tool_error(message)),
+        };
 
         let checked = check_optional(
             "Der Titel",
@@ -466,6 +558,11 @@ impl TodoServer {
             r#type: non_empty(&params.r#type).map(str::to_string),
             due_date: set_or_clear(due_date, params.clear_due_date),
             category: set_or_clear(category, params.clear_category),
+            tags: if params.clear_tags == Some(true) {
+                Some(Vec::new())
+            } else {
+                checked_tags
+            },
         };
         self.respond_write(store::update_todo(&self.pool, params.id, update).await)
     }
@@ -703,6 +800,7 @@ mod tests {
                 due_date: Some("2026-04-01".into()),
                 category: Some("intern".into()),
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -724,6 +822,7 @@ mod tests {
                 due_date: None,
                 category: Some("Urlaub".into()),
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("an unknown category is not a protocol error");
@@ -1232,6 +1331,7 @@ mod tests {
                 due_date: None,
                 category: None,
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -1310,6 +1410,7 @@ mod tests {
                 due_date: None,
                 category: Some("Kundenprojekt".into()),
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("an unknown category is not a protocol error");
@@ -1374,6 +1475,7 @@ mod tests {
                 due_date: None,
                 category: None,
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -1537,6 +1639,7 @@ mod tests {
             due_date: None,
             category: None,
             r#type: None,
+            tags: None,
         }
     }
 
@@ -1720,6 +1823,7 @@ mod tests {
                 due_date: None,
                 category: Some("Kunden\u{0}projekt".to_string()),
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -1784,6 +1888,7 @@ mod tests {
                 due_date: None,
                 category: None,
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -1803,6 +1908,7 @@ mod tests {
                 due_date: None,
                 category: None,
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -1829,6 +1935,7 @@ mod tests {
                 due_date: None,
                 category: None,
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -1906,6 +2013,7 @@ mod tests {
                 due_date: None,
                 category: None,
                 r#type: Some("bug".to_string()),
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -1922,6 +2030,7 @@ mod tests {
                 due_date: None,
                 category: None,
                 r#type: None,
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -1938,6 +2047,7 @@ mod tests {
                 due_date: None,
                 category: None,
                 r#type: Some("epic".to_string()),
+                tags: None,
             }))
             .await
             .expect("no protocol error");
@@ -1979,5 +2089,160 @@ mod tests {
             .await
             .expect("no protocol error");
         assert_eq!(ok_json(&result)["type"], "bug");
+    }
+
+    // --- Tags ---------------------------------------------------------------
+
+    #[tokio::test]
+    async fn add_todo_stores_normalized_tags() {
+        let (server, _pool) = server().await;
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                tags: Some(vec!["Frontend".into(), "UX Review".into(), "frontend".into()]),
+                ..add_todo_params("Mit Tags")
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["tags"], serde_json::json!(["frontend", "ux-review"]));
+    }
+
+    #[tokio::test]
+    async fn add_todo_refuses_an_over_long_tag_and_writes_nothing() {
+        let (server, pool) = server().await;
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                tags: Some(vec!["x".repeat(41)]),
+                ..add_todo_params("Zu lang")
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&result, "40");
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM todos")
+            .fetch_one(&pool)
+            .await
+            .expect("count");
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn add_todo_refuses_a_tag_with_control_characters() {
+        let (server, _pool) = server().await;
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                tags: Some(vec!["a\tb".into()]),
+                ..add_todo_params("Tab")
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&result, "Steuerzeichen");
+    }
+
+    #[test]
+    fn check_tags_refuses_an_over_long_raw_tag_before_normalizing() {
+        // Normalisiert bliebe nur "a" uebrig -- die Grenze greift vorher, damit
+        // kein Aufrufer beliebig viel Text durch NFC schicken kann.
+        let raw = format!("a{}", "\u{feff}".repeat(250));
+        let error = super::check_tags(&[raw]).expect_err("raw tag too long");
+        assert!(error.contains("ist kein Tag"), "{error}");
+        assert!(error.contains("40"), "{error}");
+    }
+
+    #[test]
+    fn check_tags_refuses_too_many_raw_entries_even_if_they_collapse() {
+        // 101 Mal dasselbe Tag waere nach dem Entdoppeln eines.
+        let raw: Vec<String> = (0..101).map(|_| "a".to_string()).collect();
+        let error = super::check_tags(&raw).expect_err("too many raw entries");
+        assert!(error.contains("20"), "{error}");
+    }
+
+    #[test]
+    fn check_tags_accepts_a_hundred_raw_entries_that_collapse() {
+        let raw: Vec<String> = (0..100).map(|_| "a".to_string()).collect();
+        assert_eq!(super::check_tags(&raw).expect("100 is the limit"), vec!["a"]);
+    }
+
+    #[tokio::test]
+    async fn add_todo_refuses_more_than_twenty_tags() {
+        let (server, _pool) = server().await;
+        let many: Vec<String> = (0..21).map(|i| format!("tag{i}")).collect();
+        let result = server
+            .add_todo(Parameters(super::AddTodo {
+                tags: Some(many),
+                ..add_todo_params("Viele")
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&result, "20");
+    }
+
+    #[tokio::test]
+    async fn update_todo_replaces_the_tags() {
+        let (server, pool) = server().await;
+        let todo = store::add_todo_tagged(&pool, "T", None, None, None, None, &["alt".into()])
+            .await
+            .expect("add");
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id: todo.id,
+                tags: Some(vec!["neu".into()]),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["tags"], serde_json::json!(["neu"]));
+    }
+
+    /// Issue #35 auch fuer Tags: ein leeres Array ist "nicht angegeben".
+    #[tokio::test]
+    async fn update_todo_keeps_the_tags_on_an_empty_list() {
+        let (server, pool) = server().await;
+        let todo = store::add_todo_tagged(&pool, "T", None, None, None, None, &["alt".into()])
+            .await
+            .expect("add");
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id: todo.id,
+                title: Some("Neu".into()),
+                tags: Some(Vec::new()),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["tags"], serde_json::json!(["alt"]));
+    }
+
+    #[tokio::test]
+    async fn update_todo_clears_the_tags_with_the_flag() {
+        let (server, pool) = server().await;
+        let todo = store::add_todo_tagged(&pool, "T", None, None, None, None, &["alt".into()])
+            .await
+            .expect("add");
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id: todo.id,
+                clear_tags: Some(true),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        assert_eq!(ok_json(&result)["tags"], serde_json::json!([]));
+    }
+
+    #[tokio::test]
+    async fn update_todo_refuses_to_set_and_clear_the_tags() {
+        let (server, pool) = server().await;
+        let todo = store::add_todo(&pool, "T", None, None, None, None)
+            .await
+            .expect("add");
+        let result = server
+            .update_todo(Parameters(super::UpdateTodo {
+                id: todo.id,
+                tags: Some(vec!["a".into()]),
+                clear_tags: Some(true),
+                ..Default::default()
+            }))
+            .await
+            .expect("no protocol error");
+        tool_error(&result, "clear_tags");
     }
 }

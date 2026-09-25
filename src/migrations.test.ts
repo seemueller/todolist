@@ -63,4 +63,10 @@ describe("sql migrations", () => {
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name_key ON categories(name_key);"
     );
   });
+
+  it("adds the todo_tags table with a cascading foreign key", () => {
+    expect(source).toContain("add_todo_tags");
+    expect(source).toContain("CREATE TABLE IF NOT EXISTS todo_tags");
+    expect(source).toContain("REFERENCES todos(id) ON DELETE CASCADE");
+  });
 });

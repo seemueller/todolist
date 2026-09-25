@@ -1,15 +1,22 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  loadActiveTagFilterId,
   loadStatusFilter,
+  loadTagFilters,
   loadTodoModalSize,
   loadTypeFilter,
+  saveActiveTagFilterId,
   saveStatusFilter,
+  saveTagFilters,
   saveTodoModalSize,
   saveTypeFilter,
+  ACTIVE_TAG_FILTER_KEY,
   STATUS_FILTER_KEY,
+  TAG_FILTERS_KEY,
   TODO_MODAL_SIZE_KEY,
   TYPE_FILTER_KEY,
 } from "./listPrefs";
+import type { TagFilter } from "./tagFilter";
 
 describe("listPrefs", () => {
   beforeEach(() => localStorage.clear());
@@ -91,5 +98,55 @@ describe("typeFilter", () => {
     saveTypeFilter("story");
     expect(localStorage.getItem(TYPE_FILTER_KEY)).toBe("story");
     expect(loadTypeFilter()).toBe("story");
+  });
+});
+
+describe("tag filters", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  const FILTER: TagFilter = {
+    id: "f1",
+    name: "Frontend",
+    match: "all",
+    rules: [{ kind: "has", tag: "frontend" }],
+  };
+
+  it("liefert ohne Eintrag eine leere Liste", () => {
+    expect(loadTagFilters()).toEqual([]);
+  });
+
+  it("liest zurueck, was gespeichert wurde", () => {
+    saveTagFilters([FILTER]);
+    expect(loadTagFilters()).toEqual([FILTER]);
+  });
+
+  it("uebersteht kaputtes JSON und kaputte Eintraege", () => {
+    localStorage.setItem(TAG_FILTERS_KEY, "{kaputt");
+    expect(loadTagFilters()).toEqual([]);
+
+    localStorage.setItem(TAG_FILTERS_KEY, JSON.stringify([FILTER, { id: 3 }, "x"]));
+    expect(loadTagFilters()).toEqual([FILTER]);
+  });
+
+  it("behaelt bei doppelter Id nur den ersten Filter", () => {
+    const twin = { ...FILTER, name: "Zwilling" };
+    localStorage.setItem(TAG_FILTERS_KEY, JSON.stringify([FILTER, twin]));
+    expect(loadTagFilters()).toEqual([FILTER]);
+  });
+
+  it("merkt sich den aktiven Filter und vergisst ihn", () => {
+    saveActiveTagFilterId("f1");
+    expect(loadActiveTagFilterId([FILTER])).toBe("f1");
+
+    saveActiveTagFilterId(null);
+    expect(localStorage.getItem(ACTIVE_TAG_FILTER_KEY)).toBeNull();
+    expect(loadActiveTagFilterId([FILTER])).toBeNull();
+  });
+
+  it("vergisst eine aktive Id, zu der es keinen Filter mehr gibt", () => {
+    saveActiveTagFilterId("weg");
+    expect(loadActiveTagFilterId([FILTER])).toBeNull();
   });
 });
