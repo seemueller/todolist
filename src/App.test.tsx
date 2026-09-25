@@ -74,7 +74,7 @@ vi.mock("./CustomTitleBar", () => ({
   CustomTitleBar: () => null,
 }));
 
-const todoBase = { description: "", type: "task" as TodoType, due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null, status: "todo" as const, board_order: 0 };
+const todoBase = { description: "", type: "task" as TodoType, tags: [] as string[], due_date: null, category_id: null as number | null, category_name: null as string | null, category_color: null as string | null, status: "todo" as const, board_order: 0 };
 
 const makeTodo = (overrides = {}) => ({
   id: 1,

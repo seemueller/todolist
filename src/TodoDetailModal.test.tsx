@@ -16,6 +16,7 @@ function makeTodo(overrides: Partial<Todo> = {}): Todo {
     done: false,
     status: "todo",
     type: "task",
+    tags: [],
     created_at: "2026-09-13T10:00:00.000Z",
     due_date: null,
     category_id: null,

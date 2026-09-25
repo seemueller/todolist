@@ -17,7 +17,13 @@ import {
   TODO_TYPES,
   TODO_TYPE_LABELS,
   toTodoType,
+  normalizeTag,
+  normalizeTags,
+  parseTags,
 } from "./types";
+import { readFileSync } from "node:fs";
+// Aliased wie in migrations.test.ts: jsdom ersetzt das globale URL.
+import { URL as NodeURL } from "node:url";
 
 /** "Ärzte" zerlegt: A plus kombinierendes Trema (NFD). */
 const NFD_AERZTE = "A\u0308rzte";
@@ -46,6 +52,7 @@ describe("fromRow", () => {
       done: true,
       status: "done",
       type: "task",
+      tags: [],
       created_at: "2026-01-01T00:00:00Z",
       due_date: null,
       category_id: null,
@@ -237,6 +244,7 @@ describe("sortTodos", () => {
     done: false,
     status: "todo",
     type: "task",
+    tags: [],
     created_at,
     due_date: null,
     category_id: null,
@@ -342,6 +350,7 @@ describe("sortBoardTodos", () => {
     done: false,
     status: "todo",
     type: "task",
+    tags: [],
     created_at: "2026-01-01T00:00:00.000Z",
     due_date: null,
     category_id: null,
@@ -462,5 +471,63 @@ describe("fromRow mit Typ", () => {
       category_color: null,
     };
     expect(fromRow(row).type).toBe("task");
+  });
+});
+
+// Dieselbe Tabelle prueft src-tauri/src/tags.rs. Laeuft eine Seite weg,
+// faellt ihr Test -- sonst normalisierten Oberflaeche und MCP verschieden.
+const TAG_CASES = JSON.parse(
+  readFileSync(new NodeURL("../src-tauri/src/tag_cases.json", import.meta.url), "utf8")
+) as { input: string; output: string | null }[];
+
+describe("normalizeTag", () => {
+  it.each(TAG_CASES)("normalisiert $input", ({ input, output }) => {
+    expect(normalizeTag(input)).toBe(output);
+  });
+});
+
+describe("normalizeTags", () => {
+  it("normalisiert, entfernt Dubletten und Leeres, sortiert", () => {
+    expect(normalizeTags(["Zebra", "  alpha", "ALPHA", " ", "ärger"])).toEqual([
+      "alpha",
+      "ärger",
+      "zebra",
+    ]);
+  });
+});
+
+describe("parseTags", () => {
+  it("liest die JSON-Spalte des SQL-Stores", () => {
+    expect(parseTags('["b","a"]')).toEqual(["a", "b"]);
+  });
+
+  it("liest ein Array aus dem localStorage-Store", () => {
+    expect(parseTags(["B", "a"])).toEqual(["a", "b"]);
+  });
+
+  it("liefert fuer Fehlendes und Kaputtes ein leeres Array", () => {
+    expect(parseTags(undefined)).toEqual([]);
+    expect(parseTags("kein json")).toEqual([]);
+    expect(parseTags('{"a":1}')).toEqual([]);
+    expect(parseTags([1, "ok", null])).toEqual(["ok"]);
+  });
+});
+
+describe("fromRow tags", () => {
+  it("setzt ohne Spalte ein leeres Array", () => {
+    const todo = fromRow({
+      id: 1, title: "Alt", done: 0, created_at: "2026-01-01T00:00:00.000Z",
+      due_date: null, category_id: null, category_name: null, category_color: null,
+    });
+    expect(todo.tags).toEqual([]);
+  });
+
+  it("liest die Spalte", () => {
+    const todo = fromRow({
+      id: 1, title: "Neu", done: 0, created_at: "2026-01-01T00:00:00.000Z",
+      due_date: null, category_id: null, category_name: null, category_color: null,
+      tags: '["frontend"]',
+    });
+    expect(todo.tags).toEqual(["frontend"]);
   });
 });

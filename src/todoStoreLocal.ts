@@ -15,6 +15,7 @@ import {
   sortTodos,
   categoryNameKey,
   canonicalCategoryName,
+  parseTags,
 } from "./types";
 import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
@@ -82,11 +83,12 @@ function loadTodos(): StoredTodoRecord[] {
 
 // Holt Eintraege aus aelteren Staenden auf den heutigen Stand: `status` kam
 // mit dem Brett dazu, `description` mit dem Detail-Fenster, `type` mit dem
-// Aufgabentyp. Alles davon fehlt in Daten, die davor geschrieben wurden.
+// Aufgabentyp, `tags` mit den Tags. Alles davon fehlt in Daten, die davor
+// geschrieben wurden.
 /** Ein Eintrag so, wie ihn ein aelterer Stand geschrieben haben kann: `status`,
- *  `description` und `type` koennen fehlen, `priority` kann noch dastehen. */
-type StoredTodo = Omit<StoredTodoRecord, "status" | "description" | "board_order" | "type"> &
-  Partial<Pick<StoredTodoRecord, "status" | "description" | "board_order" | "type">> & {
+ *  `description`, `type` und `tags` koennen fehlen, `priority` kann noch dastehen. */
+type StoredTodo = Omit<StoredTodoRecord, "status" | "description" | "board_order" | "type" | "tags"> &
+  Partial<Pick<StoredTodoRecord, "status" | "description" | "board_order" | "type" | "tags">> & {
     priority?: unknown;
   };
 
@@ -100,9 +102,10 @@ function migrateTodos(todos: StoredTodo[]): StoredTodoRecord[] {
     // unbekannter Wert wird zur Aufgabe, und zwar ueber toTodoType aus
     // types.ts, damit beide Speicher dieselbe Regel benutzen.
     const type = toTodoType(todo.type);
-    if (todo.status) return { ...todo, description, board_order, type, status: todo.status };
+    const tags = parseTags(todo.tags);
+    if (todo.status) return { ...todo, description, board_order, type, tags, status: todo.status };
     const status: TodoStatus = todo.done ? "done" : "todo";
-    return { ...todo, description, board_order, type, status, done: status === "done" };
+    return { ...todo, description, board_order, type, tags, status, done: status === "done" };
   });
 }
 
@@ -162,6 +165,7 @@ function addTodo(
     done: false,
     status: "todo",
     type,
+    tags: [],
     created_at: now(),
     due_date: dueDate,
     category_id: categoryId ?? null,
