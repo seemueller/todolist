@@ -19,6 +19,7 @@ import {
   deleteTodo,
   restoreTodo,
   listCategories,
+  listTags,
   listTodos,
   toggleTodoDone,
   updateCategory,
@@ -29,20 +30,26 @@ import {
 } from "./db";
 import { DATA_CHANGED_EVENT } from "./events";
 import {
+  loadActiveTagFilterId,
   loadStatusFilter,
+  loadTagFilters,
   loadTypeFilter,
+  saveActiveTagFilterId,
   saveStatusFilter,
+  saveTagFilters,
   saveTypeFilter,
   type StatusFilter,
   type TypeFilter,
 } from "./listPrefs";
 import { isTauri } from "./sqlClient";
 import type { TodoFieldsPatch } from "./storeTypes";
-import { CATEGORY_COLORS, Category, TODO_TYPE_LABELS, computeBoardOrder, needsRebalance, rebalanceBoardOrders, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus, type TodoType } from "./types";
+import { matchesTagFilter, type TagFilter } from "./tagFilter";
+import { CATEGORY_COLORS, Category, TODO_TYPE_LABELS, computeBoardOrder, needsRebalance, normalizeTags, rebalanceBoardOrders, sortBoardTodos, sortCategories, sortTodos, type TimeKind, Todo, TodoStatus, type TodoType } from "./types";
 import { APP_VERSION, CHANGELOG } from "./version";
 import { CustomTitleBar } from "./CustomTitleBar";
 import { McpSettings } from "./McpSettings";
 import { TimeTrackingView } from "./TimeTrackingView";
+import { TagFilterEditor } from "./TagFilterEditor";
 import { TodoDetailModal } from "./TodoDetailModal";
 import { TrashModal } from "./TrashModal";
 
@@ -77,6 +84,8 @@ import {
   NoteIcon,
   PencilIcon,
   PlusIcon,
+  TagChip,
+  TagFilterSelect,
   TagIcon,
   TimeKindSelect,
   TrashIcon,
@@ -185,6 +194,17 @@ function App({ migrationError = null }: AppProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(loadStatusFilter);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>(loadTypeFilter);
   const [searchQuery, setSearchQuery] = useState("");
+  // Tag-Filter: gespeichert wie der Statusfilter in localStorage, ein aktiver
+  // fuer Liste und Brett zugleich.
+  const [tagFilters, setTagFilters] = useState<TagFilter[]>(loadTagFilters);
+  const [activeTagFilterId, setActiveTagFilterId] = useState<string | null>(() =>
+    loadActiveTagFilterId(tagFilters)
+  );
+  const activeTagFilter = tagFilters.find((f) => f.id === activeTagFilterId) ?? null;
+  // undefined: Editor zu; null: neuer Filter; sonst der zu bearbeitende.
+  const [editingTagFilter, setEditingTagFilter] = useState<TagFilter | null | undefined>(undefined);
+  // Vorschlaege fuer Tag-Feld und Editor -- alle Tags, auch die im Papierkorb.
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
   // Category state
   const [categories, setCategories] = useState<Category[]>([]);
@@ -237,6 +257,31 @@ function App({ migrationError = null }: AppProps) {
     saveTypeFilter(value);
   }, []);
 
+  const changeActiveTagFilter = useCallback((id: string | null) => {
+    setActiveTagFilterId(id);
+    saveActiveTagFilterId(id);
+  }, []);
+
+  // Speichern waehlt den Filter zugleich -- wer ihn gerade gebaut hat, will
+  // sehen, was er trifft.
+  function handleSaveTagFilter(filter: TagFilter) {
+    const next = tagFilters.some((f) => f.id === filter.id)
+      ? tagFilters.map((f) => (f.id === filter.id ? filter : f))
+      : [...tagFilters, filter];
+    setTagFilters(next);
+    saveTagFilters(next);
+    changeActiveTagFilter(filter.id);
+    setEditingTagFilter(undefined);
+  }
+
+  function handleDeleteTagFilter(id: string) {
+    const next = tagFilters.filter((f) => f.id !== id);
+    setTagFilters(next);
+    saveTagFilters(next);
+    if (activeTagFilterId === id) changeActiveTagFilter(null);
+    setEditingTagFilter(undefined);
+  }
+
   /**
    * Laedt Aufgaben und Kategorien neu.
    *
@@ -258,12 +303,14 @@ function App({ migrationError = null }: AppProps) {
    */
   async function refresh(clearErrorOnSuccess = false) {
     try {
-      const [items, cats] = await Promise.all([
+      const [items, cats, tags] = await Promise.all([
         listTodos(),
         listCategories(),
+        listTags(),
       ]);
       setTodos(items);
       setCategories(cats);
+      setTagSuggestions(tags);
       if (clearErrorOnSuccess) setError(null);
     } catch (err) {
       setError(String(err));
@@ -450,6 +497,9 @@ function App({ migrationError = null }: AppProps) {
   async function handleSaveDetail(id: number, patch: TodoFieldsPatch) {
     const updated = await updateTodoFields(id, patch);
     setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    // Neue Tags gleich vorschlagen, ohne Nachladen. Weggenommene bleiben bis
+    // zum naechsten refresh stehen -- eine andere Aufgabe kann sie noch tragen.
+    setTagSuggestions((prev) => normalizeTags([...prev, ...updated.tags]));
     setError(null);
   }
 
@@ -472,9 +522,10 @@ function App({ migrationError = null }: AppProps) {
       todos.filter(
         (t) =>
           (boardCategories.size === 0 || boardCategories.has(t.category_id)) &&
-          (boardType === "all" || t.type === boardType)
+          (boardType === "all" || t.type === boardType) &&
+          (activeTagFilter === null || matchesTagFilter(t.tags, activeTagFilter))
       ),
-    [todos, boardCategories, boardType]
+    [todos, boardCategories, boardType, activeTagFilter]
   );
 
   const kanbanLanes: { status: TodoStatus; label: string; icon: ReactNode; color: string }[] = [
@@ -773,6 +824,7 @@ function App({ migrationError = null }: AppProps) {
     if (statusFilter === "open" && todo.done) return false;
     if (statusFilter === "done" && !todo.done) return false;
     if (categoryFilter !== null && todo.category_id !== categoryFilter) return false;
+    if (activeTagFilter && !matchesTagFilter(todo.tags, activeTagFilter)) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       if (!todo.title.toLowerCase().includes(query)) return false;
@@ -784,7 +836,7 @@ function App({ migrationError = null }: AppProps) {
 
   // "Offen" ist die Voreinstellung und damit kein gesetzter Filter, ueber den
   // das Band informieren muesste.
-  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "open" || typeFilter !== "all" || searchQuery || categoryFilter !== null;
+  const hasActiveFilter = dueDateFilter !== "all" || statusFilter !== "open" || typeFilter !== "all" || searchQuery || categoryFilter !== null || activeTagFilter !== null;
 
   // Beide Ansichten teilen sich diese eine Fehlermeldung -- die Liste zeigt
   // sie an ihrer angestammten Stelle, das Brett hat sonst keine.
@@ -902,6 +954,13 @@ function App({ migrationError = null }: AppProps) {
               onValueChange={setCategoryFilter}
               placeholderLabel="Alle Kategorien"
             />
+            <TagFilterSelect
+              filters={tagFilters}
+              activeId={activeTagFilterId}
+              onActiveChange={changeActiveTagFilter}
+              onEdit={() => setEditingTagFilter(activeTagFilter)}
+              onCreate={() => setEditingTagFilter(null)}
+            />
             <IconButton
               variant="icon"
               onClick={() => setShowCategoryManager(true)}
@@ -927,6 +986,7 @@ function App({ migrationError = null }: AppProps) {
               {categoryFilter !== null
                 ? ` • ${categories.find((c) => c.id === categoryFilter)?.name || "Kategorie"}`
                 : ""}
+              {activeTagFilter ? ` • Tags: ${activeTagFilter.name}` : ""}
               {searchQuery ? ` • Suche: "${searchQuery}"` : ""}
             </span>
             <button
@@ -938,6 +998,7 @@ function App({ migrationError = null }: AppProps) {
                 changeTypeFilter("all");
                 setSearchQuery("");
                 setCategoryFilter(null);
+                changeActiveTagFilter(null);
               }}
             >
               Zurücksetzen
@@ -1016,6 +1077,14 @@ function App({ migrationError = null }: AppProps) {
                   <CategoryBadge color={todo.category_color}>{todo.category_name}</CategoryBadge>
                 )}
 
+                {todo.tags.length > 0 && (
+                  <span className="tag-list">
+                    {todo.tags.map((tag) => (
+                      <TagChip key={tag} tag={tag} />
+                    ))}
+                  </span>
+                )}
+
                 <CategorySelect
                   className="todo-select"
                   categories={categories}
@@ -1073,6 +1142,13 @@ function App({ migrationError = null }: AppProps) {
               weiterhin die Tintenflaeche tragen kann. */}
           <div className="board-filter-bar">
           <TypeFilterBar value={boardType} onValueChange={setBoardType} />
+          <TagFilterSelect
+            filters={tagFilters}
+            activeId={activeTagFilterId}
+            onActiveChange={changeActiveTagFilter}
+            onEdit={() => setEditingTagFilter(activeTagFilter)}
+            onCreate={() => setEditingTagFilter(null)}
+          />
           <div className="board-filter" role="group" aria-label="Kategorien filtern">
             <FilterChip
               active={boardCategories.size === 0}
@@ -1178,6 +1254,9 @@ function App({ migrationError = null }: AppProps) {
                                 {todo.category_name}
                               </CategoryBadge>
                             )}
+                            {todo.tags.map((tag) => (
+                              <TagChip key={tag} variant="kanban" tag={tag} />
+                            ))}
                           </div>
 
                           <div className="kanban-card-actions">
@@ -1280,6 +1359,7 @@ function App({ migrationError = null }: AppProps) {
           key={detailTodo.id}
           todo={detailTodo}
           categories={categories}
+          tagSuggestions={tagSuggestions}
           onSave={handleSaveDetail}
           onClose={closeDetail}
         />
@@ -1450,6 +1530,16 @@ function App({ migrationError = null }: AppProps) {
             setJustDeleted(null);
             void refresh();
           }}
+        />
+      )}
+
+      {editingTagFilter !== undefined && (
+        <TagFilterEditor
+          filter={editingTagFilter}
+          knownTags={tagSuggestions}
+          onSave={handleSaveTagFilter}
+          onDelete={handleDeleteTagFilter}
+          onClose={() => setEditingTagFilter(undefined)}
         />
       )}
 

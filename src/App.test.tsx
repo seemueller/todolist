@@ -4,6 +4,7 @@ import App from "./App";
 import * as db from "./db";
 import { debugLogs, clearDebugLogs, installDebugInterceptor } from "./debug";
 import type { Category, TodoType } from "./types";
+import { ACTIVE_TAG_FILTER_KEY, TAG_FILTERS_KEY } from "./listPrefs";
 
 const invokeMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -63,6 +64,7 @@ vi.mock("./db", () => ({
   addCategory: vi.fn(),
   updateCategory: vi.fn(),
   deleteCategory: vi.fn(),
+  listTags: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock("./version", () => ({
@@ -1623,6 +1625,125 @@ describe("der Papierkorb-Knopf", () => {
 
       expect(screen.getByText("Epos")).toBeInTheDocument();
       expect(localStorage.getItem("todolist.typeFilter")).toBe("all");
+    });
+  });
+});
+
+describe("Tag-Filter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    insideTauri = true;
+    handlers.clear();
+  });
+
+  const FRONTEND_OPEN = {
+    id: "f1",
+    name: "Frontend offen",
+    match: "all",
+    rules: [
+      { kind: "has", tag: "frontend" },
+      { kind: "lacks", tag: "blocked" },
+    ],
+  };
+
+  const TODOS = [
+    makeTodo({ id: 1, title: "Login-Seite", tags: ["frontend"] }),
+    makeTodo({ id: 2, title: "Blockierte Seite", tags: ["blocked", "frontend"] }),
+    makeTodo({ id: 3, title: "Backend-Job", tags: ["backend"] }),
+  ];
+
+  function activate(filter = FRONTEND_OPEN) {
+    localStorage.setItem(TAG_FILTERS_KEY, JSON.stringify([filter]));
+    localStorage.setItem(ACTIVE_TAG_FILTER_KEY, filter.id);
+  }
+
+  it("zeigt die Tags einer Aufgabe in der Zeile", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue([TODOS[0]]);
+    render(<App />);
+    expect(await screen.findByText("frontend")).toHaveClass("tag-chip");
+  });
+
+  it("filtert die Liste mit dem gemerkten Tag-Filter", async () => {
+    activate();
+    vi.mocked(db.listTodos).mockResolvedValue(TODOS);
+    render(<App />);
+
+    expect(await screen.findByText("Login-Seite")).toBeInTheDocument();
+    expect(screen.queryByText("Blockierte Seite")).toBeNull();
+    expect(screen.queryByText("Backend-Job")).toBeNull();
+    expect(screen.getByText(/Tags: Frontend offen/)).toBeInTheDocument();
+  });
+
+  it("Zuruecksetzen nimmt den Tag-Filter mit", async () => {
+    activate();
+    vi.mocked(db.listTodos).mockResolvedValue(TODOS);
+    render(<App />);
+    await screen.findByText("Login-Seite");
+
+    fireEvent.click(screen.getByRole("button", { name: "Zurücksetzen" }));
+
+    expect(await screen.findByText("Backend-Job")).toBeInTheDocument();
+    expect(localStorage.getItem(ACTIVE_TAG_FILTER_KEY)).toBeNull();
+  });
+
+  it("legt einen Filter ueber den Editor an und waehlt ihn", async () => {
+    vi.mocked(db.listTodos).mockResolvedValue(TODOS);
+    render(<App />);
+    await screen.findByText("Backend-Job");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Neuer Tag-Filter" })[0]);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Backend" } });
+    fireEvent.change(screen.getByLabelText("Regel 1 Tag"), { target: { value: "backend" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(screen.queryByText("Login-Seite")).toBeNull());
+    expect(screen.getByText("Backend-Job")).toBeInTheDocument();
+    const stored = JSON.parse(localStorage.getItem(TAG_FILTERS_KEY) ?? "[]");
+    expect(stored).toHaveLength(1);
+    expect(localStorage.getItem(ACTIVE_TAG_FILTER_KEY)).toBe(stored[0].id);
+  });
+
+  it("loescht den aktiven Filter und zeigt wieder alles", async () => {
+    activate();
+    vi.mocked(db.listTodos).mockResolvedValue(TODOS);
+    render(<App />);
+    await screen.findByText("Login-Seite");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Tag-Filter bearbeiten" })[0]);
+    // Die Zeilen tragen eigene Loeschen-Knoepfe (aria-label, ohne Text) --
+    // gemeint ist der beschriftete im Editor.
+    fireEvent.click(screen.getByText("Löschen", { selector: "button" }));
+
+    expect(await screen.findByText("Backend-Job")).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem(TAG_FILTERS_KEY) ?? "[]")).toEqual([]);
+  });
+
+  it("filtert auch das Brett", async () => {
+    activate();
+    vi.mocked(db.listTodos).mockResolvedValue(TODOS);
+    render(<App />);
+    await screen.findByText("Login-Seite");
+
+    fireEvent.click(screen.getByRole("button", { name: /Zur Ansicht Brett wechseln/i }));
+
+    await screen.findByRole("button", { name: "Alle Kategorien" });
+    expect(screen.getByText("Login-Seite")).toBeInTheDocument();
+    expect(screen.queryByText("Backend-Job")).toBeNull();
+  });
+
+  it("gibt dem Detailfenster die Tag-Vorschlaege", async () => {
+    vi.mocked(db.listTags).mockResolvedValue(["backend", "frontend"]);
+    vi.mocked(db.listTodos).mockResolvedValue([TODOS[2]]);
+    const { container } = render(<App />);
+
+    fireEvent.doubleClick(await screen.findByText("Backend-Job"));
+
+    await waitFor(() => {
+      const options = [...container.ownerDocument.querySelectorAll("datalist option")].map((o) =>
+        o.getAttribute("value")
+      );
+      expect(options).toContain("frontend");
     });
   });
 });
