@@ -12,10 +12,10 @@
 
 import { useState } from "react";
 import type { KeyboardEvent } from "react";
-import { Category, Todo, normalizeTags, type TodoType } from "./types";
+import { Category, Todo, draftTags, normalizeTags, type TodoType } from "./types";
 import type { TodoFieldsPatch } from "./storeTypes";
 import { loadTodoModalSize, saveTodoModalSize } from "./listPrefs";
-import { TagInput, draftTags } from "./TagInput";
+import { TagInput } from "./TagInput";
 import {
   CategorySelect,
   IconButton,

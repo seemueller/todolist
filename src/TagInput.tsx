@@ -13,19 +13,8 @@
 
 import { useId, useRef } from "react";
 import type { KeyboardEvent } from "react";
-import { normalizeTag, normalizeTags } from "./types";
+import { draftTags, normalizeTags } from "./types";
 import { TagChip } from "./ui";
-
-/**
- * Die Tags, die ein Entwurf ergaebe: eingefuegtes "a, b" sind zwei Tags, nicht
- * einer mit Komma. Unbrauchbare Teile (leer, zu lang) fallen weg.
- */
-export function draftTags(draft: string): string[] {
-  return draft
-    .split(",")
-    .map(normalizeTag)
-    .filter((tag): tag is string => tag !== null);
-}
 
 export interface TagInputProps {
   id?: string;

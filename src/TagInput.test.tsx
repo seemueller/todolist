@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { TagInput, draftTags } from "./TagInput";
+import { TagInput } from "./TagInput";
+import { draftTags } from "./types";
 
 // Der Entwurf liegt beim Aufrufer; der Wrapper haelt ihn wie das Detailfenster.
 function Harness({

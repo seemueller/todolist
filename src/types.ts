@@ -248,6 +248,18 @@ export function normalizeTags(raw: readonly string[]): string[] {
   return [...tags].sort(compareCategoryNames);
 }
 
+/**
+ * Die Tags, die ein getippter Entwurf ergaebe: eingefuegtes "a, b" sind zwei
+ * Tags, nicht einer mit Komma. Unbrauchbare Teile (leer, zu lang) fallen weg.
+ * Hier und nicht in TagInput.tsx, weil das Detailfenster ihn ebenfalls braucht.
+ */
+export function draftTags(draft: string): string[] {
+  return draft
+    .split(",")
+    .map(normalizeTag)
+    .filter((tag): tag is string => tag !== null);
+}
+
 /** Liest Tags aus einer Speicherquelle: JSON-Text, Array oder nichts. */
 export function parseTags(value: unknown): string[] {
   let list: unknown = value;

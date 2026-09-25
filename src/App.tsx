@@ -958,7 +958,7 @@ function App({ migrationError = null }: AppProps) {
               filters={tagFilters}
               activeId={activeTagFilterId}
               onActiveChange={changeActiveTagFilter}
-              onEdit={() => setEditingTagFilter(activeTagFilter)}
+              onEdit={() => setEditingTagFilter(activeTagFilter ?? undefined)}
               onCreate={() => setEditingTagFilter(null)}
             />
             <IconButton
@@ -1146,7 +1146,7 @@ function App({ migrationError = null }: AppProps) {
             filters={tagFilters}
             activeId={activeTagFilterId}
             onActiveChange={changeActiveTagFilter}
-            onEdit={() => setEditingTagFilter(activeTagFilter)}
+            onEdit={() => setEditingTagFilter(activeTagFilter ?? undefined)}
             onCreate={() => setEditingTagFilter(null)}
           />
           <div className="board-filter" role="group" aria-label="Kategorien filtern">
