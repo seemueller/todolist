@@ -728,9 +728,24 @@ pub async fn update_todo(
     // Spalten und Tags in einer Transaktion: ein Aufruf mit beidem soll
     // entweder ganz oder gar nicht wirken.
     let mut tx = pool.begin().await?;
+    // Wird die Aufgabe zwischen `select_todo` und hier in den Papierkorb
+    // gelegt, darf der Aufruf nichts mehr schreiben -- vor allem keine Tags.
+    // Die erste Anweisung der Transaktion ist darum immer ein UPDATE mit dem
+    // Papierkorb-Guard, und trifft es keine Zeile, ist Schluss. Kein SELECT
+    // vorab: Lesen und dann Schreiben liesse genau dieses Fenster wieder offen.
+    //
     // Ein Aufruf, der nur Tags setzt, hat keine Spalte zu schreiben -- ein
-    // "UPDATE todos SET  WHERE ..." waere ungueltiges SQL.
-    if !assignments.is_empty() {
+    // "UPDATE todos SET  WHERE ..." waere ungueltiges SQL. Er schreibt darum
+    // `id = id`: aendert nichts, zaehlt aber als getroffene Zeile.
+    let affected = if assignments.is_empty() {
+        sqlx::query(&format!(
+            "UPDATE todos SET id = id WHERE id = ? AND {NOT_DELETED_HERE}"
+        ))
+        .bind(existing.id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected()
+    } else {
         let sql = format!(
             "UPDATE todos SET {} WHERE id = ? AND {NOT_DELETED_HERE}",
             assignments.join(", ")
@@ -755,18 +770,25 @@ pub async fn update_todo(
         if let Some(category_id) = category_id {
             query = query.bind(category_id);
         }
-        if let Err(error) = query.bind(existing.id).execute(&mut *tx).await {
-            // Erst die Transaktion aufgeben, dann nachschlagen: sie haelt eine
-            // Verbindung, und map_category_fk_error fragt den Pool.
-            drop(tx);
-            // Setzt der Aufruf eine Kategorie und ist sie zwischen Aufloesen und
-            // Schreiben verschwunden, wird aus dem Fremdschluessel-Fehler eine
-            // brauchbare Meldung; sonst bleibt es ein Db-Fehler.
-            if category_id.is_some() {
-                return Err(map_category_fk_error(pool, error).await);
+        match query.bind(existing.id).execute(&mut *tx).await {
+            Ok(result) => result.rows_affected(),
+            Err(error) => {
+                // Erst die Transaktion aufgeben, dann nachschlagen: sie haelt eine
+                // Verbindung, und map_category_fk_error fragt den Pool.
+                drop(tx);
+                // Setzt der Aufruf eine Kategorie und ist sie zwischen Aufloesen und
+                // Schreiben verschwunden, wird aus dem Fremdschluessel-Fehler eine
+                // brauchbare Meldung; sonst bleibt es ein Db-Fehler.
+                if category_id.is_some() {
+                    return Err(map_category_fk_error(pool, error).await);
+                }
+                return Err(error.into());
             }
-            return Err(error.into());
         }
+    };
+    if affected == 0 {
+        drop(tx);
+        return bad_request(format!("Es gibt keine Aufgabe mit der Id {id}."));
     }
     if let Some(new_tags) = &new_tags {
         tags::replace_tags(&mut tx, existing.id, new_tags).await?;
@@ -991,6 +1013,7 @@ pub(crate) const SCHEMA: &[&str] = &[
         name TEXT NOT NULL,
         PRIMARY KEY (todo_id, name)
     );",
+    "CREATE INDEX idx_todo_tags_name ON todo_tags(name);",
     "CREATE TABLE time_slots (
         date TEXT NOT NULL,
         slot INTEGER NOT NULL,
@@ -2428,6 +2451,107 @@ mod tests {
         .await
         .expect("clear");
         assert!(cleared.tags.is_empty());
+    }
+
+    /// Laesst jedes INSERT des Tags "kaputt" scheitern -- mitten in der
+    /// Transaktion, nach dem Schreiben der Spalten.
+    async fn fail_on_kaputt_tag(pool: &Pool<Sqlite>) {
+        sqlx::query(
+            "CREATE TRIGGER fail_on_kaputt BEFORE INSERT ON todo_tags
+             WHEN NEW.name = 'kaputt'
+             BEGIN SELECT RAISE(ABORT, 'kaputt'); END;",
+        )
+        .execute(pool)
+        .await
+        .expect("create trigger");
+    }
+
+    #[tokio::test]
+    async fn add_todo_tagged_leaves_no_todo_when_the_tags_fail() {
+        let pool = setup().await;
+        fail_on_kaputt_tag(&pool).await;
+
+        let result =
+            add_todo_tagged(&pool, "Halb", None, None, None, None, &["kaputt".into()]).await;
+
+        assert!(result.is_err(), "the failing tag insert must surface");
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM todos")
+            .fetch_one(&pool)
+            .await
+            .expect("count");
+        assert_eq!(count, 0, "the INSERT must have been rolled back");
+    }
+
+    #[tokio::test]
+    async fn update_todo_keeps_title_and_tags_when_the_tags_fail() {
+        let pool = setup().await;
+        let todo = add_todo_tagged(&pool, "Alt", None, None, None, None, &["alt".into()])
+            .await
+            .expect("add");
+        fail_on_kaputt_tag(&pool).await;
+
+        let result = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                title: Some("Neu".into()),
+                tags: Some(vec!["kaputt".into()]),
+                ..TodoUpdate::default()
+            },
+        )
+        .await;
+
+        assert!(result.is_err(), "the failing tag insert must surface");
+        let title: String = sqlx::query_scalar("SELECT title FROM todos WHERE id = ?")
+            .bind(todo.id)
+            .fetch_one(&pool)
+            .await
+            .expect("title");
+        assert_eq!(title, "Alt", "the title UPDATE must have been rolled back");
+        assert_eq!(tag_rows(&pool, todo.id).await, vec!["alt"]);
+    }
+
+    /// Nur ueber den oeffentlichen Weg: `select_todo` weist eine abgelegte
+    /// Aufgabe schon vor der Transaktion ab. Der Guard in der Transaktion
+    /// deckt das Fenster ab, in dem sie *danach* abgelegt wird -- das laesst
+    /// sich hier nicht herstellen, ohne update_todo aufzuspalten.
+    #[tokio::test]
+    async fn update_todo_does_not_touch_the_tags_of_a_todo_in_the_trash() {
+        let pool = setup().await;
+        let todo = add_todo_tagged(&pool, "Weg", None, None, None, None, &["alt".into()])
+            .await
+            .expect("add");
+        delete_todo(&pool, todo.id).await.expect("trash");
+
+        let result = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                tags: Some(vec!["neu".into()]),
+                ..TodoUpdate::default()
+            },
+        )
+        .await;
+
+        match result {
+            Err(StoreError::Request(message)) => {
+                assert!(message.contains("keine Aufgabe mit der Id"), "{message}");
+            }
+            other => panic!("expected a Request error, got {other:?}"),
+        }
+        assert_eq!(tag_rows(&pool, todo.id).await, vec!["alt"]);
+    }
+
+    #[tokio::test]
+    async fn schema_has_the_tag_name_index_of_migration_16() {
+        let pool = setup().await;
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_todo_tags_name'",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("sqlite_master");
+        assert_eq!(count, 1);
     }
 
     #[tokio::test]

@@ -113,6 +113,12 @@ const MAX_CATEGORY_CHARS: usize = 100;
 const MAX_DESCRIPTION_CHARS: usize = 4000;
 /// Mehr Tags an einer Aufgabe sind kein Ordnungssystem mehr, sondern Unsinn.
 const MAX_TAGS: usize = 20;
+/// So viele Eintraege nimmt `check_tags` ueberhaupt an, bevor es normalisiert.
+/// Grosszuegig ueber `MAX_TAGS`, damit Dubletten nicht schon hier scheitern.
+const MAX_RAW_TAGS: usize = 100;
+/// So lang darf ein Tag vor der Normalisierung sein. Grosszuegig ueber
+/// `tags::MAX_TAG_CHARS`, weil Leerraum am Rand und im Inneren noch schrumpft.
+const MAX_RAW_TAG_CHARS: usize = 200;
 
 /// Prueft ein Textfeld auf Laenge und Steuerzeichen.
 ///
@@ -229,8 +235,24 @@ fn set_or_clear(value: Option<&str>, clear: Option<bool>) -> Option<Option<Strin
 /// bekaeme sonst weniger zurueck, als er geschickt hat. Steuerzeichen werden
 /// abgelehnt statt zu "-" gemacht, dieselbe Entscheidung wie in `check_text`.
 fn check_tags(raw: &[String]) -> Result<Vec<String>, String> {
+    // Grenzen auf der Rohform, vor jeder NFC-Arbeit: sonst liesse sich
+    // beliebig viel Text durch die Normalisierung schicken, solange er am Ende
+    // auf wenige kurze Tags zusammenfaellt (Dubletten, entfernte BOMs).
+    if raw.len() > MAX_RAW_TAGS {
+        return Err(format!(
+            "Eine Aufgabe traegt hoechstens {MAX_TAGS} Tags; angegeben waren {} Eintraege.",
+            raw.len()
+        ));
+    }
     let mut checked = Vec::new();
     for tag in raw {
+        if tag.chars().nth(MAX_RAW_TAG_CHARS).is_some() {
+            return Err(format!(
+                "{} ist kein Tag: ein Tag darf nicht leer sein und hoechstens {} Zeichen haben.",
+                quoted(tag),
+                tags::MAX_TAG_CHARS
+            ));
+        }
         if tag.chars().any(char::is_control) {
             return Err(format!(
                 "Das Tag {} enthaelt Steuerzeichen; erlaubt sind Woerter, durch Leerzeichen getrennt.",
@@ -2113,6 +2135,30 @@ mod tests {
             .await
             .expect("no protocol error");
         tool_error(&result, "Steuerzeichen");
+    }
+
+    #[test]
+    fn check_tags_refuses_an_over_long_raw_tag_before_normalizing() {
+        // Normalisiert bliebe nur "a" uebrig -- die Grenze greift vorher, damit
+        // kein Aufrufer beliebig viel Text durch NFC schicken kann.
+        let raw = format!("a{}", "\u{feff}".repeat(250));
+        let error = super::check_tags(&[raw]).expect_err("raw tag too long");
+        assert!(error.contains("ist kein Tag"), "{error}");
+        assert!(error.contains("40"), "{error}");
+    }
+
+    #[test]
+    fn check_tags_refuses_too_many_raw_entries_even_if_they_collapse() {
+        // 101 Mal dasselbe Tag waere nach dem Entdoppeln eines.
+        let raw: Vec<String> = (0..101).map(|_| "a".to_string()).collect();
+        let error = super::check_tags(&raw).expect_err("too many raw entries");
+        assert!(error.contains("20"), "{error}");
+    }
+
+    #[test]
+    fn check_tags_accepts_a_hundred_raw_entries_that_collapse() {
+        let raw: Vec<String> = (0..100).map(|_| "a".to_string()).collect();
+        assert_eq!(super::check_tags(&raw).expect("100 is the limit"), vec!["a"]);
     }
 
     #[tokio::test]
