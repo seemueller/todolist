@@ -27,6 +27,7 @@ use unicode_normalization::char::is_combining_mark;
 
 use super::echo::quoted;
 use super::slots::{SLOT_MINUTES, SLOTS_PER_DAY, slot_label};
+use crate::tags;
 
 /// Die beiden Fehlerarten, die die Tools unterschiedlich beantworten.
 ///
@@ -79,6 +80,8 @@ pub struct Todo {
     /// steht als "task" in der Spalte -- die Migration hat den Vorgabewert
     /// gesetzt, hier kommt also nie ein leerer String an.
     pub r#type: String,
+    /// Normalisiert und sortiert; leer heisst "keine Tags".
+    pub tags: Vec<String>,
     pub created_at: String,
     pub due_date: Option<String>,
     pub category_id: Option<i64>,
@@ -94,6 +97,7 @@ struct TodoRow {
     done: i64,
     status: String,
     r#type: String,
+    tags: String,
     created_at: String,
     due_date: Option<String>,
     category_id: Option<i64>,
@@ -113,6 +117,7 @@ impl From<TodoRow> for Todo {
             description: row.description,
             status: row.status,
             r#type: row.r#type,
+            tags: tags::parse_tag_column(&row.tags),
             created_at: row.created_at,
             due_date: row.due_date,
             category_id: row.category_id,
@@ -148,6 +153,8 @@ pub struct TodoUpdate {
     pub r#type: Option<String>,
     pub due_date: Option<Option<String>>,
     pub category: Option<Option<String>>,
+    /// `None` unveraendert, `Some(leer)` leert, sonst ersetzt die Menge.
+    pub tags: Option<Vec<String>>,
 }
 
 impl TodoUpdate {
@@ -158,6 +165,7 @@ impl TodoUpdate {
             && self.r#type.is_none()
             && self.due_date.is_none()
             && self.category.is_none()
+            && self.tags.is_none()
     }
 }
 
@@ -470,8 +478,12 @@ async fn map_category_fk_error(pool: &Pool<Sqlite>, error: sqlx::Error) -> Store
 
 // --- Aufgaben ---------------------------------------------------------------
 
+/// Die Tag-Unterabfrage ist dieselbe wie in `TODO_COLUMNS` in
+/// src/todoStoreSql.ts: ohne Tags liefert `json_group_array` ein leeres
+/// Array `[]`, nie NULL.
 const TODO_COLUMNS: &str = "t.id, t.title, t.description, t.done, t.status, t.type,
-     t.created_at, t.due_date, t.category_id, c.name AS category_name, c.color AS category_color";
+     t.created_at, t.due_date, t.category_id, c.name AS category_name, c.color AS category_color,
+     (SELECT json_group_array(tt.name) FROM todo_tags tt WHERE tt.todo_id = t.id) AS tags";
 
 /// Die eine Stelle, an der steht, was "nicht im Papierkorb" heisst. Spiegelt
 /// `NOT_DELETED` in src/todoStoreSql.ts.
@@ -569,13 +581,15 @@ pub async fn list_todos(
 ///
 /// Ohne Angabe gelten dieselben Vorgaben wie im Frontend:
 /// Status "todo", Typ "task", nicht erledigt, keine Faelligkeit, keine Kategorie.
-pub async fn add_todo(
+/// `tags` durchlaufen `tags::normalize_tags`; Unbrauchbares faellt dort weg.
+pub async fn add_todo_tagged(
     pool: &Pool<Sqlite>,
     title: &str,
     due_date: Option<&str>,
     category: Option<&str>,
     description: Option<&str>,
     todo_type: Option<&str>,
+    tags: &[String],
 ) -> Result<Todo, StoreError> {
     let title = title.trim();
     if title.is_empty() {
@@ -589,7 +603,11 @@ pub async fn add_todo(
         None => None,
     };
     let description = description.unwrap_or("");
+    let new_tags = tags::normalize_tags(tags);
 
+    // INSERT und Tags in einer Transaktion: eine Aufgabe, deren Tags nicht
+    // geschrieben werden konnten, soll es gar nicht erst geben.
+    let mut tx = pool.begin().await?;
     // `strftime` statt einer Zeit-Crate: dasselbe ISO-Format mit Millisekunden
     // und Z, das `new Date().toISOString()` im Frontend schreibt, und ohne neue
     // Abhaengigkeit.
@@ -603,18 +621,35 @@ pub async fn add_todo(
     .bind(todo_type)
     .bind(due_date)
     .bind(category_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await;
     let id: i64 = match insert {
         Ok(id) => id,
         // Nur wenn eine Kategorie im Spiel war, kann der Fremdschluessel greifen.
+        // Erst die Transaktion aufgeben, dann nachschlagen: sie haelt eine
+        // Verbindung, und map_category_fk_error fragt den Pool.
         Err(error) if category_id.is_some() => {
+            drop(tx);
             return Err(map_category_fk_error(pool, error).await);
         }
         Err(error) => return Err(error.into()),
     };
+    tags::replace_tags(&mut tx, id, &new_tags).await?;
+    tx.commit().await?;
 
     select_todo(pool, id).await
+}
+
+/// `add_todo_tagged` ohne Tags.
+pub async fn add_todo(
+    pool: &Pool<Sqlite>,
+    title: &str,
+    due_date: Option<&str>,
+    category: Option<&str>,
+    description: Option<&str>,
+    todo_type: Option<&str>,
+) -> Result<Todo, StoreError> {
+    add_todo_tagged(pool, title, due_date, category, description, todo_type, &[]).await
 }
 
 /// Aendert genau die Felder, die angegeben wurden, und gibt die Aufgabe zurueck.
@@ -685,39 +720,55 @@ pub async fn update_todo(
         assignments.push("category_id = ?");
     }
 
-    let sql = format!(
-        "UPDATE todos SET {} WHERE id = ? AND {NOT_DELETED_HERE}",
-        assignments.join(", ")
-    );
-    let mut query = sqlx::query(&sql);
-    if let Some(title) = title {
-        query = query.bind(title);
-    }
-    if let Some(description) = description {
-        query = query.bind(description);
-    }
-    if let Some(status) = &update.status {
-        let done = i64::from(status == STATUS_DONE);
-        query = query.bind(status.clone()).bind(done);
-    }
-    if let Some(todo_type) = &update.r#type {
-        query = query.bind(todo_type.clone());
-    }
-    if let Some(due_date) = due_date {
-        query = query.bind(due_date);
-    }
-    if let Some(category_id) = category_id {
-        query = query.bind(category_id);
-    }
-    if let Err(error) = query.bind(existing.id).execute(pool).await {
-        // Setzt der Aufruf eine Kategorie und ist sie zwischen Aufloesen und
-        // Schreiben verschwunden, wird aus dem Fremdschluessel-Fehler eine
-        // brauchbare Meldung; sonst bleibt es ein Db-Fehler.
-        if category_id.is_some() {
-            return Err(map_category_fk_error(pool, error).await);
+    let new_tags = update.tags.as_deref().map(tags::normalize_tags);
+
+    // Spalten und Tags in einer Transaktion: ein Aufruf mit beidem soll
+    // entweder ganz oder gar nicht wirken.
+    let mut tx = pool.begin().await?;
+    // Ein Aufruf, der nur Tags setzt, hat keine Spalte zu schreiben -- ein
+    // "UPDATE todos SET  WHERE ..." waere ungueltiges SQL.
+    if !assignments.is_empty() {
+        let sql = format!(
+            "UPDATE todos SET {} WHERE id = ? AND {NOT_DELETED_HERE}",
+            assignments.join(", ")
+        );
+        let mut query = sqlx::query(&sql);
+        if let Some(title) = title {
+            query = query.bind(title);
         }
-        return Err(error.into());
+        if let Some(description) = description {
+            query = query.bind(description);
+        }
+        if let Some(status) = &update.status {
+            let done = i64::from(status == STATUS_DONE);
+            query = query.bind(status.clone()).bind(done);
+        }
+        if let Some(todo_type) = &update.r#type {
+            query = query.bind(todo_type.clone());
+        }
+        if let Some(due_date) = due_date {
+            query = query.bind(due_date);
+        }
+        if let Some(category_id) = category_id {
+            query = query.bind(category_id);
+        }
+        if let Err(error) = query.bind(existing.id).execute(&mut *tx).await {
+            // Erst die Transaktion aufgeben, dann nachschlagen: sie haelt eine
+            // Verbindung, und map_category_fk_error fragt den Pool.
+            drop(tx);
+            // Setzt der Aufruf eine Kategorie und ist sie zwischen Aufloesen und
+            // Schreiben verschwunden, wird aus dem Fremdschluessel-Fehler eine
+            // brauchbare Meldung; sonst bleibt es ein Db-Fehler.
+            if category_id.is_some() {
+                return Err(map_category_fk_error(pool, error).await);
+            }
+            return Err(error.into());
+        }
     }
+    if let Some(new_tags) = &new_tags {
+        tags::replace_tags(&mut tx, existing.id, new_tags).await?;
+    }
+    tx.commit().await?;
 
     select_todo(pool, id).await
 }
@@ -2291,6 +2342,99 @@ mod tests {
             }
             other => panic!("expected a Request error, got {other:?}"),
         }
+    }
+
+    // --- Tags -----------------------------------------------------------------
+
+    async fn tag_rows(pool: &Pool<Sqlite>, id: i64) -> Vec<String> {
+        sqlx::query_scalar("SELECT name FROM todo_tags WHERE todo_id = ? ORDER BY name")
+            .bind(id)
+            .fetch_all(pool)
+            .await
+            .expect("select tags")
+    }
+
+    #[tokio::test]
+    async fn add_todo_tagged_stores_normalized_tags() {
+        let pool = setup().await;
+        let todo = add_todo_tagged(
+            &pool,
+            "Mit Tags",
+            None,
+            None,
+            None,
+            None,
+            &["Zebra".to_string(), "alpha".to_string(), "ALPHA".to_string()],
+        )
+        .await
+        .expect("add");
+        assert_eq!(todo.tags, vec!["alpha", "zebra"]);
+
+        let listed = list_todos(&pool, None, None, None).await.expect("list");
+        assert_eq!(listed[0].tags, vec!["alpha", "zebra"]);
+    }
+
+    #[tokio::test]
+    async fn a_todo_without_tags_lists_an_empty_list() {
+        let pool = setup().await;
+        let todo = add_todo(&pool, "Ohne", None, None, None, None)
+            .await
+            .expect("add");
+        assert!(todo.tags.is_empty());
+    }
+
+    #[tokio::test]
+    async fn update_todo_replaces_clears_and_keeps_tags() {
+        let pool = setup().await;
+        let todo = add_todo_tagged(&pool, "T", None, None, None, None, &["alt".to_string()])
+            .await
+            .expect("add");
+
+        let kept = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                title: Some("Neu".into()),
+                ..TodoUpdate::default()
+            },
+        )
+        .await
+        .expect("title only");
+        assert_eq!(kept.tags, vec!["alt"]);
+
+        let replaced = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                tags: Some(vec!["b".into(), "a".into()]),
+                ..TodoUpdate::default()
+            },
+        )
+        .await
+        .expect("tags only is not an empty update");
+        assert_eq!(replaced.tags, vec!["a", "b"]);
+
+        let cleared = update_todo(
+            &pool,
+            todo.id,
+            TodoUpdate {
+                tags: Some(Vec::new()),
+                ..TodoUpdate::default()
+            },
+        )
+        .await
+        .expect("clear");
+        assert!(cleared.tags.is_empty());
+    }
+
+    #[tokio::test]
+    async fn tags_stay_with_a_todo_in_the_trash() {
+        let pool = setup().await;
+        let todo = add_todo_tagged(&pool, "Weg", None, None, None, None, &["a".to_string()])
+            .await
+            .expect("add");
+        delete_todo(&pool, todo.id).await.expect("trash");
+        assert_eq!(tag_rows(&pool, todo.id).await, vec!["a"]);
     }
 
     #[tokio::test]

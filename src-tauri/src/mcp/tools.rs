@@ -466,6 +466,7 @@ impl TodoServer {
             r#type: non_empty(&params.r#type).map(str::to_string),
             due_date: set_or_clear(due_date, params.clear_due_date),
             category: set_or_clear(category, params.clear_category),
+            tags: None,
         };
         self.respond_write(store::update_todo(&self.pool, params.id, update).await)
     }
