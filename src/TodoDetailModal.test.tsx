@@ -379,3 +379,55 @@ describe("TodoDetailModal", () => {
     });
   });
 });
+
+describe("TodoDetailModal tags", () => {
+  it("schreibt geaenderte Tags in den Patch", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <TodoDetailModal
+        todo={makeTodo({ tags: ["alt"] })}
+        categories={categories}
+        tagSuggestions={["frontend"]}
+        onSave={onSave}
+        onClose={() => {}}
+      />
+    );
+
+    const field = screen.getByLabelText("Tags");
+    fireEvent.change(field, { target: { value: "Neu Tag" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(screen.getByText("neu-tag")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sichern" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(7, { tags: ["alt", "neu-tag"] }));
+  });
+
+  it("laesst unveraenderte Tags aus dem Patch", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <TodoDetailModal
+        todo={makeTodo({ tags: ["alt"] })}
+        categories={categories}
+        onSave={onSave}
+        onClose={() => {}}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "Anders" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sichern" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(7, { title: "Anders" }));
+  });
+
+  it("uebernimmt einen nicht bestaetigten Tag beim Klick auf Sichern", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <TodoDetailModal todo={makeTodo()} categories={categories} onSave={onSave} onClose={() => {}} />
+    );
+
+    const field = screen.getByLabelText("Tags");
+    fireEvent.change(field, { target: { value: "frontend" } });
+    fireEvent.blur(field);
+    fireEvent.click(screen.getByRole("button", { name: "Sichern" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(7, { tags: ["frontend"] }));
+  });
+});
