@@ -640,7 +640,10 @@ pub async fn add_todo_tagged(
     select_todo(pool, id).await
 }
 
-/// `add_todo_tagged` ohne Tags.
+/// `add_todo_tagged` ohne Tags. Nur noch fuer die Tests: das Tool ruft
+/// `add_todo_tagged` direkt, und ausserhalb der Tests waere das hier toter
+/// Code, an dem Clippy scheitert.
+#[cfg(test)]
 pub async fn add_todo(
     pool: &Pool<Sqlite>,
     title: &str,
