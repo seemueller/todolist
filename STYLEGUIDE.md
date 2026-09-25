@@ -244,6 +244,30 @@ als bei der Kategorie stehen die drei Werte fest.
 | `variant` | `"list" \| "kanban"` | Größe je nach Umgebung. |
 | `type` | `TodoType` | Bug, Task oder Story; bestimmt Text und Farbklasse. |
 
+### `TagChip`
+
+Ein Tag als Pille. Keine Farbe aus den Daten: Tags haben keine, die Fläche ist
+fest `--surface-muted`. Mit `onRemove` trägt der Chip einen Entfernen-Knopf —
+nur dort, wo Tags bearbeitet werden.
+
+| Prop | Typ | Bedeutung |
+|---|---|---|
+| `tag` | `string` | Der Tag, schon normalisiert. |
+| `variant` | `"list" \| "kanban"` | Größe für Zeile/Fenster oder Karte. |
+| `onRemove` | `() => void` | Optional; zeigt den Knopf „Tag … entfernen". |
+
+### `TagFilterSelect`
+
+Auswahl des Tag-Filters samt „Bearbeiten" und „Neu". Steht über der Liste und
+über dem Brett und zeigt in beiden denselben aktiven Filter.
+
+| Prop | Typ | Bedeutung |
+|---|---|---|
+| `filters` | `TagFilter[]` | Die gespeicherten Filter. |
+| `activeId` | `string \| null` | Gewählter Filter, `null` für keinen. |
+| `onActiveChange` | `(id: string \| null) => void` | Neue Auswahl. |
+| `onEdit` / `onCreate` | `() => void` | Editor öffnen; Bearbeiten ist ohne Auswahl gesperrt. |
+
 ### `Modal`
 
 Overlay, Panel und Kopfzeile mit Titel und Schließen-Knopf. Bringt
@@ -253,7 +277,7 @@ Modal offen sein soll** — der Listener hängt an der Lebensdauer der Komponent
 
 | Prop | Typ | Bedeutung |
 |---|---|---|
-| `variant` | `"changelog" \| "category" \| "todo" \| "trash" \| "stats"` | Wählt die Panelbreite (520 / 460 / **896** / 460 / 560 px). |
+| `variant` | `"changelog" \| "category" \| "todo" \| "trash" \| "stats" \| "tagFilter"` | Wählt die Panelbreite (520 / 460 / **896** / 460 / 560 / 560 px). |
 | `title` | `string` | Text der `<h2>` in der Kopfzeile. |
 | `onClose` | `() => void` | Overlay-Klick, Schließen-Knopf, Escape. |
 | `closeLabel` | `string` | `aria-label` des Schließen-Knopfs. |

@@ -48,7 +48,7 @@ Beschriftung umbenennt, zieht den Test mit.
 
 ## Test Files
 
-- `src/types.test.ts` — unit tests for type utilities (`fromRow`, `compareCategoryNames`)
+- `src/types.test.ts` — unit tests for type utilities (`fromRow`, `compareCategoryNames`) und `normalizeTag` gegen `src-tauri/src/tag_cases.json`
 - `src/timeSlots.test.ts` — unit tests for the time-tracking domain logic
 - `src/timeCsv.test.ts` — unit tests for the CSV export
 - `src/contrast.test.ts` — readable text colour on a category colour; guards the hex values against the tokens in `App.css`
@@ -56,10 +56,15 @@ Beschriftung umbenennt, zieht den Test mit.
 - `src/TimeStatsModal.test.tsx` — the time-tracking breakdown per category (`timeDb` is mocked)
 - `src/App.test.tsx` — React component tests (db layer is mocked)
 - `src/TodoDetailModal.test.tsx` — the detail window, isolated from `App`
+- `src/TagInput.test.tsx` — die Tag-Eingabe des Detailfensters
+- `src/TagFilterEditor.test.tsx` — der Editor für Tag-Filter
+- `src/tagFilter.test.ts` — Tag-Filter: Regeln, Verknüpfung, Lesen aus `localStorage`
 - `src/markdown.test.ts` — the markdown parser for the description (blocks and inline)
 - `src/ui/Markdown.test.tsx` — the renderer: elements, not HTML — raw markup stays text
 - `src/ui/TypeBadge.test.tsx` — das Badge des Aufgabentyps: Farbklasse statt Inline-Style
 - `src/ui/TypeSelect.test.tsx` — das Auswahlfeld des Aufgabentyps
+- `src/ui/TagChip.test.tsx` — das Tag-Etikett
+- `src/ui/TagFilterSelect.test.tsx` — die Auswahl des Tag-Filters
 - `src/main.test.tsx` — checks that the migration runs before the first render
 - `src/db.test.ts` / `src/timeDb.test.ts` — which backend each dispatcher picks
 - `src/todoStoreLocal.test.ts` / `src/timeStoreLocal.test.ts` — the localStorage stores
@@ -72,8 +77,10 @@ Beschriftung umbenennt, zieht den Test mit.
 - `e2e/timetracking.spec.ts` — Playwright end-to-end tests for the time tracking view
 
 Die Rust-Seite hat eigene Tests in `src-tauri/src/lib.rs` (`cd src-tauri && cargo test`).
-Sie decken `replace_time_day_tx` ab, inklusive des Falls, dass ein Fehler mitten im
-Schreibvorgang den Tag unverändert lässt.
+Sie decken `replace_time_day_tx` und `set_todo_tags_tx` ab, jeweils inklusive des
+Falls, dass ein Fehler mitten im Schreibvorgang den Stand unverändert lässt.
+`src-tauri/src/tags.rs` prüft die Tag-Regel gegen dieselbe Tabelle wie
+`types.test.ts`.
 
 ## Persistenz
 
@@ -85,7 +92,8 @@ Interfaces aus `src/storeTypes.ts`.
 
 **Oberflächen-Vorlieben gehören nicht in den Store.** Was nur die Ansicht betrifft
 — der Statusfilter der Liste (`todolist.statusFilter`) und ihr Typfilter
-(`todolist.typeFilter`) — liegt in
+(`todolist.typeFilter`) — sowie die gespeicherten Tag-Filter
+(`todolist.tagFilters`) und der gewählte (`todolist.activeTagFilter`) — liegt in
 `localStorage` und wird über `src/listPrefs.ts` gelesen und geschrieben, nicht
 über `app_settings`. Sonst müsste das Store-Interface in beiden Backends wachsen
 und das Lesen asynchron werden, womit die Liste beim Start kurz im falschen
@@ -125,6 +133,14 @@ Vier Fallen, in die dieses Projekt schon getreten ist:
   `buildCsv`/`blockRow` (`src/timeCsv.ts`) Pflichtparameter und kein
   Vorgabewert: eine still auf „intern" gesetzte Spalte fällt in keinem Test auf.
 
+**Tags** liegen in `todo_tags(todo_id, name)`, ohne eigene Tabelle `tags`. Was
+ein Tag ist, entscheidet `normalizeTag` in `types.ts` — und zum zweiten Mal
+`tags::normalize_tag` in Rust für MCP und den Command `set_todo_tags`. Beide
+prüfen sich gegen `src-tauri/src/tag_cases.json`; wer die Regel ändert, ändert
+beide Seiten und die Tabelle. `updateTodoFields` mit `tags` ist im SQL-Store
+bewusst zwei Schritte (UPDATE über das Plugin, dann der Command) — die
+Begründung steht in `storeTypes.ts`.
+
 ## MCP-Server
 
 Solange die Desktop-App läuft, bietet sie ihre Daten zusätzlich über MCP an:
@@ -158,6 +174,23 @@ Eine Aufgabe trägt außerdem einen **Typ**: `bug`, `task` oder `story`, Vorgabe
 angegeben ist — ein `clear_type` gibt es nicht, weil es keine Aufgabe ohne Typ
 gibt. Ein anderer Wert ist ein Tool-Fehler und die Meldung nennt die drei
 erlaubten.
+
+Eine Aufgabe trägt außerdem **Tags**. `list_todos` liefert sie, `add_todo`
+nimmt sie optional, `update_todo` ersetzt sie mit `tags` vollständig.
+Weglassen, `null` und `[]` lassen sie unverändert; geleert werden sie
+ausschließlich über `clear_tags: true`, beides zugleich ist ein Tool-Fehler —
+dieselbe Regel wie bei der Beschreibung. `check_tags` prüft zuerst die
+Rohform, vor jeder Normalisierung: mehr als 100 Einträge oder ein einzelner
+Rohtext über 200 Zeichen sind ein Tool-Fehler, bevor überhaupt normalisiert
+wird — sonst ließe sich beliebig viel Text durchschicken, solange er am Ende
+auf wenige kurze Tags zusammenfällt. Danach ist ein Tag mit Steuerzeichen,
+eines, das nach der Normalisierung leer oder länger als 40 Zeichen ist, und
+mehr als 20 Tags an einer Aufgabe ebenfalls ein Tool-Fehler; anders als die
+Oberfläche verwirft die Tool-Grenze nichts still. Das Schreiben der Tags
+geschieht in derselben Transaktion wie der Rest von `update_todo`, die immer
+mit dem trash-geschützten UPDATE beginnt; scheitern die Tags, bleiben Titel
+und übrige Felder unverändert (`update_todo_keeps_title_and_tags_when_the_tags_fail`).
+Kein neues Tool, weiterhin sieben.
 
 **Der Token steht in der Datenbank**, in `app_settings` unter dem Schlüssel
 `mcp_token`, und entsteht beim ersten Start (32 Zufallsbytes, base64url). Die

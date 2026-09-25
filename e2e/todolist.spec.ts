@@ -284,8 +284,10 @@ test.describe("Category Management", () => {
     await input.fill("Personal task");
     await todoAddBtn.click();
 
-    // Filter by category
-    const filterCategorySelect = page.locator(".filter-select");
+    // Filter by category. Ueber .category-select, nicht .filter-select: die
+    // Klasse traegt seit dem Tag-Filter auch dessen Auswahl, und .filter-select
+    // allein waere nicht mehr eindeutig.
+    const filterCategorySelect = page.locator(".category-select.filter-select");
     await filterCategorySelect.selectOption("Work");
 
     await expect(page.getByText("Work task")).toBeVisible();
@@ -922,5 +924,48 @@ test.describe("Aufgabentyp", () => {
 
     await page.getByRole("button", { name: /Zur Ansicht Liste wechseln/i }).click();
     await expect(page.locator(".todo-list .title").getByText("Ganz normale Aufgabe")).toBeVisible();
+  });
+
+  test("filters by tags with has and lacks rules, and keeps the filter", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "TodoList" })).toBeVisible();
+
+    const input = page.getByPlaceholder(/Was steht an/i);
+    const add = page.getByRole("button", { name: /Aufgabe hinzufügen/i });
+    for (const title of ["Login-Seite", "Blockierte Seite", "Backend-Job"]) {
+      await input.fill(title);
+      await add.click();
+    }
+
+    async function tag(title: string, tags: string[]) {
+      await page.locator(".todo-list .title", { hasText: title }).dblclick();
+      const field = page.getByLabel("Tags", { exact: true });
+      for (const t of tags) {
+        await field.fill(t);
+        await field.press("Enter");
+      }
+      await page.getByRole("button", { name: "Sichern" }).click();
+      await expect(page.getByRole("heading", { name: "Aufgabe bearbeiten" })).toHaveCount(0);
+    }
+    await tag("Login-Seite", ["frontend"]);
+    await tag("Blockierte Seite", ["frontend", "blocked"]);
+    await tag("Backend-Job", ["backend"]);
+
+    await page.getByRole("button", { name: "Neuer Tag-Filter" }).click();
+    await page.getByLabel("Name", { exact: true }).fill("Frontend offen");
+    await page.getByLabel("Regel 1 Tag").fill("frontend");
+    await page.getByRole("button", { name: "Regel hinzufügen" }).click();
+    await page.getByLabel("Regel 2 Art").selectOption("lacks");
+    await page.getByLabel("Regel 2 Tag").fill("blocked");
+    await page.getByRole("button", { name: "Speichern" }).click();
+
+    const list = page.locator(".todo-list");
+    await expect(list.getByText("Login-Seite")).toBeVisible();
+    await expect(list.getByText("Blockierte Seite")).toHaveCount(0);
+    await expect(list.getByText("Backend-Job")).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.locator(".todo-list").getByText("Login-Seite")).toBeVisible();
+    await expect(page.locator(".todo-list").getByText("Backend-Job")).toHaveCount(0);
   });
 });
