@@ -2,6 +2,13 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.20.0] - 2026-09-25
+
+### Hinzugefügt
+- Aufgaben tragen **Tags**: freie Schlagworte neben Kategorie und Typ, im Detailfenster eingetippt (Enter oder Komma übernimmt) und mit Vorschlägen aus den vorhandenen Tags — auch aus dem Papierkorb. Tags werden kleingeschrieben, Leerzeichen im Inneren werden zu „-". Liste und Brett zeigen sie an der Aufgabe.
+- **Tag-Filter** mit eigenem Editor: benannte Filter aus Regeln „hat Tag", „hat Tag nicht" und „hat keine Tags", verknüpft mit „Alle Regeln" oder „Mindestens eine". Ein gewählter Filter wirkt in Liste und Brett zugleich, zusammen mit den übrigen Filtern, und bleibt über einen Neustart gewählt.
+- Über MCP liefert `list_todos` die Tags; `add_todo` nimmt sie an, `update_todo` ersetzt sie mit `tags` und leert sie ausschließlich über `clear_tags`.
+
 ## [0.19.0] - 2026-09-23
 
 ### Hinzugefügt

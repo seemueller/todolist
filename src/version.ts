@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.19.0";
+export const APP_VERSION = "0.20.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.20.0",
+    date: "2026-09-25",
+    changes: [
+      "Aufgaben tragen Tags, im Detailfenster gesetzt und in Liste und Brett angezeigt",
+      "Tag-Filter mit eigenem Editor: hat, hat nicht und hat keine Tags, verknüpft mit alle oder mindestens eine",
+      "Tags auch über MCP lesen und setzen",
+    ],
+  },
   {
     version: "0.19.0",
     date: "2026-09-23",
