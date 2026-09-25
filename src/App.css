@@ -794,6 +794,50 @@ a:hover {
   color: var(--ink-faint);
 }
 
+/* Tag-Etikett. Keine Datenfarbe wie beim Kategorie-Badge: Tags haben keine,
+   darum fest --surface-muted. Pille statt Rechteck und keine Versalien, damit
+   es neben Typ- und Kategorie-Badge als nachrangig liest. */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border: var(--border-thin);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.tag-chip--kanban {
+  padding: 2px 7px;
+  font-size: 10.5px;
+}
+
+.done .tag-chip {
+  border-color: var(--ink-ghost);
+  background: transparent;
+  color: var(--ink-faint);
+}
+
+.tag-chip-remove {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Mehrere Chips nebeneinander, in Zeile und Karte. */
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .todo-select {
   flex-shrink: 0;
   max-width: 96px;
