@@ -227,7 +227,7 @@ export const MAX_TAG_CHARS = 40;
  */
 export function normalizeTag(raw: string): string | null {
   const tag = raw
-    .replace(/﻿/g, "")
+    .replace(/\uFEFF/g, "")
     .normalize("NFC")
     .toLowerCase()
     .split(/[\s\u0085]+/)
