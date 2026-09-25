@@ -15,6 +15,7 @@ import {
   sortCategories,
   categoryNameKey,
   canonicalCategoryName,
+  normalizeTags,
 } from "./types";
 import { getDb } from "./sqlClient";
 import { TodoStore, TodoFieldsPatch } from "./storeTypes";
@@ -197,6 +198,14 @@ async function purgeTodo(id: number): Promise<number> {
   return id;
 }
 
+// Ohne Papierkorb-Bedingung, mit Absicht: todo_tags haengt auch an abgelegten
+// Aufgaben, endgueltig geloeschte hat das CASCADE schon mitgenommen.
+async function listTags(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select<{ name: string }[]>("SELECT DISTINCT name FROM todo_tags");
+  return normalizeTags(rows.map((r) => r.name));
+}
+
 async function purgeDeletedBefore(cutoff: string): Promise<number> {
   const db = await getDb();
   // Textvergleich -- gilt nur, weil alle Backends dasselbe ISO-Format
@@ -300,6 +309,7 @@ export const sqlTodoStore: TodoStore = {
   toggleTodoDone,
   deleteTodo,
   listDeletedTodos,
+  listTags,
   restoreTodo,
   purgeTodo,
   purgeDeletedBefore,

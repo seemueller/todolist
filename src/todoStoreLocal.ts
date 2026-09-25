@@ -16,6 +16,7 @@ import {
   categoryNameKey,
   canonicalCategoryName,
   parseTags,
+  normalizeTags,
 } from "./types";
 import { TodoStore, TodoFieldsPatch } from "./storeTypes";
 
@@ -218,6 +219,7 @@ async function updateTodoFields(id: number, patch: TodoFieldsPatch): Promise<Tod
     next.category_name = cat?.name ?? null;
     next.category_color = cat?.color ?? null;
   }
+  if (patch.tags !== undefined) next.tags = normalizeTags(patch.tags);
 
   todos[idx] = next;
   saveTodos(todos);
@@ -300,6 +302,11 @@ function purgeTodo(id: number): Promise<number> {
   // folgenlos, siehe Vertrag in storeTypes.ts.
   saveTodos(loadTodos().filter((t) => !(t.id === id && isInTrash(t))));
   return Promise.resolve(id);
+}
+
+// Ueber alle Eintraege, auch die im Papierkorb -- siehe Vertrag in storeTypes.ts.
+function listTags(): Promise<string[]> {
+  return Promise.resolve(normalizeTags(loadTodos().flatMap((t) => t.tags)));
 }
 
 function purgeDeletedBefore(cutoff: string): Promise<number> {
@@ -413,6 +420,7 @@ export const localTodoStore: TodoStore = {
   toggleTodoDone,
   deleteTodo,
   listDeletedTodos,
+  listTags,
   restoreTodo,
   purgeTodo,
   purgeDeletedBefore,

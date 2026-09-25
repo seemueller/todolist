@@ -67,6 +67,10 @@ export function listDeletedTodos(): Promise<Todo[]> {
   return store().listDeletedTodos();
 }
 
+export function listTags(): Promise<string[]> {
+  return store().listTags();
+}
+
 export function restoreTodo(id: number): Promise<Todo> {
   return store().restoreTodo(id);
 }

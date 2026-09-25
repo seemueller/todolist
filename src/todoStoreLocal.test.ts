@@ -624,3 +624,73 @@ describe("Aufgabentyp", () => {
     expect(listed.type).toBe("task");
   });
 });
+
+describe("localTodoStore tags", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("starts a new todo without tags", async () => {
+    const todo = await localTodoStore.addTodo("A", null);
+    expect(todo.tags).toEqual([]);
+  });
+
+  it("replaces the tags through updateTodoFields, normalized and sorted", async () => {
+    const todo = await localTodoStore.addTodo("A", null);
+    const updated = await localTodoStore.updateTodoFields(todo.id, {
+      tags: ["Zebra", " alpha ", "ALPHA"],
+    });
+    expect(updated.tags).toEqual(["alpha", "zebra"]);
+    const [listed] = await localTodoStore.listTodos();
+    expect(listed.tags).toEqual(["alpha", "zebra"]);
+  });
+
+  it("leaves the tags alone when the patch does not name them", async () => {
+    const todo = await localTodoStore.addTodo("A", null);
+    await localTodoStore.updateTodoFields(todo.id, { tags: ["frontend"] });
+    const updated = await localTodoStore.updateTodoFields(todo.id, { title: "B" });
+    expect(updated.tags).toEqual(["frontend"]);
+  });
+
+  it("clears the tags with an empty list", async () => {
+    const todo = await localTodoStore.addTodo("A", null);
+    await localTodoStore.updateTodoFields(todo.id, { tags: ["frontend"] });
+    const updated = await localTodoStore.updateTodoFields(todo.id, { tags: [] });
+    expect(updated.tags).toEqual([]);
+  });
+
+  it("keeps the tags through trash and restore", async () => {
+    const todo = await localTodoStore.addTodo("A", null);
+    await localTodoStore.updateTodoFields(todo.id, { tags: ["frontend"] });
+    await localTodoStore.deleteTodo(todo.id);
+    const restored = await localTodoStore.restoreTodo(todo.id);
+    expect(restored.tags).toEqual(["frontend"]);
+  });
+
+  it("lists tags of todos in the trash, but not of purged ones", async () => {
+    const a = await localTodoStore.addTodo("A", null);
+    await localTodoStore.updateTodoFields(a.id, { tags: ["frontend"] });
+    const b = await localTodoStore.addTodo("B", null);
+    await localTodoStore.updateTodoFields(b.id, { tags: ["alt", "frontend"] });
+    await localTodoStore.deleteTodo(b.id);
+
+    expect(await localTodoStore.listTags()).toEqual(["alt", "frontend"]);
+
+    await localTodoStore.purgeTodo(b.id);
+    expect(await localTodoStore.listTags()).toEqual(["frontend"]);
+  });
+
+  it("reads an entry written before tags existed as untagged", async () => {
+    localStorage.setItem(
+      "todolist_todos",
+      JSON.stringify([
+        {
+          id: 1, title: "Alt", done: false, created_at: "2026-01-01T00:00:00.000Z",
+          due_date: null, category_id: null, category_name: null, category_color: null,
+        },
+      ])
+    );
+    const [todo] = await localTodoStore.listTodos();
+    expect(todo.tags).toEqual([]);
+  });
+});
