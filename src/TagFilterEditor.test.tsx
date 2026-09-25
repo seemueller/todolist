@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TagFilterEditor } from "./TagFilterEditor";
 import type { TagFilter } from "./tagFilter";
+import { MAX_TAG_CHARS } from "./types";
 
 function setup(filter: TagFilter | null, knownTags = ["frontend", "blocked"]) {
   const props = { onSave: vi.fn(), onDelete: vi.fn(), onClose: vi.fn() };
@@ -65,6 +66,61 @@ describe("TagFilterEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByText("Regel 1: Tag fehlt.")).toBeInTheDocument();
+  });
+
+  it("meldet nur Leerraum als fehlenden Tag", () => {
+    const { onSave } = setup(null);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "N" } });
+    fireEvent.change(screen.getByLabelText("Regel 1 Tag"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByText("Regel 1: Tag fehlt.")).toBeInTheDocument();
+  });
+
+  it("meldet einen zu langen Tag als zu lang, nicht als fehlend", () => {
+    const { onSave } = setup(null);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "N" } });
+    fireEvent.change(screen.getByLabelText("Regel 1 Tag"), {
+      target: { value: "x".repeat(MAX_TAG_CHARS + 1) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(`Regel 1: Tag ist länger als ${MAX_TAG_CHARS} Zeichen.`)
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Regel 1: Tag fehlt.")).toBeNull();
+  });
+
+  it("raeumt die Fehlermeldung weg, sobald der Name geaendert wird", () => {
+    setup(null);
+    fireEvent.change(screen.getByLabelText("Regel 1 Tag"), { target: { value: "a" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByText("Der Filter braucht einen Namen.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "N" } });
+    expect(screen.queryByText("Der Filter braucht einen Namen.")).toBeNull();
+  });
+
+  it("raeumt die Fehlermeldung weg, sobald eine Regel geaendert wird", () => {
+    setup(null);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "N" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByText("Regel 1: Tag fehlt.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Regel 1 Tag"), { target: { value: "a" } });
+    expect(screen.queryByText("Regel 1: Tag fehlt.")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Regel 1 Tag"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByText("Regel 1: Tag fehlt.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Regel 1 Art"), { target: { value: "untagged" } });
+    expect(screen.queryByText("Regel 1: Tag fehlt.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Regel hinzufügen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByText("Regel 2: Tag fehlt.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Regel 2 entfernen" }));
+    expect(screen.queryByText("Regel 2: Tag fehlt.")).toBeNull();
   });
 
   it("markiert einen Tag, den keine Aufgabe traegt", () => {

@@ -4,7 +4,7 @@
 // Eigene Datei, weil App.tsx schon zu gross ist.
 
 import { useId, useRef, useState } from "react";
-import { normalizeTag } from "./types";
+import { MAX_TAG_CHARS, normalizeTag } from "./types";
 import { newTagFilterId, type TagFilter, type TagMatch, type TagRule } from "./tagFilter";
 import { FilterChip, IconButton, Modal, PlusIcon, TrashIcon } from "./ui";
 
@@ -54,17 +54,27 @@ export function TagFilterEditor({ filter, knownTags, onSave, onDelete, onClose }
   const nextKey = useRef(rules.length);
   const [error, setError] = useState<string | null>(null);
 
+  // Jede Aenderung am Entwurf raeumt die Fehlermeldung weg -- sie beschreibt
+  // den Stand beim letzten Speichern, und der ist dann nicht mehr der aktuelle.
+  function changeName(value: string) {
+    setName(value);
+    setError(null);
+  }
+
   function updateRule(key: number, change: Partial<DraftRule>) {
     setRules((prev) => prev.map((rule) => (rule.key === key ? { ...rule, ...change } : rule)));
+    setError(null);
   }
 
   function addRule() {
     const key = nextKey.current++;
     setRules((prev) => [...prev, { key, kind: "has", tag: "" }]);
+    setError(null);
   }
 
   function removeRule(key: number) {
     setRules((prev) => prev.filter((rule) => rule.key !== key));
+    setError(null);
   }
 
   function handleSave() {
@@ -81,7 +91,14 @@ export function TagFilterEditor({ filter, knownTags, onSave, onDelete, onClose }
       }
       const tag = normalizeTag(rule.tag);
       if (tag === null) {
-        setError(`Regel ${index + 1}: Tag fehlt.`);
+        // normalizeTag sagt nur "kein Tag" -- ob nichts da war oder zu viel,
+        // entscheidet hier der Rohtext. Leerraum wie in normalizeTag, also mit
+        // U+0085 und U+FEFF, die trim() anders behandelt.
+        setError(
+          rule.tag.replace(/[\s\u0085\uFEFF]/g, "") === ""
+            ? `Regel ${index + 1}: Tag fehlt.`
+            : `Regel ${index + 1}: Tag ist länger als ${MAX_TAG_CHARS} Zeichen.`
+        );
         return;
       }
       built.push({ kind: rule.kind, tag });
@@ -105,7 +122,7 @@ export function TagFilterEditor({ filter, knownTags, onSave, onDelete, onClose }
             type="text"
             value={name}
             autoFocus
-            onChange={(e) => setName(e.currentTarget.value)}
+            onChange={(e) => changeName(e.currentTarget.value)}
           />
         </div>
 
