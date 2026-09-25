@@ -430,4 +430,16 @@ describe("TodoDetailModal tags", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sichern" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(7, { tags: ["frontend"] }));
   });
+
+  it("nimmt den getippten Tag bei Strg+Enter mit", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <TodoDetailModal todo={makeTodo()} categories={categories} onSave={onSave} onClose={() => {}} />
+    );
+
+    const field = screen.getByLabelText("Tags");
+    fireEvent.change(field, { target: { value: "frontend" } });
+    fireEvent.keyDown(field, { key: "Enter", ctrlKey: true });
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(7, { tags: ["frontend"] }));
+  });
 });

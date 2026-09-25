@@ -12,10 +12,10 @@
 
 import { useState } from "react";
 import type { KeyboardEvent } from "react";
-import { Category, Todo, type TodoType } from "./types";
+import { Category, Todo, normalizeTags, type TodoType } from "./types";
 import type { TodoFieldsPatch } from "./storeTypes";
 import { loadTodoModalSize, saveTodoModalSize } from "./listPrefs";
-import { TagInput } from "./TagInput";
+import { TagInput, draftTags } from "./TagInput";
 import {
   CategorySelect,
   IconButton,
@@ -59,6 +59,11 @@ export function TodoDetailModal({
   const [dueDate, setDueDate] = useState(todo.due_date ?? "");
   const [categoryId, setCategoryId] = useState<number | null>(todo.category_id);
   const [tags, setTags] = useState<string[]>(todo.tags);
+  // Der getippte, noch nicht uebernommene Tag. Er liegt hier und nicht im
+  // Tag-Feld, damit Strg+Enter ihn mitsichert: das Feld wird dabei nicht
+  // verlassen, und ein setState im selben Tastendruck saehe `handleSave` noch
+  // nicht.
+  const [tagDraft, setTagDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   // Das Fenster oeffnet im Lesemodus: laengere Beschreibungen sind als
@@ -97,11 +102,14 @@ export function TodoDetailModal({
     const nextDueDate = dueDate || null;
     if (nextDueDate !== original.due_date) patch.dueDate = nextDueDate;
     if (categoryId !== original.category_id) patch.categoryId = categoryId;
+    // Ein offener Entwurf zaehlt mit; ein unbrauchbarer (zu lang) faellt weg.
     // Beide Seiten sind normalisiert und sortiert, ein Vergleich Stelle fuer
     // Stelle reicht also.
+    const nextTags = normalizeTags([...tags, ...draftTags(tagDraft)]);
     const tagsChanged =
-      tags.length !== original.tags.length || tags.some((tag, i) => tag !== original.tags[i]);
-    if (tagsChanged) patch.tags = tags;
+      nextTags.length !== original.tags.length ||
+      nextTags.some((tag, i) => tag !== original.tags[i]);
+    if (tagsChanged) patch.tags = nextTags;
     return patch;
   }
 
@@ -247,6 +255,8 @@ export function TodoDetailModal({
             value={tags}
             suggestions={tagSuggestions}
             onValueChange={setTags}
+            draft={tagDraft}
+            onDraftChange={setTagDraft}
           />
         </div>
 

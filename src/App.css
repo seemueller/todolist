@@ -846,8 +846,8 @@ a:hover {
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  border: var(--border);
-  border-radius: var(--radius-md);
+  border: var(--border-thin);
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
