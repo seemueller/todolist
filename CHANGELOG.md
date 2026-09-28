@@ -2,6 +2,11 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.21.1] - 2026-09-28
+
+### Behoben
+- Das Datumsfeld im Detailfenster steht jetzt als Pille neben Typ und Kategorie. Das aufklappende Monatsblatt zeigt den gewählten Tag in der Akzentfarbe, und ohne Datum steht der Platzhalter blass wie in den übrigen Textfeldern.
+
 ## [0.21.0] - 2026-09-28
 
 ### Behoben

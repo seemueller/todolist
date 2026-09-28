@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.21.0";
+export const APP_VERSION = "0.21.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,11 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.21.1",
+    date: "2026-09-28",
+    changes: ["Datumsfeld im Detailfenster als Pille, Kalender in der Akzentfarbe"],
+  },
   {
     version: "0.21.0",
     date: "2026-09-28",
