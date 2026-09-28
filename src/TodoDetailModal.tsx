@@ -226,7 +226,7 @@ export function TodoDetailModal({
             <label htmlFor="todo-detail-due">Fällig</label>
             <input
               id="todo-detail-due"
-              className="edit-date-input"
+              className={dueDate ? "edit-date-input" : "edit-date-input date-empty"}
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.currentTarget.value)}
