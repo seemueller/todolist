@@ -707,16 +707,48 @@ a:hover {
   box-shadow: var(--shadow-sm);
 }
 
+/* Dieselbe Pille wie Typ und Kategorie daneben im Detailfenster. */
 .edit-date-input {
-  padding: 6px 10px;
-  border: var(--border-thin);
-  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  border: var(--border);
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--ink);
   font-family: inherit;
   font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
   outline: none;
+}
+
+.edit-date-input:hover {
+  background: var(--highlight);
+}
+
+/* Das aufklappende Monatsblatt zeichnet der Browser selbst; per CSS
+   erreichbar sind nur Farbschema und Akzentfarbe (gewaehlter Tag). */
+input[type='date'] {
+  color-scheme: light;
+  accent-color: var(--accent);
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+input[type='date']::-webkit-calendar-picker-indicator:hover {
+  background-color: var(--canvas-sunken);
+}
+
+/* Ohne Datum steht der Platzhalter (TT.MM.JJJJ) blass wie in den
+   Textfeldern. */
+input[type='date'].date-empty::-webkit-datetime-edit {
+  color: var(--ink-faint);
 }
 
 /* Badges */

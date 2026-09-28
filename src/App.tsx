@@ -877,7 +877,7 @@ function App({ migrationError = null }: AppProps) {
           />
           <input
             type="date"
-            className="date-input"
+            className={newDueDate ? "date-input" : "date-input date-empty"}
             value={newDueDate}
             onChange={(e) => setNewDueDate(e.currentTarget.value)}
             title="Fälligkeitsdatum (optional)"
