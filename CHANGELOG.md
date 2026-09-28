@@ -2,6 +2,11 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.21.0] - 2026-09-28
+
+### Behoben
+- Die Auswahl des Tag-Filters, die Regelart im Tag-Filter-Editor und die Typ-Auswahl im Detailfenster standen im Browser-Standard; sie tragen jetzt dieselbe Pille wie die übrigen Auswahlfelder.
+
 ## [0.20.0] - 2026-09-25
 
 ### Hinzugefügt
