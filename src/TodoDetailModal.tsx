@@ -219,9 +219,6 @@ export function TodoDetailModal({
         <div className="todo-modal-row">
           <div className="todo-modal-field">
             <label htmlFor="todo-detail-type">Typ</label>
-            {/* .type-select hat ausserhalb von .add-form keine eigene Regel:
-                die Felder der Zeile stehen hier nackt und gleich breit
-                nebeneinander. */}
             <TypeSelect id="todo-detail-type" value={type} onValueChange={setType} />
           </div>
 
