@@ -2,6 +2,11 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.22.0] - 2026-10-26
+
+### Hinzugefügt
+- Eine neue Aufgabe startet in dem, worauf die Ansicht gerade filtert: Steht das Brett auf genau einer Kategorie oder auf einem Typ, sind beide im Formular vorausgewählt; in der Liste übernimmt das Formular die Kategorie aus dem Filter. So verschwindet die Aufgabe nicht gleich nach dem Anlegen aus der Ansicht.
+
 ## [0.21.1] - 2026-09-28
 
 ### Behoben

@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.21.1";
+export const APP_VERSION = "0.22.0";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,11 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.22.0",
+    date: "2026-10-26",
+    changes: ["Neue Aufgabe übernimmt Kategorie und Typ aus dem aktiven Filter"],
+  },
   {
     version: "0.21.1",
     date: "2026-09-28",
