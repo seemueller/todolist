@@ -231,6 +231,31 @@ function App({ migrationError = null }: AppProps) {
   // Liste: wer im Brett auf Bugs schaut, will die Liste nicht mit umstellen.
   const [boardType, setBoardType] = useState<TypeFilterValue>("all");
 
+  // Eine neue Aufgabe startet in der Kategorie und dem Typ, auf die die Ansicht
+  // gerade filtert -- sonst verschwaende sie gleich nach dem Anlegen aus ihr.
+  // Im Brett nur bei genau einer Kategorie; bei mehreren bleibt das Feld leer,
+  // welche waere gemeint? Den Typ belegt nur der Filter des Bretts vor.
+  const defaultNewCategoryId =
+    viewMode === "list"
+      ? categoryFilter
+      : viewMode === "kanban" && boardCategories.size === 1
+        ? (boardCategories.values().next().value ?? null)
+        : null;
+  const defaultNewType: TodoType = viewMode === "kanban" && boardType !== "all" ? boardType : "task";
+  // Waehrend des Renderns angeglichen statt in einem Effekt: so steht die
+  // Vorbelegung schon im selben Durchlauf im Formular. Nur beim Wechsel des
+  // Filters -- eine von Hand gewaehlte Auswahl bleibt sonst stehen.
+  const [prevDefaultNewCategoryId, setPrevDefaultNewCategoryId] = useState(defaultNewCategoryId);
+  if (prevDefaultNewCategoryId !== defaultNewCategoryId) {
+    setPrevDefaultNewCategoryId(defaultNewCategoryId);
+    setNewCategoryId(defaultNewCategoryId);
+  }
+  const [prevDefaultNewType, setPrevDefaultNewType] = useState(defaultNewType);
+  if (prevDefaultNewType !== defaultNewType) {
+    setPrevDefaultNewType(defaultNewType);
+    setNewType(defaultNewType);
+  }
+
   const toggleBoardCategory = useCallback((id: number | null) => {
     setBoardCategories((prev) => {
       const next = new Set(prev);
@@ -428,9 +453,9 @@ function App({ migrationError = null }: AppProps) {
       const todo = await addTodo(title, dueDate, newCategoryId, undefined, newType);
       setTodos((prev) => [todo, ...prev]);
       setNewTitle("");
-      setNewType("task");
+      setNewType(defaultNewType);
       setNewDueDate("");
-      setNewCategoryId(null);
+      setNewCategoryId(defaultNewCategoryId);
       setError(null);
     } catch (err) {
       setError(String(err));

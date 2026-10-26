@@ -1322,6 +1322,75 @@ describe("der Kategorie-Filter im Brett", () => {
     expect(screen.getByText("Aufgabe ohne Kategorie")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Alle Kategorien" })).toHaveClass("active");
   });
+
+  /** Legt ueber das Formular eine Aufgabe an. */
+  function submitNewTodo(title: string) {
+    fireEvent.change(screen.getByPlaceholderText(/Was steht an/i), { target: { value: title } });
+    fireEvent.click(screen.getByRole("button", { name: /Aufgabe hinzufügen/i }));
+  }
+
+  // Sonst verschwaende die neue Karte sofort aus dem gefilterten Brett.
+  it("belegt die Kategorie einer neuen Aufgabe mit dem Brett-Filter vor", async () => {
+    vi.mocked(db.addTodo).mockResolvedValue(
+      makeTodo({ id: 4, title: "Neu", category_id: 1, category_name: "Arbeit" }),
+    );
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    submitNewTodo("Neu");
+
+    await waitFor(() =>
+      expect(db.addTodo).toHaveBeenCalledWith("Neu", null, 1, undefined, "task"),
+    );
+    // Auch die naechste Aufgabe startet wieder in der gefilterten Kategorie.
+    vi.mocked(db.addTodo).mockClear();
+    submitNewTodo("Noch eine");
+    await waitFor(() =>
+      expect(db.addTodo).toHaveBeenCalledWith("Noch eine", null, 1, undefined, "task"),
+    );
+  });
+
+  it("belegt bei mehreren gewaehlten Kategorien nichts vor", async () => {
+    vi.mocked(db.addTodo).mockResolvedValue(makeTodo({ id: 4, title: "Neu" }));
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Privat" }));
+    submitNewTodo("Neu");
+
+    await waitFor(() =>
+      expect(db.addTodo).toHaveBeenCalledWith("Neu", null, null, undefined, "task"),
+    );
+  });
+
+  it("nimmt die Vorbelegung zurueck, wenn der Filter wieder auf 'Alle' steht", async () => {
+    vi.mocked(db.addTodo).mockResolvedValue(makeTodo({ id: 4, title: "Neu" }));
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kategorie Arbeit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Alle Kategorien" }));
+    submitNewTodo("Neu");
+
+    await waitFor(() =>
+      expect(db.addTodo).toHaveBeenCalledWith("Neu", null, null, undefined, "task"),
+    );
+  });
+
+  it("belegt die Kategorie einer neuen Aufgabe mit dem Listen-Filter vor", async () => {
+    vi.mocked(db.addTodo).mockResolvedValue(
+      makeTodo({ id: 4, title: "Neu", category_id: 2, category_name: "Privat" }),
+    );
+    const { container } = render(<App />);
+    await waitFor(() => expect(screen.getByText("Arbeit-Aufgabe")).toBeInTheDocument());
+
+    const filter = container.querySelector("select.filter-select") as HTMLSelectElement;
+    fireEvent.change(filter, { target: { value: "2" } });
+    submitNewTodo("Neu");
+
+    await waitFor(() =>
+      expect(db.addTodo).toHaveBeenCalledWith("Neu", null, 2, undefined, "task"),
+    );
+  });
 });
 
 describe("der Typ-Filter im Brett", () => {
@@ -1370,6 +1439,33 @@ describe("der Typ-Filter im Brett", () => {
     expect(await screen.findByText("Aufraeumen")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Typ Alle" })).toHaveClass("active");
     expect(localStorage.getItem("todolist.typeFilter")).not.toBe("bug");
+  });
+
+  it("belegt den Typ einer neuen Aufgabe mit dem Brett-Filter vor", async () => {
+    vi.mocked(db.addTodo).mockResolvedValue(makeTodo({ id: 4, title: "Neu", type: "bug" }));
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Typ Bug" }));
+    fireEvent.change(screen.getByPlaceholderText(/Was steht an/i), { target: { value: "Neu" } });
+    fireEvent.click(screen.getByRole("button", { name: /Aufgabe hinzufügen/i }));
+
+    await waitFor(() =>
+      expect(db.addTodo).toHaveBeenCalledWith("Neu", null, null, undefined, "bug"),
+    );
+  });
+
+  it("startet nach 'Alle' wieder mit dem Typ Aufgabe", async () => {
+    vi.mocked(db.addTodo).mockResolvedValue(makeTodo({ id: 4, title: "Neu" }));
+    await renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Typ Bug" }));
+    fireEvent.click(screen.getByRole("button", { name: "Typ Alle" }));
+    fireEvent.change(screen.getByPlaceholderText(/Was steht an/i), { target: { value: "Neu" } });
+    fireEvent.click(screen.getByRole("button", { name: /Aufgabe hinzufügen/i }));
+
+    await waitFor(() =>
+      expect(db.addTodo).toHaveBeenCalledWith("Neu", null, null, undefined, "task"),
+    );
   });
 });
 
