@@ -2,6 +2,11 @@
 
 Alle bemerkenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.22.1] - 2026-11-19
+
+### Sicherheit
+- Abhängigkeiten mit bekannten Sicherheitslücken aktualisiert (vite, rustls und weitere). Der Updater kommt ohne Zip-Unterstützung aus, die er nie gebraucht hat; damit entfällt die betroffene Zip-Bibliothek ganz.
+
 ## [0.22.0] - 2026-10-26
 
 ### Hinzugefügt

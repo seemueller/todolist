@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.22.0";
+export const APP_VERSION = "0.22.1";
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,11 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.22.1",
+    date: "2026-11-19",
+    changes: ["Abhängigkeiten mit Sicherheitslücken aktualisiert"],
+  },
   {
     version: "0.22.0",
     date: "2026-10-26",
